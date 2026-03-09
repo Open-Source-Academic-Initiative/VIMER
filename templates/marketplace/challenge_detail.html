@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}{{ challenge.title }} - VIMER{% endblock %}
+{% block content %}
+<h2>{{ challenge.title }}</h2>
+<div class="card">
+    <p>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></p>
+    <p>NIT: {{ challenge.publisher.nit }}</p>
+    <hr>
+    <h3>Descripción</h3>
+    <p>{{ challenge.description|linebreaks }}</p>
+</div>
+
+{% if user.organization.role == 'OFERENTE' %}
+    <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Aplicar al Desafío</a>
+{% endif %}
+
+{% if user.organization == challenge.publisher %}
+    <h3>Interesados en este desafío:</h3>
+    <ul>
+        {% for app in challenge.applications.all %}
+            <li><strong>{{ app.applicant.business_name }}:</strong> {{ app.proposal_text|truncatewords:20 }}</li>
+        {% empty %}
+            <li>Aún no hay propuestas para este desafío.</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<p><a href="{% url 'marketplace:challenge-list' %}">Volver a la lista</a></p>
+{% endblock %}

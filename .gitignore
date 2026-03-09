@@ -1,0 +1,8 @@
+contexto_ini.md
+.env
+db.sqlite3
+__pycache__/
+media/
+static/
+usuarios_prueba.txt
+resumen_sesion.md
