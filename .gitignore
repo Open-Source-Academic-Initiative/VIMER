@@ -1,8 +1,57 @@
-contexto_ini.md
-.env
-db.sqlite3
+# Django/Python - Estándar de Buenas Prácticas
+*.py[cod]
+*$py.class
 __pycache__/
+*.so
+
+# Entornos Virtuales (CRÍTICO)
+.venv/
+venv/
+ENV/
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Configuración y Secretos
+.env
+.python-version
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Medios y Estáticos (Carga de usuario)
 media/
+staticfiles/
 static/
+!static/.gitkeep
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Archivos de la sesión (vimer)
+server.log
+contexto_ini.md
 usuarios_prueba.txt
 resumen_sesion.md
+django_skill.md
+django-report.md
+django_skill.md
+django-report.md
