@@ -1,4 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView
 from django.urls import reverse_lazy
 from .models import Challenge, Application
@@ -41,8 +42,17 @@ class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
     template_name = 'marketplace/application_form.html'
     success_url = reverse_lazy('marketplace:challenge-list')
 
+    def get_challenge(self):
+        if not hasattr(self, '_challenge'):
+            self._challenge = get_object_or_404(Challenge, pk=self.kwargs['pk'])
+        return self._challenge
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['challenge'] = self.get_challenge()
+        return context
+
     def form_valid(self, form):
-        challenge = Challenge.objects.get(pk=self.kwargs['pk'])
-        form.instance.challenge = challenge
+        form.instance.challenge = self.get_challenge()
         form.instance.applicant = self.request.user.organization
         return super().form_valid(form)

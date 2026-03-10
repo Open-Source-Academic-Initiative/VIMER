@@ -48,11 +48,6 @@ static/
 
 # Archivos de la sesión (vimer)
 server.log
-contexto_ini.md
 usuarios_prueba.txt
-resumen_sesion.md
 django_skill.md
 django-report.md
-django_skill.md
-django-report.md
-STATUS.md

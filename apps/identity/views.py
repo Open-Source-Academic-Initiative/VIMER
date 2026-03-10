@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.views import View
+from django import forms
 from .forms import RegistrationForm
 
 class SignUpView(View):
@@ -10,6 +11,12 @@ class SignUpView(View):
     def post(self, request):
         form = RegistrationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('login') # Redirigir al login público
+            try:
+                form.save()
+            except forms.ValidationError as exc:
+                for field, errors in exc.message_dict.items():
+                    for error in errors:
+                        form.add_error(field, error)
+            else:
+                return redirect('login') # Redirigir al login público
         return render(request, 'identity/signup.html', {'form': form})
