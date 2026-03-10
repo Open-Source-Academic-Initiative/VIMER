@@ -1,119 +1,119 @@
 # VIMER
 
-Documento autoritativo del proyecto. Este `README.md` consolida la documentación funcional, técnica y operativa de VIMER.
+This is the authoritative project document. This `README.md` consolidates VIMER's functional, technical, and operational documentation.
 
-## Resumen
+## Summary
 
-VIMER es un MVP en Django para conectar organizaciones demandantes y oferentes alrededor de retos de I+D+i.
+VIMER is a Django MVP designed to connect demand-side and supply-side organizations around R&D&I challenges.
 
-Estado actual:
-- Base funcional de desarrollo operativa.
-- Flujo principal implementado: registro, login, listado de desafíos, detalle, publicación de retos y postulación.
-- No está listo para producción: faltan endurecimiento de seguridad, pruebas más amplias y cierre de brechas operativas.
+Current status:
+- Working development baseline.
+- Main flow implemented: signup, login, challenge listing, challenge detail, challenge publishing, and application submission.
+- Not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be closed.
 
-## Dominio
+## Domain
 
-VIMER modela tres conceptos centrales:
-- `Organization`: entidad jurídica con rol de mercado único, `DEMANDANTE` u `OFERENTE`.
-- `Challenge`: reto o necesidad de I+D+i publicada por una organización demandante.
-- `Application`: propuesta técnica enviada por una organización oferente a un desafío.
+VIMER models three core concepts:
+- `Organization`: a legal entity with a single market role, either `DEMANDANTE` or `OFERENTE`.
+- `Challenge`: an R&D&I challenge or need published by a demand-side organization.
+- `Application`: a technical proposal submitted by a supply-side organization to a challenge.
 
-Lenguaje ubicuo:
-- Demandante: publica desafíos.
-- Oferente: postula soluciones.
-- Representante: usuario humano que opera en nombre de una organización.
+Ubiquitous language:
+- Demand-side organization: publishes challenges.
+- Supply-side organization: submits solutions.
+- Representative: a human user operating on behalf of an organization.
 
-## Arquitectura
+## Architecture
 
-El proyecto sigue una separación simple por apps:
+The project follows a simple app-based split:
 
 ```text
-config/          Configuración Django
-apps/identity/   Usuario personalizado, registro y autenticación
-apps/corporate/  Organizaciones y rol de mercado
-apps/marketplace/Desafíos y postulaciones
-templates/       Plantillas HTML
+config/           Django configuration
+apps/identity/    Custom user, signup, and authentication
+apps/corporate/   Organizations and market roles
+apps/marketplace/ Challenges and applications
+templates/        HTML templates
 ```
 
-Modelos principales:
-- `identity.User`: extiende `AbstractUser` y se vincula a `corporate.Organization`.
-- `corporate.Organization`: almacena NIT, razón social, rol y datos de contacto.
-- `marketplace.Challenge`: reto publicado por un demandante.
-- `marketplace.Application`: solución propuesta por un oferente.
+Main models:
+- `identity.User`: extends `AbstractUser` and links to `corporate.Organization`.
+- `corporate.Organization`: stores tax ID, legal name, market role, and contact data.
+- `marketplace.Challenge`: a challenge published by a demand-side organization.
+- `marketplace.Application`: a solution proposal submitted by a supply-side organization.
 
-## Funcionalidad implementada
+## Implemented functionality
 
-- Registro unificado de usuario y organización.
-- Login y logout.
-- Protección de marketplace para usuarios autenticados.
-- Navegación condicionada por rol.
-- Publicación de retos por organizaciones demandantes.
-- Postulación a retos por organizaciones oferentes.
-- Administración básica en Django admin.
-- Contenerización básica con `Dockerfile` y `docker-compose.yml`.
+- Unified user and organization signup.
+- Login and logout.
+- Marketplace access restricted to authenticated users.
+- Role-aware navigation.
+- Challenge publishing by demand-side organizations.
+- Challenge applications by supply-side organizations.
+- Basic Django admin integration.
+- Basic containerization with `Dockerfile` and `docker-compose.yml`.
 
-## Reglas de negocio vigentes
+## Current business rules
 
-- El NIT de una organización es único.
-- Solo organizaciones `DEMANDANTE` pueden publicar desafíos.
-- Solo organizaciones `OFERENTE` pueden aplicar a desafíos.
-- Una organización no puede aplicar dos veces al mismo desafío.
+- An organization's tax ID must be unique.
+- Only `DEMANDANTE` organizations can publish challenges.
+- Only `OFERENTE` organizations can apply to challenges.
+- An organization cannot apply twice to the same challenge.
 
-Las restricciones de rol están implementadas hoy sobre todo en lógica de aplicación y validaciones de modelo. No existe todavía una capa completa de constraints de base de datos para todas las invariantes del dominio.
+Role restrictions are currently enforced mainly through application logic and model validation. There is not yet a full database-level constraint layer for all domain invariants.
 
-## Estado real del proyecto
+## Actual project state
 
-Fortalezas:
-- El proyecto arranca y `python manage.py check` no reporta errores.
-- El repositorio está estructurado y la rama actual es `foundation`.
-- El dominio central ya está modelado y navegable.
+Strengths:
+- The project starts correctly and `python manage.py check` reports no errors.
+- The repository is structured and the current branch is `foundation`.
+- The core domain is already modeled and navigable.
 
-Limitaciones actuales:
-- El perfil por defecto sigue siendo de desarrollo.
-- La seguridad de despliegue depende de variables de entorno correctas.
-- No hay todavía una suite de pruebas amplia.
-- Se usa SQLite como base por defecto.
+Current limitations:
+- The default profile is still development-oriented.
+- Deployment security still depends on correct environment configuration.
+- Test coverage is still limited.
+- SQLite is still the default database.
 
-## Correcciones aplicadas en esta consolidación
+## Fixes applied during this consolidation
 
-Se corrigieron fallos prioritarios detectados durante la auditoría:
-- Se añadió la plantilla faltante para crear desafíos.
-- Se corrigió el logout para usar `POST`, evitando el `405` del enlace por `GET`.
-- Se pasó el desafío al contexto del formulario de postulación.
-- El registro ahora solicita y guarda `contact_phone`, alineado con el modelo.
-- Se definió `ASGI_APPLICATION`.
-- `ALLOWED_HOSTS` tiene un default local seguro y compatible con pruebas (`localhost`, `127.0.0.1`, `[::1]`, `testserver`).
-- Se agregaron pruebas mínimas para los flujos más críticos.
+Priority issues identified during the audit were fixed:
+- Added the missing challenge creation template.
+- Changed logout to use `POST`, avoiding the previous `405` from a `GET` link.
+- Passed the selected challenge into the application form context.
+- Signup now collects and stores `contact_phone`, aligned with the model.
+- Added `ASGI_APPLICATION`.
+- `ALLOWED_HOSTS` now has a safe local default compatible with tests (`localhost`, `127.0.0.1`, `[::1]`, `testserver`).
+- Added minimal tests for the most critical flows.
 
-## Rutas principales
+## Main routes
 
-- `/signup/`: registro de usuario y organización
-- `/login/`: inicio de sesión
-- `/logout/`: cierre de sesión por `POST`
-- `/marketplace/`: listado de desafíos
-- `/marketplace/challenge/create/`: creación de desafío
-- `/marketplace/challenge/<id>/`: detalle de desafío
-- `/marketplace/challenge/<id>/apply/`: envío de propuesta
-- `/admin/`: administración
+- `/signup/`: user and organization signup
+- `/login/`: login
+- `/logout/`: logout via `POST`
+- `/marketplace/`: challenge list
+- `/marketplace/challenge/create/`: challenge creation
+- `/marketplace/challenge/<id>/`: challenge detail
+- `/marketplace/challenge/<id>/apply/`: proposal submission
+- `/admin/`: administration
 
-## Requisitos
+## Requirements
 
 - Python 3.12+
 - Django 6.0.x
 - Pillow
 - django-environ
 
-Dependencias definidas en [requirements.txt](requirements.txt).
+Dependencies are defined in [requirements.txt](requirements.txt).
 
-## Configuración local
+## Local setup
 
-1. Crear entorno virtual e instalar dependencias.
-2. Definir `.env` si se necesitan valores explícitos.
-3. Ejecutar migraciones.
-4. Crear superusuario si hace falta.
-5. Levantar el servidor.
+1. Create a virtual environment and install dependencies.
+2. Define `.env` if explicit values are needed.
+3. Run migrations.
+4. Create a superuser if needed.
+5. Start the server.
 
-Comandos:
+Commands:
 
 ```bash
 python -m venv .venv
@@ -124,28 +124,28 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Variables de entorno relevantes:
+Relevant environment variables:
 - `SECRET_KEY`
 - `DEBUG`
 - `ALLOWED_HOSTS`
 - `DATABASE_URL`
 - `CSRF_TRUSTED_ORIGINS`
 
-Comportamiento por entorno:
-- Desarrollo: `DEBUG=True`, SQLite por defecto, cookies seguras desactivadas y `ALLOWED_HOSTS` locales automáticos.
-- Producción: requiere `SECRET_KEY`, permite `DATABASE_URL` externo y activa por defecto HSTS, cookies seguras y redirect a HTTPS salvo override explícito por entorno.
+Environment behavior:
+- Development: `DEBUG=True`, SQLite by default, secure cookies disabled, and local `ALLOWED_HOSTS` automatically included.
+- Production: requires `SECRET_KEY`, allows an external `DATABASE_URL`, and enables HSTS, secure cookies, and HTTPS redirect by default unless explicitly overridden by environment configuration.
 
 ## Docker
 
-El proyecto incluye:
+The project includes:
 - `Dockerfile`
 - `docker-compose.yml`
 
-Actualmente ambos usan `runserver`, por lo que sirven para desarrollo, no para producción.
+Both currently use `runserver`, so they are suitable for development, not production.
 
-## Verificación
+## Verification
 
-Comandos útiles:
+Useful commands:
 
 ```bash
 python manage.py check
@@ -153,15 +153,15 @@ python manage.py check --deploy
 python manage.py test
 ```
 
-## Pendientes prioritarios
+## Priority backlog
 
-- Endurecer configuración de producción (`DEBUG=False`, cookies seguras, HSTS, SSL redirect).
-- Migrar a un servidor y stack de producción reales.
-- Añadir más pruebas de permisos, validaciones y errores de negocio.
-- Evaluar constraints de base de datos para reforzar invariantes.
-- Mejorar UX de formularios y plantillas.
-- Definir estrategia de despliegue y persistencia más allá de SQLite.
+- Harden production configuration (`DEBUG=False`, secure cookies, HSTS, SSL redirect).
+- Move to a real production server and deployment stack.
+- Add more tests for permissions, validations, and business-rule failures.
+- Evaluate database constraints to reinforce domain invariants.
+- Improve form and template UX.
+- Define a persistence and deployment strategy beyond SQLite.
 
-## Notas de documentación
+## Documentation notes
 
-Este archivo reemplaza como referencia del proyecto a la documentación de estado dispersa previa. Los archivos Markdown auxiliares sobre Django 6.0 son notas de referencia local y no forman parte de la documentación funcional de VIMER.
+This file replaces the previous scattered status documents as the main project reference. The auxiliary Markdown files about Django 6.0 are local reference notes and are not part of VIMER's functional documentation.
