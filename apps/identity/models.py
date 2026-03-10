@@ -4,8 +4,8 @@ from django.utils.translation import gettext_lazy as _
 
 class User(AbstractUser):
     """
-    Modelo de usuario personalizado para VIMER.
-    Representa a la persona física que opera en nombre de una Organización.
+    Custom user model for VIMER.
+    Represents the human operator acting on behalf of an organization.
     """
     email = models.EmailField(_("email address"), unique=True)
     organization = models.ForeignKey(

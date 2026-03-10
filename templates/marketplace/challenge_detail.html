@@ -4,13 +4,13 @@
 <h2>{{ challenge.title }}</h2>
 <div class="card">
     <p>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></p>
-    <p>NIT: {{ challenge.publisher.nit }}</p>
+    <p>NIT: {{ challenge.publisher.tax_id }}</p>
     <hr>
     <h3>Descripción</h3>
     <p>{{ challenge.description|linebreaks }}</p>
 </div>
 
-{% if user.organization.role == 'OFERENTE' %}
+{% if user.organization.role == 'SUPPLY_SIDE' %}
     <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Aplicar al Desafío</a>
 {% endif %}
 

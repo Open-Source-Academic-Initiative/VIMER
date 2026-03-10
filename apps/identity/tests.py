@@ -8,14 +8,14 @@ class RegistrationFlowTests(TestCase):
         response = self.client.post(
             reverse("signup"),
             {
-                "username": "nuevo_usuario",
+                "username": "new_user",
                 "email": "nuevo@example.com",
-                "first_name": "Nuevo",
-                "last_name": "Usuario",
-                "nit": "900123456",
-                "business_name": "Org Nueva",
+                "first_name": "New",
+                "last_name": "User",
+                "tax_id": "900123456",
+                "business_name": "New Org",
                 "chamber_of_commerce": "CC-123",
-                "role": "OFERENTE",
+                "role": "SUPPLY_SIDE",
                 "contact_phone": "3001234567",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
@@ -23,22 +23,22 @@ class RegistrationFlowTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("login"))
-        user = get_user_model().objects.get(username="nuevo_usuario")
-        self.assertEqual(user.organization.business_name, "Org Nueva")
+        user = get_user_model().objects.get(username="new_user")
+        self.assertEqual(user.organization.business_name, "New Org")
         self.assertEqual(user.organization.contact_phone, "3001234567")
 
-    def test_signup_rejects_duplicate_nit_as_form_error(self):
+    def test_signup_rejects_duplicate_tax_id_as_form_error(self):
         self.client.post(
             reverse("signup"),
             {
-                "username": "primer_usuario",
-                "email": "primer@example.com",
-                "first_name": "Primer",
-                "last_name": "Usuario",
-                "nit": "900999999",
-                "business_name": "Org Base",
+                "username": "first_user",
+                "email": "first@example.com",
+                "first_name": "First",
+                "last_name": "User",
+                "tax_id": "900999999",
+                "business_name": "Base Org",
                 "chamber_of_commerce": "CC-BASE",
-                "role": "OFERENTE",
+                "role": "SUPPLY_SIDE",
                 "contact_phone": "3000000000",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
@@ -48,14 +48,14 @@ class RegistrationFlowTests(TestCase):
         response = self.client.post(
             reverse("signup"),
             {
-                "username": "segundo_usuario",
-                "email": "segundo@example.com",
-                "first_name": "Segundo",
-                "last_name": "Usuario",
-                "nit": "900999999",
-                "business_name": "Org Duplicada",
+                "username": "second_user",
+                "email": "second@example.com",
+                "first_name": "Second",
+                "last_name": "User",
+                "tax_id": "900999999",
+                "business_name": "Duplicate Org",
                 "chamber_of_commerce": "CC-DUP",
-                "role": "OFERENTE",
+                "role": "SUPPLY_SIDE",
                 "contact_phone": "3111111111",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
@@ -65,7 +65,7 @@ class RegistrationFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFormError(
             response.context["form"],
-            "nit",
+            "tax_id",
             "Ya existe una organización registrada con este NIT.",
         )
 
@@ -73,14 +73,14 @@ class RegistrationFlowTests(TestCase):
         response = self.client.post(
             reverse("signup"),
             {
-                "username": "usuario_debil",
+                "username": "weak_user",
                 "email": "debil@example.com",
-                "first_name": "Debil",
+                "first_name": "Weak",
                 "last_name": "Password",
-                "nit": "901234567",
-                "business_name": "Org Debil",
+                "tax_id": "901234567",
+                "business_name": "Weak Org",
                 "chamber_of_commerce": "CC-WEAK",
-                "role": "OFERENTE",
+                "role": "SUPPLY_SIDE",
                 "contact_phone": "3222222222",
                 "password": "123",
                 "confirm_password": "123",
@@ -88,7 +88,7 @@ class RegistrationFlowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(get_user_model().objects.filter(username="usuario_debil").exists())
+        self.assertFalse(get_user_model().objects.filter(username="weak_user").exists())
         self.assertTrue(response.context["form"].errors.get("password"))
 
     def test_logout_requires_post_and_redirects(self):

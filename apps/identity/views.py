@@ -18,5 +18,5 @@ class SignUpView(View):
                     for error in errors:
                         form.add_error(field, error)
             else:
-                return redirect('login') # Redirigir al login público
+                return redirect('login')  # Redirect to the public login page.
         return render(request, 'identity/signup.html', {'form': form})

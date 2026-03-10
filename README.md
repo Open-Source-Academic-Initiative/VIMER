@@ -14,7 +14,7 @@ Current status:
 ## Domain
 
 VIMER models three core concepts:
-- `Organization`: a legal entity with a single market role, either `DEMANDANTE` or `OFERENTE`.
+- `Organization`: a legal entity with a single market role, either `DEMAND_SIDE` or `SUPPLY_SIDE`.
 - `Challenge`: an R&D&I challenge or need published by a demand-side organization.
 - `Application`: a technical proposal submitted by a supply-side organization to a challenge.
 
@@ -55,8 +55,8 @@ Main models:
 ## Current business rules
 
 - An organization's tax ID must be unique.
-- Only `DEMANDANTE` organizations can publish challenges.
-- Only `OFERENTE` organizations can apply to challenges.
+- Only `DEMAND_SIDE` organizations can publish challenges.
+- Only `SUPPLY_SIDE` organizations can apply to challenges.
 - An organization cannot apply twice to the same challenge.
 
 Role restrictions are currently enforced mainly through application logic and model validation. There is not yet a full database-level constraint layer for all domain invariants.

@@ -7,14 +7,14 @@ from .models import User
 from apps.corporate.models import Organization
 
 class RegistrationForm(forms.ModelForm):
-    # Campos de Organización
-    nit = forms.CharField(max_length=20, label="NIT de la Organización")
+    # Organization fields
+    tax_id = forms.CharField(max_length=20, label="NIT de la Organización")
     business_name = forms.CharField(max_length=255, label="Razón Social")
     chamber_of_commerce = forms.CharField(max_length=100, label="Registro Cámara de Comercio")
     role = forms.ChoiceField(choices=Organization.MarketRole.choices, label="Rol en la Plataforma")
     contact_phone = forms.CharField(max_length=20, label="Teléfono de Contacto")
     
-    # Campos de Usuario
+    # User fields
     password = forms.CharField(widget=forms.PasswordInput, label="Contraseña")
     confirm_password = forms.CharField(widget=forms.PasswordInput, label="Confirmar Contraseña")
 
@@ -22,11 +22,11 @@ class RegistrationForm(forms.ModelForm):
         model = User
         fields = ('username', 'email', 'first_name', 'last_name')
 
-    def clean_nit(self):
-        nit = self.cleaned_data["nit"].strip()
-        if Organization.objects.filter(nit=nit).exists():
+    def clean_tax_id(self):
+        tax_id = self.cleaned_data["tax_id"].strip()
+        if Organization.objects.filter(tax_id=tax_id).exists():
             raise forms.ValidationError("Ya existe una organización registrada con este NIT.")
-        return nit
+        return tax_id
 
     def clean(self):
         cleaned_data = super().clean()
@@ -52,9 +52,9 @@ class RegistrationForm(forms.ModelForm):
     @transaction.atomic
     def save(self):
         try:
-            # 1. Crear Organización
-            org = Organization.objects.create(
-                nit=self.cleaned_data['nit'],
+            # 1. Create organization
+            organization = Organization.objects.create(
+                tax_id=self.cleaned_data['tax_id'],
                 business_name=self.cleaned_data['business_name'],
                 chamber_of_commerce_record=self.cleaned_data['chamber_of_commerce'],
                 role=self.cleaned_data['role'],
@@ -63,12 +63,12 @@ class RegistrationForm(forms.ModelForm):
             )
         except IntegrityError as exc:
             raise forms.ValidationError(
-                {"nit": "Ya existe una organización registrada con este NIT."}
+                {"tax_id": "Ya existe una organización registrada con este NIT."}
             ) from exc
 
-        # 2. Crear Usuario
+        # 2. Create user
         user = super().save(commit=False)
         user.set_password(self.cleaned_data['password'])
-        user.organization = org
+        user.organization = organization
         user.save()
         return user

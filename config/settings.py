@@ -11,7 +11,7 @@ DEFAULT_ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", "testserver"]
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Leer .env
+# Load values from .env when present.
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 DEBUG = env('DEBUG', default=True)
@@ -20,7 +20,7 @@ if DEBUG:
 else:
     SECRET_KEY = env('SECRET_KEY', default=None)
     if not SECRET_KEY:
-        raise ImproperlyConfigured('SECRET_KEY es obligatoria cuando DEBUG=False.')
+        raise ImproperlyConfigured("SECRET_KEY is required when DEBUG=False.")
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=DEFAULT_ALLOWED_HOSTS)
 if DEBUG:
@@ -114,7 +114,7 @@ SECURE_REFERRER_POLICY = env(
 )
 X_FRAME_OPTIONS = env('X_FRAME_OPTIONS', default='DENY')
 
-# Modelo de Usuario Personalizado
+# Custom user model
 AUTH_USER_MODEL = 'identity.User'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'marketplace:challenge-list'

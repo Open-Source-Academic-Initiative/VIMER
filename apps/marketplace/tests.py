@@ -8,42 +8,42 @@ from apps.marketplace.models import Challenge
 
 class MarketplaceFlowTests(TestCase):
     def setUp(self):
-        self.demandante = Organization.objects.create(
-            nit="900000101",
-            business_name="Demandante Test",
+        self.demand_organization = Organization.objects.create(
+            tax_id="900000101",
+            business_name="Demand-side Test",
             chamber_of_commerce_record="CC-101",
-            role="DEMANDANTE",
-            contact_email="demandante@example.com",
+            role="DEMAND_SIDE",
+            contact_email="demand@example.com",
             contact_phone="1111111",
         )
-        self.oferente = Organization.objects.create(
-            nit="900000202",
-            business_name="Oferente Test",
+        self.supply_organization = Organization.objects.create(
+            tax_id="900000202",
+            business_name="Supply-side Test",
             chamber_of_commerce_record="CC-202",
-            role="OFERENTE",
-            contact_email="oferente@example.com",
+            role="SUPPLY_SIDE",
+            contact_email="supply@example.com",
             contact_phone="2222222",
         )
-        self.demandante_user = get_user_model().objects.create_user(
-            username="demandante_user",
-            email="demandante_user@example.com",
+        self.demand_user = get_user_model().objects.create_user(
+            username="demand_user",
+            email="demand_user@example.com",
             password="ClaveSegura123",
-            organization=self.demandante,
+            organization=self.demand_organization,
         )
-        self.oferente_user = get_user_model().objects.create_user(
-            username="oferente_user",
-            email="oferente_user@example.com",
+        self.supply_user = get_user_model().objects.create_user(
+            username="supply_user",
+            email="supply_user@example.com",
             password="ClaveSegura123",
-            organization=self.oferente,
+            organization=self.supply_organization,
         )
         self.challenge = Challenge.objects.create(
-            publisher=self.demandante,
-            title="Reto existente",
-            description="Descripcion del reto",
+            publisher=self.demand_organization,
+            title="Existing challenge",
+            description="Challenge description",
         )
 
-    def test_challenge_create_page_loads_for_demandante(self):
-        self.client.force_login(self.demandante_user)
+    def test_challenge_create_page_loads_for_demand_side_user(self):
+        self.client.force_login(self.demand_user)
 
         response = self.client.get(reverse("marketplace:challenge-create"))
 
@@ -51,7 +51,7 @@ class MarketplaceFlowTests(TestCase):
         self.assertTemplateUsed(response, "marketplace/challenge_form.html")
 
     def test_challenge_apply_page_includes_challenge_context(self):
-        self.client.force_login(self.oferente_user)
+        self.client.force_login(self.supply_user)
 
         response = self.client.get(
             reverse("marketplace:challenge-apply", args=[self.challenge.pk])

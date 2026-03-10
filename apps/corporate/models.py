@@ -3,10 +3,10 @@ from django.utils.translation import gettext_lazy as _
 
 class Organization(models.Model):
     class MarketRole(models.TextChoices):
-        DEMANDANTE = "DEMANDANTE", _("Demandante (Seeker)")
-        OFERENTE = "OFERENTE", _("Oferente (Provider)")
+        DEMAND_SIDE = "DEMAND_SIDE", _("Demandante")
+        SUPPLY_SIDE = "SUPPLY_SIDE", _("Oferente")
 
-    nit = models.CharField(_("NIT"), max_length=20, unique=True)
+    tax_id = models.CharField(_("NIT"), max_length=20, unique=True)
     business_name = models.CharField(_("Razón Social"), max_length=255)
     chamber_of_commerce_record = models.CharField(_("Registro Cámara de Comercio"), max_length=100)
     role = models.CharField(max_length=20, choices=MarketRole.choices)

@@ -5,13 +5,13 @@ from apps.corporate.models import Organization
 
 class Challenge(models.Model):
     """
-    Representa un desafío o necesidad de I+D+i publicado por un Demandante.
+    R&D&I challenge published by a demand-side organization.
     """
     publisher = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
         related_name="published_challenges",
-        limit_choices_to={'role': 'DEMANDANTE'}
+        limit_choices_to={'role': Organization.MarketRole.DEMAND_SIDE}
     )
     title = models.CharField(_("Título del Desafío"), max_length=255)
     description = models.TextField(_("Descripción del Reto / Necesidad"))
@@ -25,7 +25,7 @@ class Challenge(models.Model):
         ordering = ['-created_at']
 
     def clean(self):
-        if self.publisher and self.publisher.role != "DEMANDANTE":
+        if self.publisher and self.publisher.role != Organization.MarketRole.DEMAND_SIDE:
             raise ValidationError(_("Solo las organizaciones con rol Demandante pueden publicar desafíos."))
 
     def save(self, *args, **kwargs):
@@ -37,7 +37,7 @@ class Challenge(models.Model):
 
 class Application(models.Model):
     """
-    Representa una postulación o solución propuesta por un Oferente a un desafío.
+    Proposal submitted by a supply-side organization for a challenge.
     """
     challenge = models.ForeignKey(
         Challenge,
@@ -48,7 +48,7 @@ class Application(models.Model):
         Organization,
         on_delete=models.CASCADE,
         related_name="submitted_proposals",
-        limit_choices_to={'role': 'OFERENTE'}
+        limit_choices_to={'role': Organization.MarketRole.SUPPLY_SIDE}
     )
     proposal_text = models.TextField(_("Propuesta Tecnológica / Solución"))
     
@@ -60,7 +60,7 @@ class Application(models.Model):
         unique_together = ('challenge', 'applicant')
 
     def clean(self):
-        if self.applicant and self.applicant.role != "OFERENTE":
+        if self.applicant and self.applicant.role != Organization.MarketRole.SUPPLY_SIDE:
             raise ValidationError(_("Solo las organizaciones con rol Oferente pueden aplicar a desafíos."))
 
     def save(self, *args, **kwargs):

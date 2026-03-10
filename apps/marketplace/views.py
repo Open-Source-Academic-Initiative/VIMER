@@ -2,6 +2,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView
 from django.urls import reverse_lazy
+from apps.corporate.models import Organization
 from .models import Challenge, Application
 
 class RoleRequiredMixin(UserPassesTestMixin):
@@ -26,7 +27,7 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
 
 class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
     model = Challenge
-    role_required = 'DEMANDANTE'
+    role_required = Organization.MarketRole.DEMAND_SIDE
     fields = ['title', 'description']
     template_name = 'marketplace/challenge_form.html'
     success_url = reverse_lazy('marketplace:challenge-list')
@@ -37,7 +38,7 @@ class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
 
 class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
     model = Application
-    role_required = 'OFERENTE'
+    role_required = Organization.MarketRole.SUPPLY_SIDE
     fields = ['proposal_text']
     template_name = 'marketplace/application_form.html'
     success_url = reverse_lazy('marketplace:challenge-list')
