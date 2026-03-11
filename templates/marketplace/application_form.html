@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}Aplicar a Desafío - VIMER{% endblock %}
+{% block content %}
+<h2>Enviar Propuesta Tecnológica</h2>
+<h3>{{ challenge.title }}</h3>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Enviar Propuesta</button>
+</form>
+<p><a href="{% url 'marketplace:challenge-list' %}">Cancelar</a></p>
+{% endblock %}
