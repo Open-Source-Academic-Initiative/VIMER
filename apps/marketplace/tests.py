@@ -3,6 +3,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.corporate.models import Organization
+from apps.marketplace.application.commands import SubmitApplicationCommand
+from apps.marketplace.application.exceptions import DuplicateChallengeApplicationError
+from apps.marketplace.application.services import submit_challenge_application
 from apps.marketplace.models import Challenge
 
 
@@ -59,3 +62,44 @@ class MarketplaceFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["challenge"], self.challenge)
+
+
+class MarketplaceApplicationServiceTests(TestCase):
+    def setUp(self):
+        self.demand_organization = Organization.objects.create(
+            tax_id="903000001",
+            business_name="Demand Org",
+            chamber_of_commerce_record="CC-301",
+            role="DEMAND_SIDE",
+            contact_email="demand-app@example.com",
+            contact_phone="1111111",
+        )
+        self.supply_organization = Organization.objects.create(
+            tax_id="903000002",
+            business_name="Supply Org",
+            chamber_of_commerce_record="CC-302",
+            role="SUPPLY_SIDE",
+            contact_email="supply-app@example.com",
+            contact_phone="2222222",
+        )
+        self.challenge = Challenge.objects.create(
+            publisher=self.demand_organization,
+            title="Challenge",
+            description="Description",
+        )
+
+    def test_submit_application_rejects_duplicates(self):
+        command = SubmitApplicationCommand(proposal_text="Initial proposal")
+
+        submit_challenge_application(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            command=command,
+        )
+
+        with self.assertRaises(DuplicateChallengeApplicationError):
+            submit_challenge_application(
+                challenge=self.challenge,
+                applicant=self.supply_organization,
+                command=command,
+            )

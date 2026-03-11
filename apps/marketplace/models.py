@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import UniqueConstraint
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from apps.corporate.models import Organization
@@ -57,7 +58,12 @@ class Application(models.Model):
     class Meta:
         verbose_name = _("Postulación")
         verbose_name_plural = _("Postulaciones")
-        unique_together = ('challenge', 'applicant')
+        constraints = [
+            UniqueConstraint(
+                fields=["challenge", "applicant"],
+                name="unique_application_per_challenge_and_applicant",
+            ),
+        ]
 
     def clean(self):
         if self.applicant and self.applicant.role != Organization.MarketRole.SUPPLY_SIDE:

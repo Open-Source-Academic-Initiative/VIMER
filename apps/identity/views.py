@@ -1,22 +1,21 @@
-from django.shortcuts import render, redirect
-from django.views import View
-from django import forms
+from django.http import HttpResponseRedirect
+from django.urls import reverse_lazy
+from django.views.generic import FormView
+
+from apps.identity.application.exceptions import DuplicateTaxIdError
+from apps.identity.application.services import register_organization_user
 from .forms import RegistrationForm
 
-class SignUpView(View):
-    def get(self, request):
-        form = RegistrationForm()
-        return render(request, 'identity/signup.html', {'form': form})
+class SignUpView(FormView):
+    form_class = RegistrationForm
+    template_name = "identity/signup.html"
+    success_url = reverse_lazy("login")
 
-    def post(self, request):
-        form = RegistrationForm(request.POST)
-        if form.is_valid():
-            try:
-                form.save()
-            except forms.ValidationError as exc:
-                for field, errors in exc.message_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
-            else:
-                return redirect('login')  # Redirect to the public login page.
-        return render(request, 'identity/signup.html', {'form': form})
+    def form_valid(self, form):
+        try:
+            register_organization_user(form.to_command())
+        except DuplicateTaxIdError:
+            form.add_error("tax_id", "Ya existe una organización registrada con este NIT.")
+            return self.form_invalid(form)
+
+        return HttpResponseRedirect(self.get_success_url())

@@ -9,6 +9,9 @@ VIMER is a Django MVP designed to connect demand-side and supply-side organizati
 Current status:
 - Working development baseline.
 - Main flow implemented: signup, login, challenge listing, challenge detail, challenge publishing, and application submission.
+- Write-side use cases now run through explicit application services in `identity` and `marketplace`.
+- Application duplication is enforced with an explicit database constraint.
+- The automated test suite currently passes with 8 tests.
 - Not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be closed.
 
 ## Domain
@@ -35,6 +38,15 @@ apps/marketplace/ Challenges and applications
 templates/        HTML templates
 ```
 
+Use cases are orchestrated through explicit application services instead of embedding write-side workflow logic directly inside Django forms or generic ORM-backed views.
+
+Write-side application layer:
+
+```text
+apps/identity/application/     Registration command, exceptions, and service
+apps/marketplace/application/  Challenge publication and application services
+```
+
 Main models:
 - `identity.User`: extends `AbstractUser` and links to `corporate.Organization`.
 - `corporate.Organization`: stores tax ID, legal name, market role, and contact data.
@@ -59,14 +71,16 @@ Main models:
 - Only `SUPPLY_SIDE` organizations can apply to challenges.
 - An organization cannot apply twice to the same challenge.
 
-Role restrictions are currently enforced mainly through application logic and model validation. There is not yet a full database-level constraint layer for all domain invariants.
+Duplicate challenge applications are enforced both in domain validation and through an explicit `UniqueConstraint` at the database level. Role restrictions are still enforced mainly through application logic and model validation.
 
 ## Actual project state
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
+- `python manage.py test` currently passes with 8 tests.
 - The repository is structured and the current branch is `foundation`.
 - The core domain is already modeled and navigable.
+- The write side is now routed through explicit application services instead of form-bound persistence logic.
 
 Current limitations:
 - The default profile is still development-oriented.
@@ -83,7 +97,9 @@ Priority issues identified during the audit were fixed:
 - Signup now collects and stores `contact_phone`, aligned with the model.
 - Added `ASGI_APPLICATION`.
 - `ALLOWED_HOSTS` now has a safe local default compatible with tests (`localhost`, `127.0.0.1`, `[::1]`, `testserver`).
-- Added minimal tests for the most critical flows.
+- Added explicit application services for registration, challenge publication, and proposal submission.
+- Replaced `unique_together` on applications with an explicit `UniqueConstraint`.
+- Expanded automated coverage to 8 tests, including application-service behavior.
 
 ## Main routes
 
@@ -158,7 +174,7 @@ python manage.py test
 - Harden production configuration (`DEBUG=False`, secure cookies, HSTS, SSL redirect).
 - Move to a real production server and deployment stack.
 - Add more tests for permissions, validations, and business-rule failures.
-- Evaluate database constraints to reinforce domain invariants.
+- Evaluate additional database constraints to reinforce remaining domain invariants.
 - Improve form and template UX.
 - Define a persistence and deployment strategy beyond SQLite.
 

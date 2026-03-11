@@ -1,9 +1,16 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
-from django.views.generic import ListView, DetailView, CreateView
+from django.views.generic import DetailView, FormView, ListView
 from django.urls import reverse_lazy
 from apps.corporate.models import Organization
-from .models import Challenge, Application
+from apps.marketplace.application.exceptions import DuplicateChallengeApplicationError
+from apps.marketplace.application.services import (
+    publish_challenge,
+    submit_challenge_application,
+)
+from apps.marketplace.forms import ApplicationSubmissionForm, ChallengePublicationForm
+from .models import Challenge
 
 class RoleRequiredMixin(UserPassesTestMixin):
     role_required = None
@@ -25,21 +32,22 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
     template_name = 'marketplace/challenge_detail.html'
     context_object_name = 'challenge'
 
-class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
-    model = Challenge
+class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
+    form_class = ChallengePublicationForm
     role_required = Organization.MarketRole.DEMAND_SIDE
-    fields = ['title', 'description']
     template_name = 'marketplace/challenge_form.html'
-    success_url = reverse_lazy('marketplace:challenge-list')
+    success_url = reverse_lazy("marketplace:challenge-list")
 
     def form_valid(self, form):
-        form.instance.publisher = self.request.user.organization
-        return super().form_valid(form)
+        publish_challenge(
+            publisher=self.request.user.organization,
+            command=form.to_command(),
+        )
+        return HttpResponseRedirect(self.get_success_url())
 
-class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
-    model = Application
+class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
+    form_class = ApplicationSubmissionForm
     role_required = Organization.MarketRole.SUPPLY_SIDE
-    fields = ['proposal_text']
     template_name = 'marketplace/application_form.html'
     success_url = reverse_lazy('marketplace:challenge-list')
 
@@ -54,6 +62,17 @@ class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
         return context
 
     def form_valid(self, form):
-        form.instance.challenge = self.get_challenge()
-        form.instance.applicant = self.request.user.organization
-        return super().form_valid(form)
+        try:
+            submit_challenge_application(
+                challenge=self.get_challenge(),
+                applicant=self.request.user.organization,
+                command=form.to_command(),
+            )
+        except DuplicateChallengeApplicationError:
+            form.add_error(
+                None,
+                "Tu organización ya envió una propuesta para este desafío.",
+            )
+            return self.form_invalid(form)
+
+        return HttpResponseRedirect(self.get_success_url())

@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from apps.identity.application.commands import RegisterOrganizationUserCommand
+from apps.identity.application.services import register_organization_user
+
 
 class RegistrationFlowTests(TestCase):
     def test_signup_creates_user_and_organization(self):
@@ -102,3 +105,24 @@ class RegistrationFlowTests(TestCase):
         response = self.client.post(reverse("logout"))
 
         self.assertRedirects(response, reverse("login"))
+
+
+class RegistrationApplicationServiceTests(TestCase):
+    def test_register_organization_user_creates_aggregate(self):
+        user = register_organization_user(
+            RegisterOrganizationUserCommand(
+                username="service_user",
+                email="service@example.com",
+                first_name="Service",
+                last_name="User",
+                password="ClaveSegura123",
+                tax_id="902000001",
+                business_name="Service Org",
+                chamber_of_commerce_record="CC-SVC",
+                role="SUPPLY_SIDE",
+                contact_phone="3001112233",
+            )
+        )
+
+        self.assertEqual(user.organization.tax_id, "902000001")
+        self.assertEqual(user.organization.business_name, "Service Org")
