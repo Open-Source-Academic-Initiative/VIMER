@@ -177,7 +177,3 @@ python manage.py test
 - Evaluate additional database constraints to reinforce remaining domain invariants.
 - Improve form and template UX.
 - Define a persistence and deployment strategy beyond SQLite.
-
-## Documentation notes
-
-This file replaces the previous scattered status documents as the main project reference. The auxiliary Markdown files about Django 6.0 are local reference notes and are not part of VIMER's functional documentation.
