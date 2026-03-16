@@ -7,6 +7,13 @@ from apps.identity.application.services import register_organization_user
 
 
 class RegistrationFlowTests(TestCase):
+    def test_home_loads_landing_page(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "landing.html")
+        self.assertContains(response, "Conecta desafíos con soluciones")
+
     def test_signup_creates_user_and_organization(self):
         response = self.client.post(
             reverse("signup"),

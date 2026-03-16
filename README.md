@@ -4,7 +4,7 @@ This is the authoritative project document. This `README.md` consolidates VIMER'
 
 ## Summary
 
-VIMER is a Django MVP designed to connect demand-side and supply-side organizations around R&D&I challenges.
+VIMER is a Django MVP designed to connect Solicitante organizations and Proveedor tecnológico organizations around R&D&I challenges.
 
 Current status:
 - Working development baseline.
@@ -17,13 +17,13 @@ Current status:
 ## Domain
 
 VIMER models three core concepts:
-- `Organization`: a legal entity with a single market role, either `DEMAND_SIDE` or `SUPPLY_SIDE`.
-- `Challenge`: an R&D&I challenge or need published by a demand-side organization.
-- `Application`: a technical proposal submitted by a supply-side organization to a challenge.
+- `Organization`: a legal entity with a single market role, either `DEMAND_SIDE` (`Solicitante`) or `SUPPLY_SIDE` (`Proveedor tecnológico`).
+- `Challenge`: an R&D&I challenge or need published by a Solicitante organization.
+- `Application`: a technical proposal submitted by a Proveedor tecnológico organization to a challenge.
 
 Ubiquitous language:
-- Demand-side organization: publishes challenges.
-- Supply-side organization: submits solutions.
+- Solicitante organization: publishes challenges.
+- Proveedor tecnológico organization: submits solutions.
 - Representative: a human user operating on behalf of an organization.
 
 ## Architecture
@@ -50,8 +50,8 @@ apps/marketplace/application/  Challenge publication and application services
 Main models:
 - `identity.User`: extends `AbstractUser` and links to `corporate.Organization`.
 - `corporate.Organization`: stores tax ID, legal name, market role, and contact data.
-- `marketplace.Challenge`: a challenge published by a demand-side organization.
-- `marketplace.Application`: a solution proposal submitted by a supply-side organization.
+- `marketplace.Challenge`: a challenge published by a Solicitante organization.
+- `marketplace.Application`: a solution proposal submitted by a Proveedor tecnológico organization.
 
 ## Implemented functionality
 
@@ -59,16 +59,16 @@ Main models:
 - Login and logout.
 - Marketplace access restricted to authenticated users.
 - Role-aware navigation.
-- Challenge publishing by demand-side organizations.
-- Challenge applications by supply-side organizations.
+- Challenge publishing by Solicitante organizations.
+- Challenge applications by Proveedor tecnológico organizations.
 - Basic Django admin integration.
 - Basic containerization with `Dockerfile` and `docker-compose.yml`.
 
 ## Current business rules
 
 - An organization's tax ID must be unique.
-- Only `DEMAND_SIDE` organizations can publish challenges.
-- Only `SUPPLY_SIDE` organizations can apply to challenges.
+- Only `DEMAND_SIDE` (`Solicitante`) organizations can publish challenges.
+- Only `SUPPLY_SIDE` (`Proveedor tecnológico`) organizations can apply to challenges.
 - An organization cannot apply twice to the same challenge.
 
 Duplicate challenge applications are enforced both in domain validation and through an explicit `UniqueConstraint` at the database level. Role restrictions are still enforced mainly through application logic and model validation.

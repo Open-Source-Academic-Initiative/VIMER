@@ -6,7 +6,7 @@ from apps.corporate.models import Organization
 
 class Challenge(models.Model):
     """
-    R&D&I challenge published by a demand-side organization.
+    R&D&I challenge published by a solicitante organization.
     """
     publisher = models.ForeignKey(
         Organization,
@@ -27,7 +27,7 @@ class Challenge(models.Model):
 
     def clean(self):
         if self.publisher and self.publisher.role != Organization.MarketRole.DEMAND_SIDE:
-            raise ValidationError(_("Solo las organizaciones con rol Demandante pueden publicar desafíos."))
+            raise ValidationError(_("Solo las organizaciones con rol Solicitante pueden publicar desafíos."))
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -38,7 +38,7 @@ class Challenge(models.Model):
 
 class Application(models.Model):
     """
-    Proposal submitted by a supply-side organization for a challenge.
+    Proposal submitted by a proveedor tecnológico organization for a challenge.
     """
     challenge = models.ForeignKey(
         Challenge,
@@ -67,7 +67,7 @@ class Application(models.Model):
 
     def clean(self):
         if self.applicant and self.applicant.role != Organization.MarketRole.SUPPLY_SIDE:
-            raise ValidationError(_("Solo las organizaciones con rol Oferente pueden aplicar a desafíos."))
+            raise ValidationError(_("Solo las organizaciones con rol Proveedor tecnológico pueden aplicar a desafíos."))
 
     def save(self, *args, **kwargs):
         self.full_clean()

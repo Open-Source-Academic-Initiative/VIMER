@@ -29,8 +29,8 @@ class Migration(migrations.Migration):
             name="role",
             field=models.CharField(
                 choices=[
-                    ("DEMAND_SIDE", "Demandante"),
-                    ("SUPPLY_SIDE", "Oferente"),
+                    ("DEMAND_SIDE", "Solicitante"),
+                    ("SUPPLY_SIDE", "Proveedor tecnológico"),
                 ],
                 max_length=20,
             ),

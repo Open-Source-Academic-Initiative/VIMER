@@ -1,10 +1,15 @@
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
-from django.views.generic import FormView
+from django.views.generic import FormView, TemplateView
 
 from apps.identity.application.exceptions import DuplicateTaxIdError
 from apps.identity.application.services import register_organization_user
 from .forms import RegistrationForm
+
+
+class LandingPageView(TemplateView):
+    template_name = "landing.html"
+
 
 class SignUpView(FormView):
     form_class = RegistrationForm

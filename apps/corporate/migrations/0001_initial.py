@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 ('nit', models.CharField(max_length=20, unique=True, verbose_name='NIT')),
                 ('business_name', models.CharField(max_length=255, verbose_name='Razón Social')),
                 ('chamber_of_commerce_record', models.CharField(max_length=100, verbose_name='Registro Cámara de Comercio')),
-                ('role', models.CharField(choices=[('DEMANDANTE', 'Demandante (Seeker)'), ('OFERENTE', 'Oferente (Provider)')], max_length=20)),
+                ('role', models.CharField(choices=[('DEMANDANTE', 'Solicitante'), ('OFERENTE', 'Proveedor tecnológico')], max_length=20)),
                 ('logo', models.ImageField(blank=True, null=True, upload_to='corporate/logos/')),
                 ('description', models.TextField(blank=True, verbose_name='Descripción')),
                 ('economic_activity', models.TextField(blank=True, verbose_name='Actividad Económica')),
