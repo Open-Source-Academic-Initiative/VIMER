@@ -4,26 +4,28 @@ This is the authoritative project document. This `README.md` consolidates VIMER'
 
 ## Summary
 
-VIMER is a Django MVP designed to connect Solicitante organizations and Proveedor tecnológico organizations around R&D&I challenges.
+VIMER is a Django MVP designed to connect organizations acting as `Solicitantes` with organizations acting as `Proveedores tecnológicos` around R&D&I challenges.
 
 Current status:
-- Working development baseline.
-- Main flow implemented: signup, login, challenge listing, challenge detail, challenge publishing, and application submission.
-- Write-side use cases now run through explicit application services in `identity` and `marketplace`.
-- Application duplication is enforced with an explicit database constraint.
-- The automated test suite currently passes with 8 tests.
-- Not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be closed.
+- Stable development baseline.
+- A public landing page is available at `/`.
+- The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, and application submission.
+- Write-side use cases are routed through explicit application services in `identity` and `marketplace`.
+- Duplicate applications are prevented through an explicit database constraint.
+- The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
+- The automated test suite currently passes with 11 tests.
+- The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
 
 ## Domain
 
 VIMER models three core concepts:
 - `Organization`: a legal entity with a single market role, either `DEMAND_SIDE` (`Solicitante`) or `SUPPLY_SIDE` (`Proveedor tecnológico`).
-- `Challenge`: an R&D&I challenge or need published by a Solicitante organization.
-- `Application`: a technical proposal submitted by a Proveedor tecnológico organization to a challenge.
+- `Challenge`: an R&D&I challenge or need published by a `Solicitante` organization.
+- `Application`: a technical proposal submitted by a `Proveedor tecnológico` organization in response to a challenge.
 
 Ubiquitous language:
-- Solicitante organization: publishes challenges.
-- Proveedor tecnológico organization: submits solutions.
+- `Solicitante` organization: publishes challenges.
+- `Proveedor tecnológico` organization: submits solutions.
 - Representative: a human user operating on behalf of an organization.
 
 ## Architecture
@@ -50,17 +52,18 @@ apps/marketplace/application/  Challenge publication and application services
 Main models:
 - `identity.User`: extends `AbstractUser` and links to `corporate.Organization`.
 - `corporate.Organization`: stores tax ID, legal name, market role, and contact data.
-- `marketplace.Challenge`: a challenge published by a Solicitante organization.
-- `marketplace.Application`: a solution proposal submitted by a Proveedor tecnológico organization.
+- `marketplace.Challenge`: a challenge published by a `Solicitante` organization.
+- `marketplace.Application`: a solution proposal submitted by a `Proveedor tecnológico` organization.
 
 ## Implemented functionality
 
+- Public landing page for unauthenticated visitors.
 - Unified user and organization signup.
 - Login and logout.
 - Marketplace access restricted to authenticated users.
 - Role-aware navigation.
-- Challenge publishing by Solicitante organizations.
-- Challenge applications by Proveedor tecnológico organizations.
+- Challenge publishing by `Solicitante` organizations.
+- Challenge applications by `Proveedor tecnológico` organizations.
 - Basic Django admin integration.
 - Basic containerization with `Dockerfile` and `docker-compose.yml`.
 
@@ -71,22 +74,24 @@ Main models:
 - Only `SUPPLY_SIDE` (`Proveedor tecnológico`) organizations can apply to challenges.
 - An organization cannot apply twice to the same challenge.
 
-Duplicate challenge applications are enforced both in domain validation and through an explicit `UniqueConstraint` at the database level. Role restrictions are still enforced mainly through application logic and model validation.
+Duplicate applications are enforced both through domain validation and through an explicit `UniqueConstraint` at the database level. Role restrictions are still enforced primarily through application logic and model validation.
 
-## Actual project state
+## Current Project State
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 8 tests.
-- The repository is structured and the current branch is `foundation`.
+- `python manage.py test` currently passes with 11 tests.
+- The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
+- The root route now exposes a dedicated landing page instead of sending users directly to signup.
 
 Current limitations:
-- The default profile is still development-oriented.
+- The default runtime profile remains development-oriented unless environment variables are configured carefully.
 - Deployment security still depends on correct environment configuration.
 - Test coverage is still limited.
 - SQLite is still the default database.
+- `README.md` should be kept in sync as the local iteration evolves, since some operational details change faster than the core architecture.
 
 ## Fixes applied during this consolidation
 
@@ -94,15 +99,18 @@ Priority issues identified during the audit were fixed:
 - Added the missing challenge creation template.
 - Changed logout to use `POST`, avoiding the previous `405` from a `GET` link.
 - Passed the selected challenge into the application form context.
-- Signup now collects and stores `contact_phone`, aligned with the model.
+- Signup now collects and stores `contact_phone`, in alignment with the model.
 - Added `ASGI_APPLICATION`.
 - `ALLOWED_HOSTS` now has a safe local default compatible with tests (`localhost`, `127.0.0.1`, `[::1]`, `testserver`).
 - Added explicit application services for registration, challenge publication, and proposal submission.
 - Replaced `unique_together` on applications with an explicit `UniqueConstraint`.
-- Expanded automated coverage to 8 tests, including application-service behavior.
+- Corrected application-submission error handling so duplicate applications are no longer confused with other validation failures.
+- Added a public landing page at `/` to separate public navigation from the signup flow.
+- Expanded automated coverage to 11 tests, including landing page and application-service behavior.
 
 ## Main routes
 
+- `/`: public landing page
 - `/signup/`: user and organization signup
 - `/login/`: login
 - `/logout/`: logout via `POST`
@@ -124,7 +132,7 @@ Dependencies are defined in [requirements.txt](requirements.txt).
 ## Local setup
 
 1. Create a virtual environment and install dependencies.
-2. Define `.env` if explicit values are needed.
+2. Create a `.env` file if explicit values are needed.
 3. Run migrations.
 4. Create a superuser if needed.
 5. Start the server.
@@ -148,8 +156,8 @@ Relevant environment variables:
 - `CSRF_TRUSTED_ORIGINS`
 
 Environment behavior:
-- Development: `DEBUG=True`, SQLite by default, secure cookies disabled, and local `ALLOWED_HOSTS` automatically included.
-- Production: requires `SECRET_KEY`, allows an external `DATABASE_URL`, and enables HSTS, secure cookies, and HTTPS redirect by default unless explicitly overridden by environment configuration.
+- Development: `DEBUG=True`, SQLite by default, secure cookies disabled, and local `ALLOWED_HOSTS` entries automatically included.
+- Production: requires `SECRET_KEY`, supports an external `DATABASE_URL`, and enables HSTS, secure cookies, and HTTPS redirects by default unless explicitly overridden by environment configuration.
 
 ## Docker
 
@@ -169,8 +177,12 @@ python manage.py check --deploy
 python manage.py test
 ```
 
+Note:
+- In this workspace, running tests with `DEBUG=True` avoids HTTPS redirects caused by stricter local `.env` settings.
+
 ## Priority backlog
 
+- Keep this README synchronized with the current implementation and local branch reality.
 - Harden production configuration (`DEBUG=False`, secure cookies, HSTS, SSL redirect).
 - Move to a real production server and deployment stack.
 - Add more tests for permissions, validations, and business-rule failures.
