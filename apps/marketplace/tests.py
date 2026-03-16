@@ -4,9 +4,12 @@ from django.urls import reverse
 
 from apps.corporate.models import Organization
 from apps.marketplace.application.commands import SubmitApplicationCommand
-from apps.marketplace.application.exceptions import DuplicateChallengeApplicationError
+from apps.marketplace.application.exceptions import (
+    ChallengeApplicationValidationError,
+    DuplicateChallengeApplicationError,
+)
 from apps.marketplace.application.services import submit_challenge_application
-from apps.marketplace.models import Challenge
+from apps.marketplace.models import Application, Challenge
 
 
 class MarketplaceFlowTests(TestCase):
@@ -63,6 +66,26 @@ class MarketplaceFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["challenge"], self.challenge)
 
+    def test_challenge_apply_duplicate_submission_shows_duplicate_message(self):
+        Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            proposal_text="Initial proposal",
+        )
+        self.client.force_login(self.supply_user)
+
+        response = self.client.post(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+            {"proposal_text": "Second proposal"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            None,
+            "Tu organización ya envió una propuesta para este desafío.",
+        )
+
 
 class MarketplaceApplicationServiceTests(TestCase):
     def setUp(self):
@@ -103,3 +126,18 @@ class MarketplaceApplicationServiceTests(TestCase):
                 applicant=self.supply_organization,
                 command=command,
             )
+
+    def test_submit_application_rejects_invalid_applicant_role_with_validation_error(self):
+        command = SubmitApplicationCommand(proposal_text="Proposal")
+
+        with self.assertRaises(ChallengeApplicationValidationError) as captured:
+            submit_challenge_application(
+                challenge=self.challenge,
+                applicant=self.demand_organization,
+                command=command,
+            )
+
+        self.assertIn(
+            "Solo las organizaciones con rol Oferente pueden aplicar a desafíos.",
+            captured.exception.messages,
+        )

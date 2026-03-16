@@ -6,7 +6,10 @@ from apps.marketplace.application.commands import (
     PublishChallengeCommand,
     SubmitApplicationCommand,
 )
-from apps.marketplace.application.exceptions import DuplicateChallengeApplicationError
+from apps.marketplace.application.exceptions import (
+    ChallengeApplicationValidationError,
+    DuplicateChallengeApplicationError,
+)
 from apps.marketplace.models import Application, Challenge
 
 
@@ -30,6 +33,9 @@ def submit_challenge_application(
     applicant: Organization,
     command: SubmitApplicationCommand,
 ) -> Application:
+    if Application.objects.filter(challenge=challenge, applicant=applicant).exists():
+        raise DuplicateChallengeApplicationError
+
     application = Application(
         challenge=challenge,
         applicant=applicant,
@@ -38,7 +44,9 @@ def submit_challenge_application(
 
     try:
         application.save()
-    except (IntegrityError, ValidationError) as exc:
+    except IntegrityError as exc:
         raise DuplicateChallengeApplicationError from exc
+    except ValidationError as exc:
+        raise ChallengeApplicationValidationError(exc.messages) from exc
 
     return application

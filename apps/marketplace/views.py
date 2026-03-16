@@ -4,7 +4,10 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, FormView, ListView
 from django.urls import reverse_lazy
 from apps.corporate.models import Organization
-from apps.marketplace.application.exceptions import DuplicateChallengeApplicationError
+from apps.marketplace.application.exceptions import (
+    ChallengeApplicationValidationError,
+    DuplicateChallengeApplicationError,
+)
 from apps.marketplace.application.services import (
     publish_challenge,
     submit_challenge_application,
@@ -73,6 +76,10 @@ class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
                 None,
                 "Tu organización ya envió una propuesta para este desafío.",
             )
+            return self.form_invalid(form)
+        except ChallengeApplicationValidationError as exc:
+            for message in exc.messages:
+                form.add_error(None, message)
             return self.form_invalid(form)
 
         return HttpResponseRedirect(self.get_success_url())
