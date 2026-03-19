@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.contrib.admin import helpers
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -376,4 +377,68 @@ class RegistrationApplicationServiceTests(TestCase):
         self.assertIn(
             "Ingrese una dirección de correo electrónico válida.",
             captured.exception.messages,
+        )
+
+
+class SuperuserAdminSafeguardsTests(TestCase):
+    def setUp(self):
+        self.admin_user = get_user_model().objects.create_superuser(
+            username="platform_admin",
+            email="platform-admin@example.com",
+            password="ClaveSegura123",
+        )
+        self.other_user = get_user_model().objects.create_user(
+            username="managed_user",
+            email="managed-user@example.com",
+            password="ClaveSegura123",
+        )
+
+    def test_superuser_cannot_delete_itself_from_admin_delete_view(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("admin:identity_user_delete", args=[self.admin_user.pk]),
+            {"post": "yes"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(
+            get_user_model().objects.filter(pk=self.admin_user.pk).exists()
+        )
+
+    def test_superuser_bulk_delete_skips_own_account(self):
+        self.client.force_login(self.admin_user)
+        selected_users = [str(self.admin_user.pk), str(self.other_user.pk)]
+
+        confirmation_response = self.client.post(
+            reverse("admin:identity_user_changelist"),
+            {
+                "action": "delete_selected_preserving_self",
+                helpers.ACTION_CHECKBOX_NAME: selected_users,
+                "index": 0,
+            },
+        )
+
+        self.assertEqual(confirmation_response.status_code, 200)
+
+        response = self.client.post(
+            reverse("admin:identity_user_changelist"),
+            {
+                "action": "delete_selected_preserving_self",
+                helpers.ACTION_CHECKBOX_NAME: selected_users,
+                "post": "yes",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            get_user_model().objects.filter(pk=self.admin_user.pk).exists()
+        )
+        self.assertFalse(
+            get_user_model().objects.filter(pk=self.other_user.pk).exists()
+        )
+        self.assertContains(
+            response,
+            "No puedes eliminarte a ti mismo desde el panel de administración.",
         )

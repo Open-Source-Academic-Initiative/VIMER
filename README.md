@@ -13,7 +13,8 @@ Current status:
 - Write-side use cases are routed through explicit application services in `identity` and `marketplace`.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 18 tests.
+- The automated test suite currently passes with 20 tests.
+- Django Admin now prevents a platform superuser from deleting its own account.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
 
 ## Domain
@@ -65,6 +66,7 @@ Main models:
 - Challenge publishing by `Solicitante` organizations.
 - Challenge applications by `Proveedor tecnológico` organizations.
 - Basic Django admin integration.
+- Platform superuser safeguard against self-deletion in Django Admin.
 - Basic containerization with `Dockerfile` and `docker-compose.yml`.
 
 ## Current business rules
@@ -73,6 +75,7 @@ Main models:
 - Only `DEMAND_SIDE` (`Solicitante`) organizations can publish challenges.
 - Only `SUPPLY_SIDE` (`Proveedor tecnológico`) organizations can apply to challenges.
 - An organization cannot apply twice to the same challenge.
+- A platform superuser cannot delete its own account from Django Admin.
 
 Duplicate applications are enforced both through domain validation and through an explicit `UniqueConstraint` at the database level. Role restrictions are still enforced primarily through application logic and model validation.
 
@@ -80,11 +83,12 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 18 tests.
+- `python manage.py test` currently passes with 20 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
 - The root route now exposes a dedicated landing page instead of sending users directly to signup.
+- The admin now includes an explicit safeguard to prevent a superuser from deleting its own account.
 
 Current limitations:
 - The default runtime profile remains development-oriented unless environment variables are configured carefully.
@@ -106,7 +110,8 @@ Priority issues identified during the audit were fixed:
 - Replaced `unique_together` on applications with an explicit `UniqueConstraint`.
 - Corrected application-submission error handling so duplicate applications are no longer confused with other validation failures.
 - Added a public landing page at `/` to separate public navigation from the signup flow.
-- Expanded automated coverage to 18 tests, including duplicate username/email handling and registration-service validation errors.
+- Added an admin safeguard so a superuser cannot delete its own account.
+- Expanded automated coverage to 20 tests, including duplicate username/email handling, registration-service validation errors, and superuser self-deletion safeguards.
 
 ## Main routes
 
@@ -192,4 +197,4 @@ Note:
 
 ## Documentation notes
 
-This file replaces the previous scattered status documents as the main project reference. The auxiliary Markdown files about Django 6.0 are local reference notes and are not part of VIMER's functional documentation.
+This file is the versioned, authoritative project reference. Local state snapshots such as `status_de_desarrollo.md` and `resumen_ejecutivo.md` may exist as ignored workspace notes, while `django_skill.md` and `django-report.md` are Django 6.0 reference notes rather than VIMER functional documentation.
