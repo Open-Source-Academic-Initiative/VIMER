@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from apps.corporate.avatar_utils import validate_logo_image
 from .models import User
 from apps.corporate.models import Organization
 from apps.identity.application.commands import RegisterOrganizationUserCommand
@@ -12,6 +13,10 @@ class RegistrationForm(forms.Form):
     chamber_of_commerce = forms.CharField(max_length=100, label="Registro Cámara de Comercio")
     role = forms.ChoiceField(choices=Organization.MarketRole.choices, label="Rol en la Plataforma")
     contact_phone = forms.CharField(max_length=20, label="Teléfono de Contacto")
+    logo = forms.ImageField(
+        required=False,
+        label="Logo de la organización (PNG o JPG)",
+    )
     
     # User fields
     password = forms.CharField(widget=forms.PasswordInput, label="Contraseña")
@@ -39,6 +44,17 @@ class RegistrationForm(forms.Form):
         if User.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError("Ya existe un usuario registrado con este correo electrónico.")
         return email
+
+    def clean_logo(self):
+        logo = self.cleaned_data.get("logo")
+        if not logo:
+            return None
+
+        try:
+            validate_logo_image(logo)
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.messages)
+        return logo
 
     def clean(self):
         cleaned_data = super().clean()
@@ -73,4 +89,5 @@ class RegistrationForm(forms.Form):
             chamber_of_commerce_record=self.cleaned_data["chamber_of_commerce"],
             role=self.cleaned_data["role"],
             contact_phone=self.cleaned_data["contact_phone"],
+            logo_upload=self.cleaned_data.get("logo"),
         )

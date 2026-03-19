@@ -3,7 +3,16 @@
 {% block content %}
 <h2>{{ challenge.title }}</h2>
 <div class="card">
-    <p>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></p>
+    <p class="org-chip">
+        {% if challenge.publisher.logo %}
+            <img
+                src="{{ challenge.publisher.logo.url }}"
+                alt="Logo de {{ challenge.publisher.business_name }}"
+                class="avatar avatar-marketplace"
+            >
+        {% endif %}
+        <span>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></span>
+    </p>
     <p>NIT: {{ challenge.publisher.tax_id }}</p>
     <hr>
     <h3>Descripción</h3>
@@ -18,7 +27,18 @@
     <h3>Interesados en este desafío:</h3>
     <ul>
         {% for app in challenge.applications.all %}
-            <li><strong>{{ app.applicant.business_name }}:</strong> {{ app.proposal_text|truncatewords:20 }}</li>
+            <li>
+                <span class="org-chip">
+                    {% if app.applicant.logo %}
+                        <img
+                            src="{{ app.applicant.logo.url }}"
+                            alt="Logo de {{ app.applicant.business_name }}"
+                            class="avatar avatar-marketplace"
+                        >
+                    {% endif %}
+                    <span><strong>{{ app.applicant.business_name }}:</strong> {{ app.proposal_text|truncatewords:20 }}</span>
+                </span>
+            </li>
         {% empty %}
             <li>Aún no hay propuestas para este desafío.</li>
         {% endfor %}

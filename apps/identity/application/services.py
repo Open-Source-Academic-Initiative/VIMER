@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from apps.corporate.avatar_utils import generate_default_logo, validate_logo_image
 from apps.corporate.models import Organization
 from apps.identity.application.commands import RegisterOrganizationUserCommand
 from apps.identity.application.exceptions import (
@@ -22,6 +23,7 @@ def register_organization_user(command: RegisterOrganizationUserCommand) -> User
     business_name = command.business_name.strip()
     chamber_of_commerce_record = command.chamber_of_commerce_record.strip()
     contact_phone = command.contact_phone.strip()
+    logo_upload = command.logo_upload
 
     if Organization.objects.filter(tax_id=tax_id).exists():
         raise DuplicateTaxIdError
@@ -42,6 +44,15 @@ def register_organization_user(command: RegisterOrganizationUserCommand) -> User
     )
 
     try:
+        if logo_upload:
+            validate_logo_image(logo_upload)
+            organization.logo = logo_upload
+        else:
+            organization.logo = generate_default_logo(
+                business_name=business_name,
+                tax_id=tax_id,
+            )
+
         organization.full_clean()
         organization.save()
 

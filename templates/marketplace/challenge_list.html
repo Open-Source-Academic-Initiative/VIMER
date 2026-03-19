@@ -9,7 +9,16 @@
 {% for challenge in challenges %}
 <div class="card">
     <h3>{{ challenge.title }}</h3>
-    <p>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></p>
+    <p class="org-chip">
+        {% if challenge.publisher.logo %}
+            <img
+                src="{{ challenge.publisher.logo.url }}"
+                alt="Logo de {{ challenge.publisher.business_name }}"
+                class="avatar avatar-marketplace"
+            >
+        {% endif %}
+        <span>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></span>
+    </p>
     <p>{{ challenge.description|truncatewords:30 }}</p>
     <a href="{% url 'marketplace:challenge-detail' challenge.pk %}" class="btn btn-primary">Ver Más</a>
 </div>

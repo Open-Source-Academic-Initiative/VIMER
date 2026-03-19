@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 from apps.corporate.models import Organization
 
@@ -15,3 +16,4 @@ class RegisterOrganizationUserCommand:
     chamber_of_commerce_record: str
     role: Organization.MarketRole
     contact_phone: str
+    logo_upload: Any = None

@@ -13,8 +13,10 @@ Current status:
 - Write-side use cases are routed through explicit application services in `identity` and `marketplace`.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 20 tests.
+- The automated test suite currently passes with 24 tests.
 - Django Admin now prevents a platform superuser from deleting its own account.
+- Organizations can upload a custom logo during signup, limited to PNG/JPG; otherwise a procedural default avatar is generated automatically.
+- Organization logos/avatars are visible in marketplace publications and proposal listings.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
 
 ## Domain
@@ -60,6 +62,8 @@ Main models:
 
 - Public landing page for unauthenticated visitors.
 - Unified user and organization signup.
+- Optional organization logo upload at signup, with procedural default avatar generation.
+- Organization logos/avatars rendered in challenge listings, challenge detail pages, and visible proposal entries.
 - Login and logout.
 - Marketplace access restricted to authenticated users.
 - Role-aware navigation.
@@ -76,6 +80,7 @@ Main models:
 - Only `SUPPLY_SIDE` (`Proveedor tecnológico`) organizations can apply to challenges.
 - An organization cannot apply twice to the same challenge.
 - A platform superuser cannot delete its own account from Django Admin.
+- Organization logos uploaded at signup are limited to PNG/JPG; when no custom image is provided, a procedural PNG avatar is generated automatically.
 
 Duplicate applications are enforced both through domain validation and through an explicit `UniqueConstraint` at the database level. Role restrictions are still enforced primarily through application logic and model validation.
 
@@ -83,12 +88,14 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 20 tests.
+- `python manage.py test` currently passes with 24 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
 - The root route now exposes a dedicated landing page instead of sending users directly to signup.
 - The admin now includes an explicit safeguard to prevent a superuser from deleting its own account.
+- Signup now supports custom organization logos and guarantees a default procedural avatar when no image is uploaded.
+- Marketplace publications now display the publisher or applicant organization logo/avatar where relevant.
 
 Current limitations:
 - The default runtime profile remains development-oriented unless environment variables are configured carefully.
@@ -111,7 +118,8 @@ Priority issues identified during the audit were fixed:
 - Corrected application-submission error handling so duplicate applications are no longer confused with other validation failures.
 - Added a public landing page at `/` to separate public navigation from the signup flow.
 - Added an admin safeguard so a superuser cannot delete its own account.
-- Expanded automated coverage to 20 tests, including duplicate username/email handling, registration-service validation errors, and superuser self-deletion safeguards.
+- Added optional signup logo upload with strict PNG/JPG validation and procedural PNG avatar generation as fallback.
+- Expanded automated coverage to 24 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, and superuser self-deletion safeguards.
 
 ## Main routes
 

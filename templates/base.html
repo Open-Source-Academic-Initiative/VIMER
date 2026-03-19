@@ -14,6 +14,10 @@
         .badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; }
         .badge-demand_side { background: #007bff; color: #fff; }
         .badge-supply_side { background: #28a745; color: #fff; }
+        .identity-chip { align-items: center; display: inline-flex; gap: 0.5rem; }
+        .avatar { border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 999px; height: 36px; object-fit: cover; width: 36px; }
+        .avatar-marketplace { border-color: #d7d7d7; }
+        .org-chip { align-items: center; display: inline-flex; gap: 0.75rem; }
         .card { border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
         .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn-primary { background: #007bff; color: #fff; }
@@ -25,8 +29,17 @@
         <div>
             <strong><a href="/">VIMER</a></strong>
             {% if user.is_authenticated and user.organization %}
-                <span class="badge badge-{{ user.organization.role|lower }}">
-                    {{ user.organization.get_role_display }}
+                <span class="identity-chip">
+                    {% if user.organization.logo %}
+                        <img
+                            src="{{ user.organization.logo.url }}"
+                            alt="Logo de {{ user.organization.business_name }}"
+                            class="avatar"
+                        >
+                    {% endif %}
+                    <span class="badge badge-{{ user.organization.role|lower }}">
+                        {{ user.organization.get_role_display }}
+                    </span>
                 </span>
             {% endif %}
         </div>

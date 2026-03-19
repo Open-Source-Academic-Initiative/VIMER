@@ -1,9 +1,15 @@
+import shutil
+import tempfile
+from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.admin import helpers
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.urls import reverse
+from PIL import Image
 
 from apps.corporate.models import Organization
 from apps.identity.application.commands import RegisterOrganizationUserCommand
@@ -15,7 +21,43 @@ from apps.identity.application.exceptions import (
 from apps.identity.application.services import register_organization_user
 
 
-class RegistrationFlowTests(TestCase):
+class MediaRootIsolatedTestCase(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp()
+        cls._override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    def make_test_image(
+        self,
+        *,
+        image_format: str,
+        filename: str,
+        color: tuple[int, int, int] = (32, 96, 160),
+    ) -> SimpleUploadedFile:
+        image = Image.new("RGB", (32, 32), color)
+        buffer = BytesIO()
+        image.save(buffer, format=image_format)
+        content_type_map = {
+            "PNG": "image/png",
+            "JPEG": "image/jpeg",
+            "GIF": "image/gif",
+        }
+        return SimpleUploadedFile(
+            filename,
+            buffer.getvalue(),
+            content_type=content_type_map[image_format],
+        )
+
+
+class RegistrationFlowTests(MediaRootIsolatedTestCase):
     def test_home_loads_landing_page(self):
         response = self.client.get(reverse("home"))
 
@@ -45,6 +87,70 @@ class RegistrationFlowTests(TestCase):
         user = get_user_model().objects.get(username="new_user")
         self.assertEqual(user.organization.business_name, "New Org")
         self.assertEqual(user.organization.contact_phone, "3001234567")
+        self.assertTrue(user.organization.logo.name.endswith(".png"))
+        self.assertTrue(user.organization.logo.storage.exists(user.organization.logo.name))
+
+    def test_signup_accepts_custom_jpg_logo(self):
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "logo_user",
+                "email": "logo@example.com",
+                "first_name": "Logo",
+                "last_name": "User",
+                "tax_id": "900123457",
+                "business_name": "Logo Org",
+                "chamber_of_commerce": "CC-124",
+                "role": "SUPPLY_SIDE",
+                "contact_phone": "3001234568",
+                "password": "ClaveSegura123",
+                "confirm_password": "ClaveSegura123",
+                "logo": self.make_test_image(
+                    image_format="JPEG",
+                    filename="custom-logo.jpg",
+                ),
+            },
+        )
+
+        self.assertRedirects(response, reverse("login"))
+        user = get_user_model().objects.get(username="logo_user")
+        self.assertTrue(
+            user.organization.logo.name.lower().endswith((".jpg", ".jpeg"))
+        )
+
+    def test_signup_rejects_non_png_or_jpg_logo(self):
+        invalid_logo = self.make_test_image(
+            image_format="GIF",
+            filename="custom-logo.gif",
+        )
+
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "invalid_logo_user",
+                "email": "invalid-logo@example.com",
+                "first_name": "Invalid",
+                "last_name": "Logo",
+                "tax_id": "900123458",
+                "business_name": "Invalid Logo Org",
+                "chamber_of_commerce": "CC-125",
+                "role": "SUPPLY_SIDE",
+                "contact_phone": "3001234569",
+                "password": "ClaveSegura123",
+                "confirm_password": "ClaveSegura123",
+                "logo": invalid_logo,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            "logo",
+            "Solo se permiten imagenes PNG o JPG.",
+        )
+        self.assertFalse(
+            get_user_model().objects.filter(username="invalid_logo_user").exists()
+        )
 
     def test_signup_rejects_duplicate_tax_id_as_form_error(self):
         self.client.post(
@@ -273,7 +379,7 @@ class RegistrationFlowTests(TestCase):
         )
 
 
-class RegistrationApplicationServiceTests(TestCase):
+class RegistrationApplicationServiceTests(MediaRootIsolatedTestCase):
     def test_register_organization_user_creates_aggregate(self):
         user = register_organization_user(
             RegisterOrganizationUserCommand(
@@ -292,6 +398,7 @@ class RegistrationApplicationServiceTests(TestCase):
 
         self.assertEqual(user.organization.tax_id, "902000001")
         self.assertEqual(user.organization.business_name, "Service Org")
+        self.assertTrue(user.organization.logo.name.endswith(".png"))
 
     def test_register_organization_user_rejects_duplicate_username(self):
         existing_org = Organization.objects.create(
