@@ -28,6 +28,18 @@ class RegistrationForm(forms.Form):
             raise forms.ValidationError("Ya existe una organización registrada con este NIT.")
         return tax_id
 
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip()
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Ya existe un usuario registrado con este nombre de usuario.")
+        return username
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Ya existe un usuario registrado con este correo electrónico.")
+        return email
+
     def clean(self):
         cleaned_data = super().clean()
         password = cleaned_data.get("password")

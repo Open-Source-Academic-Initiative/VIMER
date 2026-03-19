@@ -1,8 +1,16 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from apps.corporate.models import Organization
 from apps.identity.application.commands import RegisterOrganizationUserCommand
+from apps.identity.application.exceptions import (
+    DuplicateEmailError,
+    DuplicateUsernameError,
+    RegistrationValidationError,
+)
 from apps.identity.application.services import register_organization_user
 
 
@@ -79,6 +87,126 @@ class RegistrationFlowTests(TestCase):
             "Ya existe una organización registrada con este NIT.",
         )
 
+    def test_signup_rejects_duplicate_username_as_form_error(self):
+        existing_org = Organization.objects.create(
+            tax_id="900777001",
+            business_name="Existing Username Org",
+            chamber_of_commerce_record="CC-USER",
+            role="SUPPLY_SIDE",
+            contact_email="existing-username-org@example.com",
+            contact_phone="3007770001",
+        )
+        get_user_model().objects.create_user(
+            username="existing_user",
+            email="existing-user@example.com",
+            password="ClaveSegura123",
+            organization=existing_org,
+        )
+
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "existing_user",
+                "email": "nuevo-username@example.com",
+                "first_name": "Repeated",
+                "last_name": "Username",
+                "tax_id": "900777002",
+                "business_name": "New Username Org",
+                "chamber_of_commerce": "CC-USER-NEW",
+                "role": "SUPPLY_SIDE",
+                "contact_phone": "3007770002",
+                "password": "ClaveSegura123",
+                "confirm_password": "ClaveSegura123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            "username",
+            "Ya existe un usuario registrado con este nombre de usuario.",
+        )
+
+    def test_signup_rejects_duplicate_email_as_form_error(self):
+        existing_org = Organization.objects.create(
+            tax_id="900888001",
+            business_name="Existing Email Org",
+            chamber_of_commerce_record="CC-EMAIL",
+            role="SUPPLY_SIDE",
+            contact_email="existing-email-org@example.com",
+            contact_phone="3008880001",
+        )
+        get_user_model().objects.create_user(
+            username="existing_email_user",
+            email="existing-email@example.com",
+            password="ClaveSegura123",
+            organization=existing_org,
+        )
+
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "new_email_user",
+                "email": "existing-email@example.com",
+                "first_name": "Repeated",
+                "last_name": "Email",
+                "tax_id": "900888002",
+                "business_name": "New Email Org",
+                "chamber_of_commerce": "CC-EMAIL-NEW",
+                "role": "SUPPLY_SIDE",
+                "contact_phone": "3008880002",
+                "password": "ClaveSegura123",
+                "confirm_password": "ClaveSegura123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            "email",
+            "Ya existe un usuario registrado con este correo electrónico.",
+        )
+
+    def test_signup_rejects_duplicate_email_case_insensitively_as_form_error(self):
+        existing_org = Organization.objects.create(
+            tax_id="900889001",
+            business_name="Existing Case Email Org",
+            chamber_of_commerce_record="CC-EMAIL-CASE",
+            role="SUPPLY_SIDE",
+            contact_email="existing-case-email-org@example.com",
+            contact_phone="3008890001",
+        )
+        get_user_model().objects.create_user(
+            username="existing_case_email_user",
+            email="Existing-Email@Example.com",
+            password="ClaveSegura123",
+            organization=existing_org,
+        )
+
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "new_case_email_user",
+                "email": "existing-email@example.com",
+                "first_name": "Repeated",
+                "last_name": "CaseEmail",
+                "tax_id": "900889002",
+                "business_name": "New Case Email Org",
+                "chamber_of_commerce": "CC-EMAIL-CASE-NEW",
+                "role": "SUPPLY_SIDE",
+                "contact_phone": "3008890002",
+                "password": "ClaveSegura123",
+                "confirm_password": "ClaveSegura123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            "email",
+            "Ya existe un usuario registrado con este correo electrónico.",
+        )
+
     def test_signup_rejects_weak_password(self):
         response = self.client.post(
             reverse("signup"),
@@ -113,6 +241,36 @@ class RegistrationFlowTests(TestCase):
 
         self.assertRedirects(response, reverse("login"))
 
+    @patch("apps.identity.views.register_organization_user")
+    def test_signup_surfaces_service_validation_errors_as_form_errors(self, mocked_register):
+        mocked_register.side_effect = RegistrationValidationError(
+            message_dict={"contact_email": ["Formato de correo inválido desde el servicio."]},
+        )
+
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "candidate_user",
+                "email": "candidate@example.com",
+                "first_name": "Candidate",
+                "last_name": "User",
+                "tax_id": "901999999",
+                "business_name": "Candidate Org",
+                "chamber_of_commerce": "CC-CAND",
+                "role": "SUPPLY_SIDE",
+                "contact_phone": "3009999999",
+                "password": "ClaveSegura123",
+                "confirm_password": "ClaveSegura123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            "email",
+            "Formato de correo inválido desde el servicio.",
+        )
+
 
 class RegistrationApplicationServiceTests(TestCase):
     def test_register_organization_user_creates_aggregate(self):
@@ -133,3 +291,89 @@ class RegistrationApplicationServiceTests(TestCase):
 
         self.assertEqual(user.organization.tax_id, "902000001")
         self.assertEqual(user.organization.business_name, "Service Org")
+
+    def test_register_organization_user_rejects_duplicate_username(self):
+        existing_org = Organization.objects.create(
+            tax_id="902100001",
+            business_name="Existing Username Service Org",
+            chamber_of_commerce_record="CC-SVC-USER",
+            role="SUPPLY_SIDE",
+            contact_email="svc-username-org@example.com",
+            contact_phone="3001110001",
+        )
+        get_user_model().objects.create_user(
+            username="service_duplicate_user",
+            email="service-duplicate-user@example.com",
+            password="ClaveSegura123",
+            organization=existing_org,
+        )
+
+        with self.assertRaises(DuplicateUsernameError):
+            register_organization_user(
+                RegisterOrganizationUserCommand(
+                    username="service_duplicate_user",
+                    email="new-service-user@example.com",
+                    first_name="Service",
+                    last_name="DuplicateUsername",
+                    password="ClaveSegura123",
+                    tax_id="902100002",
+                    business_name="New Username Service Org",
+                    chamber_of_commerce_record="CC-SVC-USER-NEW",
+                    role="SUPPLY_SIDE",
+                    contact_phone="3001110002",
+                )
+            )
+
+    def test_register_organization_user_rejects_duplicate_email(self):
+        existing_org = Organization.objects.create(
+            tax_id="902200001",
+            business_name="Existing Email Service Org",
+            chamber_of_commerce_record="CC-SVC-EMAIL",
+            role="SUPPLY_SIDE",
+            contact_email="svc-email-org@example.com",
+            contact_phone="3002220001",
+        )
+        get_user_model().objects.create_user(
+            username="service_email_user",
+            email="service-duplicate-email@example.com",
+            password="ClaveSegura123",
+            organization=existing_org,
+        )
+
+        with self.assertRaises(DuplicateEmailError):
+            register_organization_user(
+                RegisterOrganizationUserCommand(
+                    username="new_service_email_user",
+                    email="service-duplicate-email@example.com",
+                    first_name="Service",
+                    last_name="DuplicateEmail",
+                    password="ClaveSegura123",
+                    tax_id="902200002",
+                    business_name="New Email Service Org",
+                    chamber_of_commerce_record="CC-SVC-EMAIL-NEW",
+                    role="SUPPLY_SIDE",
+                    contact_phone="3002220002",
+                )
+            )
+
+    def test_register_organization_user_rejects_invalid_email_with_validation_error(self):
+        with self.assertRaises(RegistrationValidationError) as captured:
+            register_organization_user(
+                RegisterOrganizationUserCommand(
+                    username="invalid_email_user",
+                    email="invalid-email",
+                    first_name="Invalid",
+                    last_name="Email",
+                    password="ClaveSegura123",
+                    tax_id="902300001",
+                    business_name="Invalid Email Org",
+                    chamber_of_commerce_record="CC-SVC-INVALID",
+                    role="SUPPLY_SIDE",
+                    contact_phone="3003330001",
+                )
+            )
+
+        self.assertIn(
+            "Ingrese una dirección de correo electrónico válida.",
+            captured.exception.messages,
+        )

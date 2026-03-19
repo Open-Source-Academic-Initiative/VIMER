@@ -13,7 +13,7 @@ Current status:
 - Write-side use cases are routed through explicit application services in `identity` and `marketplace`.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 11 tests.
+- The automated test suite currently passes with 18 tests.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
 
 ## Domain
@@ -80,7 +80,7 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 11 tests.
+- `python manage.py test` currently passes with 18 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
@@ -106,7 +106,7 @@ Priority issues identified during the audit were fixed:
 - Replaced `unique_together` on applications with an explicit `UniqueConstraint`.
 - Corrected application-submission error handling so duplicate applications are no longer confused with other validation failures.
 - Added a public landing page at `/` to separate public navigation from the signup flow.
-- Expanded automated coverage to 11 tests, including landing page and application-service behavior.
+- Expanded automated coverage to 18 tests, including duplicate username/email handling and registration-service validation errors.
 
 ## Main routes
 
