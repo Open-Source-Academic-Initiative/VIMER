@@ -25,6 +25,11 @@ class Challenge(models.Model):
     )
     title = models.CharField(_("Título del Desafío"), max_length=255)
     description = models.TextField(_("Descripción del Reto / Necesidad"))
+    evaluation_criteria = models.TextField(
+        _("Criterios de evaluación"),
+        blank=True,
+        default="",
+    )
     status = models.CharField(
         _("Estado"),
         max_length=24,
@@ -74,12 +79,74 @@ class Challenge(models.Model):
 
         return True
 
+    def has_evaluation_criteria(self) -> bool:
+        return bool((self.evaluation_criteria or "").strip())
+
+    def evaluation_criteria_list(self) -> list[str]:
+        structured_items = list(
+            self.evaluation_criteria_items.order_by("position").values_list(
+                "label",
+                flat=True,
+            )
+        )
+        if structured_items:
+            return structured_items
+
+        return [
+            line.lstrip("-*0123456789. ").strip()
+            for line in (self.evaluation_criteria or "").splitlines()
+            if line.strip()
+        ]
+
+    def sync_evaluation_criteria_items(self) -> None:
+        if self.evaluation_criteria_items.exists():
+            return
+
+        criteria_items = self.evaluation_criteria_list()
+        if not criteria_items:
+            return
+
+        self.evaluation_criteria_items.bulk_create(
+            [
+                ChallengeEvaluationCriterion(
+                    challenge=self,
+                    label=criterion,
+                    position=index,
+                )
+                for index, criterion in enumerate(criteria_items, start=1)
+            ]
+        )
+
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title
+
+
+class ChallengeEvaluationCriterion(models.Model):
+    challenge = models.ForeignKey(
+        Challenge,
+        on_delete=models.CASCADE,
+        related_name="evaluation_criteria_items",
+    )
+    label = models.CharField(_("Criterio"), max_length=255)
+    position = models.PositiveIntegerField(_("Posición"))
+
+    class Meta:
+        verbose_name = _("Criterio de evaluación")
+        verbose_name_plural = _("Criterios de evaluación")
+        ordering = ["position", "id"]
+        constraints = [
+            UniqueConstraint(
+                fields=["challenge", "position"],
+                name="unique_evaluation_criterion_position_per_challenge",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.challenge}: {self.label}"
 
 class Application(models.Model):
     """

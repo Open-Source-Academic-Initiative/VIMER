@@ -258,11 +258,45 @@ Current enforcement:
 - adjudication service validation
 - evaluation flow and service tests
 
+### INV-16
+
+Rule:
+
+- A Desafío must define evaluation criteria before it can enter Evaluación.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- `Challenge.evaluation_criteria`
+- `ChallengeEvaluationCriterion`
+- challenge publication flow
+- evaluation application service before state transition
+- marketplace and evaluation tests
+
+### INV-17
+
+Rule:
+
+- A winning Propuesta must have all its criteria evaluated before adjudication.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- `ApplicationCriterionEvaluation`
+- evaluation application service before adjudication
+- evaluation flow and service tests
+
 ## Near-Term Enforcement Priorities
 
 The next invariants to implement in code should be:
 
-1. translate evaluation outcomes to richer domain events
+1. expand domain-event consumers beyond the current evaluation history timeline
 
 ## Traceability Expectation
 

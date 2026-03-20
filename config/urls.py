@@ -12,6 +12,7 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('marketplace/', include(('apps.marketplace.urls', 'marketplace'), namespace='marketplace')),
     path('evaluation/', include(('apps.evaluation.urls', 'evaluation'), namespace='evaluation')),
+    path('notifications/', include(('apps.notifications.urls', 'notifications'), namespace='notifications')),
     path('', LandingPageView.as_view(), name='home'),
 ]
 

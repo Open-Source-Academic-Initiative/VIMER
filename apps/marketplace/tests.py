@@ -12,6 +12,11 @@ from django.utils import timezone
 
 from apps.corporate.avatar_utils import generate_default_logo
 from apps.corporate.models import Organization
+from apps.evaluation.application.commands import (
+    CriterionAssessmentInput,
+    EvaluateApplicationCommand,
+)
+from apps.evaluation.application.services import evaluate_application_by_criteria
 from apps.marketplace.application.commands import (
     PublishChallengeCommand,
     SubmitApplicationCommand,
@@ -216,6 +221,104 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.supply_organization.logo.url)
 
+    def test_challenge_detail_shows_evaluation_criteria(self):
+        self.challenge.evaluation_criteria = (
+            "Experiencia sectorial\n"
+            "Viabilidad técnica\n"
+            "Plan de ejecución"
+        )
+        self.challenge.save()
+        self.challenge.evaluation_criteria_items.create(label="Experiencia sectorial", position=1)
+        self.challenge.evaluation_criteria_items.create(label="Viabilidad técnica", position=2)
+        self.challenge.evaluation_criteria_items.create(label="Plan de ejecución", position=3)
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Criterios de evaluación")
+        self.assertContains(response, "Experiencia sectorial")
+        self.assertContains(response, "Viabilidad técnica")
+        self.assertContains(response, "Plan de ejecución")
+
+    def test_challenge_detail_shows_application_average_score_for_publisher(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        application = Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            proposal_text="Initial proposal",
+            problem_understanding="Entendimiento inicial",
+            proposed_solution="Solución inicial",
+            capabilities_evidence="Capacidades iniciales",
+            execution_plan="Plan inicial",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=application,
+            actor=self.demand_user,
+            command=EvaluateApplicationCommand(
+                application_id=application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[0].pk,
+                        score=4,
+                        comment="Buen encaje técnico.",
+                    ),
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[1].pk,
+                        score=5,
+                        comment="Experiencia sólida.",
+                    ),
+                ),
+            ),
+        )
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Promedio actual")
+        self.assertContains(response, "4,50 / 5")
+        self.assertContains(response, "Detalle por criterio")
+
+    def test_challenge_create_persists_evaluation_criteria(self):
+        self.client.force_login(self.demand_user)
+
+        response = self.client.post(
+            reverse("marketplace:challenge-create"),
+            {
+                "title": "Nuevo desafío con criterios",
+                "description": "Descripción con criterios explícitos.",
+                "evaluation_criteria": (
+                    "Alineación técnica\n"
+                    "Capacidad de ejecución\n"
+                    "Costo total"
+                ),
+                "application_deadline": timezone.localdate() + timedelta(days=14),
+            },
+        )
+
+        self.assertRedirects(response, reverse("marketplace:challenge-list"))
+        created_challenge = Challenge.objects.get(title="Nuevo desafío con criterios")
+        self.assertEqual(
+            created_challenge.evaluation_criteria,
+            "Alineación técnica\nCapacidad de ejecución\nCosto total",
+        )
+        self.assertEqual(
+            list(created_challenge.evaluation_criteria_items.values_list("label", flat=True)),
+            ["Alineación técnica", "Capacidad de ejecución", "Costo total"],
+        )
+
     def test_challenge_apply_requires_all_proposal_components(self):
         self.client.force_login(self.supply_user)
         payload = self.make_application_payload()
@@ -263,12 +366,21 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
             command=PublishChallengeCommand(
                 title="Published challenge",
                 description="Description",
+                evaluation_criteria="Viabilidad técnica\nExperiencia\nCosto",
                 application_deadline=future_deadline,
             ),
         )
 
         self.assertEqual(challenge.status, Challenge.Status.PUBLISHED)
         self.assertEqual(challenge.application_deadline, future_deadline)
+        self.assertEqual(
+            challenge.evaluation_criteria,
+            "Viabilidad técnica\nExperiencia\nCosto",
+        )
+        self.assertEqual(
+            list(challenge.evaluation_criteria_items.values_list("label", flat=True)),
+            ["Viabilidad técnica", "Experiencia", "Costo"],
+        )
 
     def test_publish_challenge_rejects_invalid_publisher_role_with_validation_error(self):
         with self.assertRaises(ChallengePublicationValidationError) as captured:
@@ -277,6 +389,7 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
                 command=PublishChallengeCommand(
                     title="Invalid challenge",
                     description="Description",
+                    evaluation_criteria="Criterios",
                 ),
             )
 
@@ -292,6 +405,7 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
                 command=PublishChallengeCommand(
                     title="Invalid challenge",
                     description="Description",
+                    evaluation_criteria="Criterios",
                     application_deadline=timezone.localdate() - timedelta(days=1),
                 ),
             )

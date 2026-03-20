@@ -43,6 +43,7 @@ def publish_challenge(
         publisher=publisher,
         title=command.title,
         description=command.description,
+        evaluation_criteria=command.evaluation_criteria,
         status=Challenge.Status.PUBLISHED,
         application_deadline=command.application_deadline,
     )
@@ -51,6 +52,8 @@ def publish_challenge(
         challenge.save()
     except ValidationError as exc:
         raise ChallengePublicationValidationError(exc.messages) from exc
+
+    challenge.sync_evaluation_criteria_items()
 
     return challenge
 

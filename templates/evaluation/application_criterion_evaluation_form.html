@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Evaluar Propuesta - VIMER{% endblock %}
+{% block content %}
+<h2>Evaluar Propuesta</h2>
+<h3>{{ application.applicant.business_name }}</h3>
+<p><strong>Desafío:</strong> {{ challenge.title }}</p>
+<p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+
+<form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="card">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+    {% for field in form %}
+        <p>{{ field.label_tag }} {{ field }}</p>
+        {% if field.help_text %}
+            <small>{{ field.help_text }}</small>
+        {% endif %}
+        {% for error in field.errors %}
+            <p>{{ error }}</p>
+        {% endfor %}
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Guardar evaluación</button>
+</form>
+
+<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al desafío</a></p>
+{% endblock %}

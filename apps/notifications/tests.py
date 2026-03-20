@@ -1,0 +1,252 @@
+from datetime import timedelta
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from apps.corporate.models import Organization
+from apps.evaluation.application.commands import (
+    AwardDecisionCommand,
+    CriterionAssessmentInput,
+    EvaluateApplicationCommand,
+)
+from apps.evaluation.application.services import (
+    adjudicate_challenge,
+    evaluate_application_by_criteria,
+    start_challenge_evaluation,
+)
+from apps.marketplace.models import Application, Challenge
+from apps.notifications.application.services import mark_all_notifications_as_read
+from apps.notifications.models import Notification
+
+
+class NotificationEventIntegrationTests(TestCase):
+    def build_complete_evaluation_command(self):
+        self.challenge.sync_evaluation_criteria_items()
+        return EvaluateApplicationCommand(
+            application_id=self.application.pk,
+            assessments=tuple(
+                CriterionAssessmentInput(
+                    criterion_id=criterion.pk,
+                    score=4,
+                    comment=f"Comentario de evaluación para {criterion.label}.",
+                )
+                for criterion in self.challenge.evaluation_criteria_items.order_by("position")
+            ),
+        )
+
+    def setUp(self):
+        self.publisher = Organization.objects.create(
+            tax_id="930000001",
+            business_name="Solicitante Notifica",
+            chamber_of_commerce_record="CC-NOTIF-1",
+            role="DEMAND_SIDE",
+            contact_email="solicitante-notifica@example.com",
+            contact_phone="3005550001",
+        )
+        self.provider = Organization.objects.create(
+            tax_id="930000002",
+            business_name="Proveedor Notifica",
+            chamber_of_commerce_record="CC-NOTIF-2",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-notifica@example.com",
+            contact_phone="3005550002",
+        )
+        self.other_provider = Organization.objects.create(
+            tax_id="930000003",
+            business_name="Proveedor Alterno",
+            chamber_of_commerce_record="CC-NOTIF-3",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-alterno@example.com",
+            contact_phone="3005550003",
+        )
+        User = get_user_model()
+        self.publisher_user = User.objects.create_user(
+            username="publisher_notifications",
+            email="publisher-notifications@example.com",
+            password="ClaveSegura123",
+            organization=self.publisher,
+        )
+        self.provider_user = User.objects.create_user(
+            username="provider_notifications",
+            email="provider-notifications@example.com",
+            password="ClaveSegura123",
+            organization=self.provider,
+        )
+        self.other_provider_user = User.objects.create_user(
+            username="other_provider_notifications",
+            email="other-provider-notifications@example.com",
+            password="ClaveSegura123",
+            organization=self.other_provider,
+        )
+        self.challenge = Challenge.objects.create(
+            publisher=self.publisher,
+            title="Challenge notifications",
+            description="Description",
+            evaluation_criteria="Experiencia, viabilidad técnica y plan de entrega.",
+            application_deadline=timezone.localdate() + timedelta(days=7),
+        )
+        self.application = Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.provider,
+            proposal_text="Resumen",
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
+        self.other_application = Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.other_provider,
+            proposal_text="Resumen alterno",
+            problem_understanding="Otro entendimiento",
+            proposed_solution="Otra solución",
+            capabilities_evidence="Otras capacidades",
+            execution_plan="Otro plan",
+        )
+
+    def test_start_evaluation_creates_notifications_for_applicant_members(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            start_challenge_evaluation(
+                challenge=self.challenge,
+                actor=self.publisher_user,
+            )
+
+        self.assertEqual(
+            Notification.objects.filter(
+                kind=Notification.Kind.EVALUATION_STARTED
+            ).count(),
+            2,
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.provider_user,
+                title="Tu propuesta entró en evaluación",
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.other_provider_user,
+                title="Tu propuesta entró en evaluación",
+            ).exists()
+        )
+
+    def test_award_creates_notifications_for_publisher_and_applicants(self):
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=self.build_complete_evaluation_command(),
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            adjudicate_challenge(
+                challenge=self.challenge,
+                actor=self.publisher_user,
+                command=AwardDecisionCommand(
+                    winning_application_id=self.application.pk,
+                    comment="Ganadora por mayor ajuste técnico.",
+                ),
+            )
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.publisher_user,
+                title="Registraste una adjudicación",
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.provider_user,
+                title="Tu propuesta fue adjudicada",
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.other_provider_user,
+                title="Se registró la adjudicación del desafío",
+            ).exists()
+        )
+
+    def test_mark_all_notifications_as_read_updates_unread_notifications(self):
+        Notification.objects.create(
+            recipient=self.provider_user,
+            kind=Notification.Kind.EVALUATION_STARTED,
+            title="Pendiente",
+            body="Mensaje",
+        )
+        Notification.objects.create(
+            recipient=self.provider_user,
+            kind=Notification.Kind.CHALLENGE_AWARDED,
+            title="Pendiente 2",
+            body="Mensaje 2",
+        )
+
+        updated = mark_all_notifications_as_read(recipient=self.provider_user)
+
+        self.assertEqual(updated, 2)
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.provider_user,
+                read_at__isnull=True,
+            ).count(),
+            0,
+        )
+
+
+class NotificationFlowTests(TestCase):
+    def setUp(self):
+        organization = Organization.objects.create(
+            tax_id="940000001",
+            business_name="Organizacion Flow Notif",
+            chamber_of_commerce_record="CC-NOTIF-F1",
+            role="SUPPLY_SIDE",
+            contact_email="flow-notif@example.com",
+            contact_phone="3006660001",
+        )
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="flow_notifications",
+            email="flow-notifications@example.com",
+            password="ClaveSegura123",
+            organization=organization,
+        )
+        Notification.objects.create(
+            recipient=self.user,
+            kind=Notification.Kind.EVALUATION_STARTED,
+            title="Nueva notificación",
+            body="El desafío pasó a evaluación.",
+            link="/marketplace/challenge/1/",
+        )
+
+    def test_notifications_list_view_shows_unread_notifications(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("notifications:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nueva notificación")
+        self.assertContains(response, "No leída")
+
+    def test_mark_all_read_view_marks_notifications_as_read(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("notifications:mark-all-read"))
+
+        self.assertRedirects(response, reverse("notifications:list"))
+        self.assertFalse(
+            Notification.objects.filter(
+                recipient=self.user,
+                read_at__isnull=True,
+            ).exists()
+        )
+
+    def test_base_navigation_shows_unread_notification_count(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("notifications:list"))
+
+        self.assertContains(response, "Notificaciones (1)")

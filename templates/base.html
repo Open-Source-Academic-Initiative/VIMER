@@ -46,6 +46,7 @@
         <div>
             {% if user.is_authenticated %}
                 <a href="{% url 'marketplace:challenge-list' %}">Desafíos</a>
+                <a href="{% url 'notifications:list' %}">Notificaciones ({{ notifications_unread_count }})</a>
                 {% if user.organization.role == 'DEMAND_SIDE' %}
                     <a href="{% url 'marketplace:challenge-create' %}">Publicar Reto</a>
                 {% endif %}

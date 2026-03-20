@@ -26,6 +26,16 @@
     <hr>
     <h3>Descripción</h3>
     <p>{{ challenge.description|linebreaks }}</p>
+    <h3>Criterios de evaluación</h3>
+    {% if evaluation_criteria_items %}
+        <ul>
+            {% for criterion in evaluation_criteria_items %}
+                <li>{{ criterion }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Aún no se han definido criterios de evaluación para este desafío.</p>
+    {% endif %}
 </div>
 
 {% if user.organization.role == 'SUPPLY_SIDE' and challenge.is_open_for_applications %}
@@ -34,10 +44,10 @@
     <p>Este desafío no está abierto para recibir propuestas.</p>
 {% endif %}
 
-{% if user.organization == challenge.publisher %}
+    {% if user.organization == challenge.publisher %}
     <h3>Interesados en este desafío:</h3>
     <ul>
-        {% for app in challenge.applications.all %}
+        {% for app in challenge_applications %}
             <li>
                 <span class="org-chip">
                     {% if app.applicant.logo %}
@@ -54,6 +64,49 @@
                     <strong>Capacidades:</strong> {{ app.capabilities_evidence|truncatewords:20 }}<br>
                     <strong>Plan:</strong> {{ app.execution_plan|truncatewords:20 }}
                 </div>
+                {% if challenge.status == 'UNDER_EVALUATION' %}
+                    <p>
+                        <strong>Evaluación por criterios:</strong>
+                        {{ app.evaluation_summary.evaluated_count }}/{{ app.evaluation_summary.criteria_total }}
+                        completados
+                    </p>
+                    {% if app.evaluation_summary.average_score is not None %}
+                        <p>
+                            <strong>Promedio actual:</strong>
+                            {{ app.evaluation_summary.average_score|floatformat:2 }} / 5
+                            | <strong>Puntaje acumulado:</strong>
+                            {{ app.evaluation_summary.total_score }}
+                        </p>
+                    {% endif %}
+                    {% if app.evaluation_summary.criterion_results %}
+                        <details>
+                            <summary>Detalle por criterio</summary>
+                            <ul>
+                                {% for result in app.evaluation_summary.criterion_results %}
+                                    <li>
+                                        <strong>{{ result.label }}:</strong>
+                                        {% if result.score is not None %}
+                                            {{ result.score }}/5. {{ result.comment }}
+                                            {% if result.evaluated_by_username %}
+                                                ({{ result.evaluated_by_username }})
+                                            {% endif %}
+                                        {% else %}
+                                            Pendiente
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                    {% endif %}
+                    <p>
+                        <a
+                            href="{% url 'evaluation:application-criterion-evaluation-update' challenge.pk app.pk %}"
+                            class="btn btn-primary"
+                        >
+                            Evaluar propuesta
+                        </a>
+                    </p>
+                {% endif %}
             </li>
         {% empty %}
             <li>Aún no hay propuestas para este desafío.</li>
@@ -76,6 +129,25 @@
             <p><strong>Comentario:</strong> {{ award_decision.comment }}</p>
             <p><strong>Decidido por:</strong> {{ award_decision.decided_by.username }}</p>
         </div>
+    {% endif %}
+
+    {% if timeline_entries %}
+        <h3>Historial de evaluación</h3>
+        <ul>
+            {% for entry in timeline_entries %}
+                <li>
+                    <strong>{{ entry.get_event_type_display }}</strong>:
+                    {{ entry.description }}
+                    <br>
+                    <small>
+                        {{ entry.occurred_at }} por {{ entry.actor.username }}
+                        {% if entry.award_decision %}
+                            | Propuesta ganadora: {{ entry.award_decision.winning_application.applicant.business_name }}
+                        {% endif %}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
     {% endif %}
 {% endif %}
 

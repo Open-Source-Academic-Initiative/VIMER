@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Notificaciones - VIMER{% endblock %}
+{% block content %}
+<h2>Notificaciones</h2>
+
+{% if notifications %}
+    <form method="post" action="{% url 'notifications:mark-all-read' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">Marcar todas como leídas</button>
+    </form>
+    <hr>
+    {% for notification in notifications %}
+        <div class="card">
+            <p><strong>{{ notification.title }}</strong></p>
+            <p>{{ notification.body }}</p>
+            <p>
+                <strong>Estado:</strong>
+                {% if notification.is_read %}
+                    Leída
+                {% else %}
+                    No leída
+                {% endif %}
+            </p>
+            <p><small>{{ notification.created_at }}</small></p>
+            {% if notification.link %}
+                <p><a href="{{ notification.link }}">Ver desafío</a></p>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% else %}
+    <p>No tienes notificaciones todavía.</p>
+{% endif %}
+{% endblock %}

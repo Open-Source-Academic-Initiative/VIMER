@@ -4,6 +4,58 @@
 <h2>Adjudicar Desafío</h2>
 <h3>{{ challenge.title }}</h3>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+{% if challenge.evaluation_criteria_list %}
+    <h4>Criterios de evaluación</h4>
+    <ul>
+        {% for criterion in challenge.evaluation_criteria_list %}
+            <li>{{ criterion }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if application_evaluation_summaries %}
+    <h4>Resumen comparativo de propuestas</h4>
+    <ul>
+        {% for application in application_evaluation_summaries %}
+            <li>
+                <strong>{{ application.applicant.business_name }}</strong>
+                <br>
+                <strong>Avance:</strong>
+                {{ application.evaluation_summary.evaluated_count }}/{{ application.evaluation_summary.criteria_total }}
+                criterios evaluados
+                <br>
+                {% if application.evaluation_summary.average_score is not None %}
+                    <strong>Promedio actual de evaluación:</strong>
+                    {{ application.evaluation_summary.average_score|floatformat:2 }} / 5
+                    | <strong>Puntaje acumulado:</strong>
+                    {{ application.evaluation_summary.total_score }}
+                {% else %}
+                    Aún no registra evaluaciones por criterio.
+                {% endif %}
+                <br>
+                <strong>Elegible para adjudicación:</strong>
+                {% if application.evaluation_summary.is_complete %}
+                    Sí
+                {% else %}
+                    No
+                {% endif %}
+                {% if application.evaluation_summary.criterion_results %}
+                    <ul>
+                        {% for result in application.evaluation_summary.criterion_results %}
+                            <li>
+                                <strong>{{ result.label }}:</strong>
+                                {% if result.score is not None %}
+                                    {{ result.score }}/5. {{ result.comment }}
+                                {% else %}
+                                    Pendiente
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}

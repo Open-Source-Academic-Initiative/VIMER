@@ -7,12 +7,19 @@ from django.views import View
 from django.views.generic import FormView
 
 from apps.evaluation.application.exceptions import ChallengeEvaluationValidationError
+from apps.evaluation.application.queries import (
+    build_challenge_application_evaluation_summaries,
+)
 from apps.evaluation.application.services import (
     adjudicate_challenge,
+    evaluate_application_by_criteria,
     start_challenge_evaluation,
 )
-from apps.evaluation.forms import AwardDecisionForm
-from apps.marketplace.models import Challenge
+from apps.evaluation.forms import (
+    ApplicationCriterionEvaluationForm,
+    AwardDecisionForm,
+)
+from apps.marketplace.models import Application, Challenge
 
 
 class ChallengePublisherRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -63,6 +70,13 @@ class AwardDecisionCreateView(ChallengePublisherRequiredMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["challenge"] = self.get_challenge()
+        form = context.get("form")
+        if form is not None and hasattr(form, "evaluation_summaries"):
+            context["application_evaluation_summaries"] = form.evaluation_summaries
+        else:
+            context["application_evaluation_summaries"] = (
+                build_challenge_application_evaluation_summaries(self.get_challenge())
+            )
         return context
 
     def get_success_url(self):
@@ -83,5 +97,57 @@ class AwardDecisionCreateView(ChallengePublisherRequiredMixin, FormView):
         messages.success(
             self.request,
             "La decisión de adjudicación fue registrada.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class ApplicationCriterionEvaluationUpdateView(ChallengePublisherRequiredMixin, FormView):
+    form_class = ApplicationCriterionEvaluationForm
+    template_name = "evaluation/application_criterion_evaluation_form.html"
+
+    def get_application(self):
+        if not hasattr(self, "_application"):
+            self._application = get_object_or_404(
+                Application.objects.select_related("applicant", "challenge"),
+                pk=self.kwargs["application_pk"],
+            )
+        return self._application
+
+    def dispatch(self, request, *args, **kwargs):
+        if self.get_application().challenge_id != self.get_challenge().pk:
+            return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["challenge"] = self.get_challenge()
+        kwargs["application"] = self.get_application()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["challenge"] = self.get_challenge()
+        context["application"] = self.get_application()
+        return context
+
+    def get_success_url(self):
+        return reverse("marketplace:challenge-detail", args=[self.get_challenge().pk])
+
+    def form_valid(self, form):
+        try:
+            evaluate_application_by_criteria(
+                challenge=self.get_challenge(),
+                application=self.get_application(),
+                actor=self.request.user,
+                command=form.to_command(),
+            )
+        except ChallengeEvaluationValidationError as exc:
+            for message in exc.messages:
+                form.add_error(None, message)
+            return self.form_invalid(form)
+
+        messages.success(
+            self.request,
+            "La evaluación por criterios fue registrada.",
         )
         return HttpResponseRedirect(self.get_success_url())

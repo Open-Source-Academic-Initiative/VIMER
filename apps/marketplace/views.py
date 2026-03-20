@@ -4,7 +4,10 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, FormView, ListView
 from django.urls import reverse_lazy
 from apps.corporate.models import Organization
-from apps.evaluation.models import AwardDecision
+from apps.evaluation.application.queries import (
+    build_challenge_application_evaluation_summaries,
+)
+from apps.evaluation.models import AwardDecision, ChallengeTimelineEntry
 from apps.marketplace.application.exceptions import (
     ChallengeApplicationValidationError,
     DuplicateChallengeApplicationError,
@@ -46,6 +49,16 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
             "winning_application__applicant",
             "decided_by",
         ).first()
+        context["timeline_entries"] = ChallengeTimelineEntry.objects.filter(
+            challenge=challenge
+        ).select_related(
+            "actor",
+            "award_decision__winning_application__applicant",
+        )
+        context["evaluation_criteria_items"] = challenge.evaluation_criteria_list()
+        context["challenge_applications"] = build_challenge_application_evaluation_summaries(
+            challenge
+        )
         context["can_start_evaluation"] = (
             user_org is not None
             and challenge.publisher_id == user_org.pk

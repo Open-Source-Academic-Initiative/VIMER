@@ -107,11 +107,11 @@ Business meaning:
 
 Current technical mapping:
 
-- Not implemented yet as its own module or app.
+- `apps/evaluation/`
 
 Notes:
 
-- This is part of the target core domain and should become explicit in code.
+- This is already explicit in code and should continue evolving as an isolated context.
 
 ### Decisión de adjudicación
 
@@ -121,7 +121,7 @@ Business meaning:
 
 Current technical mapping:
 
-- Not implemented yet.
+- `evaluation.AwardDecision`
 
 ### Administración de plataforma
 

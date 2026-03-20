@@ -7,6 +7,7 @@ from typing import Optional
 class PublishChallengeCommand:
     title: str
     description: str
+    evaluation_criteria: str = ""
     application_deadline: Optional[date] = None
 
 

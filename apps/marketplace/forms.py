@@ -12,6 +12,11 @@ class ChallengePublicationForm(forms.Form):
         widget=forms.Textarea,
         label="Descripción del Reto / Necesidad",
     )
+    evaluation_criteria = forms.CharField(
+        widget=forms.Textarea,
+        label="Criterios de evaluación",
+        help_text="Describe cómo se evaluarán las propuestas para este desafío. Usa una línea por criterio.",
+    )
     application_deadline = forms.DateField(
         required=False,
         label="Fecha límite para recibir propuestas",
@@ -22,6 +27,7 @@ class ChallengePublicationForm(forms.Form):
         return PublishChallengeCommand(
             title=self.cleaned_data["title"],
             description=self.cleaned_data["description"],
+            evaluation_criteria=self.cleaned_data["evaluation_criteria"],
             application_deadline=self.cleaned_data.get("application_deadline"),
         )
 

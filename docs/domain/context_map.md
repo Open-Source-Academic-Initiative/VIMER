@@ -10,6 +10,7 @@ The current codebase is still organized mostly around:
 - `corporate`
 - `marketplace`
 - `evaluation`
+- `notifications`
 
 The target domain view is more explicit and should guide future refactors.
 
@@ -44,6 +45,8 @@ Current code:
 Responsibilities today:
 
 - challenge publication
+- challenge evaluation criteria definition
+- structured challenge evaluation criteria
 - proposal submission
 - challenge browsing
 
@@ -60,12 +63,26 @@ Issue:
 Responsibilities today:
 
 - transition from published challenge to evaluation
+- criterion-by-criterion proposal assessment
+- proposal evaluation summaries for comparison and adjudication
 - adjudication decision
 - winning proposal selection with mandatory comment
 
 Current code:
 
 - `apps/evaluation/`
+
+### Notifications
+
+Responsibilities today:
+
+- event-driven internal notifications
+- unread notification tracking
+- notification inbox for representatives
+
+Current code:
+
+- `apps/notifications/`
 
 ## Target Context View
 
@@ -101,6 +118,8 @@ Owns:
 
 - challenge publication
 - challenge lifecycle
+- evaluation criteria foundation
+- structured evaluation-criteria entries
 - challenge state transitions
 - application window
 
@@ -136,11 +155,31 @@ Supplies to:
 Owns:
 
 - proposal review
+- criterion assessments
+- proposal evaluation read models / summaries
 - adjudication decision
 - evaluation outcomes
 
 Consumes from:
 
+- `Challenge`
+- `Application`
+
+Supplies to:
+
+- `Notifications`
+
+### Notifications
+
+Owns:
+
+- internal user notifications
+- unread/read state
+- event-driven inbox entries
+
+Consumes from:
+
+- `Evaluation`
 - `Challenge`
 - `Application`
 
@@ -200,6 +239,10 @@ Long term:
 
 - Evaluation operates on proposals in the context of a challenge.
 
+### Evaluation -> Notifications
+
+- Evaluation emits events that can be consumed for internal user notifications.
+
 ### Platform Administration
 
 - Operates across contexts but should not distort the core market language.
@@ -210,4 +253,5 @@ Long term:
 2. Add lifecycle semantics to `Challenge`.
 3. Add structured proposal semantics to `Application`.
 4. Introduce `Evaluation`.
-5. Revisit technical names later, once behavior stabilizes.
+5. Expand `Notifications` as a dedicated supporting context.
+6. Revisit technical names later, once behavior stabilizes.
