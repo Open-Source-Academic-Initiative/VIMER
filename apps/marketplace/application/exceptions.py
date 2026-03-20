@@ -2,6 +2,12 @@ class MarketplaceApplicationError(Exception):
     pass
 
 
+class ChallengePublicationValidationError(MarketplaceApplicationError):
+    def __init__(self, messages):
+        self.messages = list(messages)
+        super().__init__(" ".join(self.messages))
+
+
 class DuplicateChallengeApplicationError(MarketplaceApplicationError):
     pass
 

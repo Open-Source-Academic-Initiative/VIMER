@@ -11,6 +11,7 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='identity/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('marketplace/', include(('apps.marketplace.urls', 'marketplace'), namespace='marketplace')),
+    path('evaluation/', include(('apps.evaluation.urls', 'evaluation'), namespace='evaluation')),
     path('', LandingPageView.as_view(), name='home'),
 ]
 

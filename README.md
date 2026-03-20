@@ -13,10 +13,16 @@ Current status:
 - Write-side use cases are routed through explicit application services in `identity` and `marketplace`.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 24 tests.
+- The automated test suite currently passes with 47 tests.
 - Django Admin now prevents a platform superuser from deleting its own account.
 - Organizations can upload a custom logo during signup, limited to PNG/JPG; otherwise a procedural default avatar is generated automatically.
 - Organization logos/avatars are visible in marketplace publications and proposal listings.
+- Marketplace invariants for role enforcement and duplicate applications are now expressed through explicit domain rule modules.
+- Challenges now expose an explicit lifecycle status and optional application deadline.
+- Applications are accepted only while a challenge is published and still open for submission.
+- Proposals now use structured required components instead of relying only on a single free-text field.
+- Submitted proposals are immutable after submission.
+- The evaluation context is now explicit and supports adjudication with a mandatory decision comment.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
 
 ## Domain
@@ -68,7 +74,10 @@ Main models:
 - Marketplace access restricted to authenticated users.
 - Role-aware navigation.
 - Challenge publishing by `Solicitante` organizations.
+- Challenge lifecycle state and optional application deadline.
 - Challenge applications by `Proveedor tecnológico` organizations.
+- Structured proposal submission with required components.
+- Evaluation and adjudication flow for challenge publishers.
 - Basic Django admin integration.
 - Platform superuser safeguard against self-deletion in Django Admin.
 - Basic containerization with `Dockerfile` and `docker-compose.yml`.
@@ -78,7 +87,11 @@ Main models:
 - An organization's tax ID must be unique.
 - Only `DEMAND_SIDE` (`Solicitante`) organizations can publish challenges.
 - Only `SUPPLY_SIDE` (`Proveedor tecnológico`) organizations can apply to challenges.
+- Challenges only accept applications while they remain published and open for submission.
 - An organization cannot apply twice to the same challenge.
+- A submitted proposal must include all required structured components.
+- A submitted proposal cannot be modified after submission.
+- A challenge can have at most one adjudicated winning proposal.
 - A platform superuser cannot delete its own account from Django Admin.
 - Organization logos uploaded at signup are limited to PNG/JPG; when no custom image is provided, a procedural PNG avatar is generated automatically.
 
@@ -88,7 +101,7 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 24 tests.
+- `python manage.py test` currently passes with 47 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
@@ -96,6 +109,9 @@ Strengths:
 - The admin now includes an explicit safeguard to prevent a superuser from deleting its own account.
 - Signup now supports custom organization logos and guarantees a default procedural avatar when no image is uploaded.
 - Marketplace publications now display the publisher or applicant organization logo/avatar where relevant.
+- Challenges now carry an explicit lifecycle state and optional application deadline.
+- Applications now store structured proposal components and enforce immutability after submission.
+- Evaluation now lives in its own Django app and closes the loop through adjudication.
 
 Current limitations:
 - The default runtime profile remains development-oriented unless environment variables are configured carefully.
@@ -119,7 +135,12 @@ Priority issues identified during the audit were fixed:
 - Added a public landing page at `/` to separate public navigation from the signup flow.
 - Added an admin safeguard so a superuser cannot delete its own account.
 - Added optional signup logo upload with strict PNG/JPG validation and procedural PNG avatar generation as fallback.
-- Expanded automated coverage to 24 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, and superuser self-deletion safeguards.
+- Introduced explicit marketplace domain rule modules to name and centralize the current publication/application invariants.
+- Added challenge lifecycle semantics with explicit status and optional application deadline.
+- Prevented applications against challenges that are closed or no longer open for submission.
+- Formalized proposal submission with structured required components and immutable submitted applications.
+- Added an explicit evaluation context with challenge transition to evaluation, adjudication, mandatory comment, and one winning proposal per challenge.
+- Expanded automated coverage to 47 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, and evaluation/adjudication flows.
 
 ## Main routes
 
@@ -131,6 +152,8 @@ Priority issues identified during the audit were fixed:
 - `/marketplace/challenge/create/`: challenge creation
 - `/marketplace/challenge/<id>/`: challenge detail
 - `/marketplace/challenge/<id>/apply/`: proposal submission
+- `/evaluation/challenge/<id>/start/`: start challenge evaluation
+- `/evaluation/challenge/<id>/award/`: register adjudication decision
 - `/admin/`: administration
 
 ## Requirements

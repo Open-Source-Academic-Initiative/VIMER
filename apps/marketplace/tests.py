@@ -1,19 +1,30 @@
 import shutil
 import tempfile
+from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.corporate.avatar_utils import generate_default_logo
 from apps.corporate.models import Organization
-from apps.marketplace.application.commands import SubmitApplicationCommand
+from apps.marketplace.application.commands import (
+    PublishChallengeCommand,
+    SubmitApplicationCommand,
+)
 from apps.marketplace.application.exceptions import (
     ChallengeApplicationValidationError,
+    ChallengePublicationValidationError,
     DuplicateChallengeApplicationError,
 )
-from apps.marketplace.application.services import submit_challenge_application
+from apps.marketplace.application.services import (
+    publish_challenge,
+    submit_challenge_application,
+)
 from apps.marketplace.models import Application, Challenge
 
 
@@ -33,6 +44,14 @@ class MediaRootIsolatedTestCase(TestCase):
 
 
 class MarketplaceFlowTests(MediaRootIsolatedTestCase):
+    def make_application_payload(self):
+        return {
+            "problem_understanding": "Entendemos el reto y su contexto operativo.",
+            "proposed_solution": "Proponemos una solución tecnológica modular.",
+            "capabilities_evidence": "Tenemos experiencia, equipo y casos previos relevantes.",
+            "execution_plan": "Ejecutaremos en fases con hitos y seguimiento.",
+        }
+
     def setUp(self):
         self.demand_organization = Organization.objects.create(
             tax_id="900000101",
@@ -76,6 +95,7 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
             publisher=self.demand_organization,
             title="Existing challenge",
             description="Challenge description",
+            application_deadline=timezone.localdate() + timedelta(days=7),
         )
 
     def test_challenge_create_page_loads_for_demand_side_user(self):
@@ -85,6 +105,13 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "marketplace/challenge_form.html")
+
+    def test_challenge_create_page_forbidden_for_supply_side_user(self):
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(reverse("marketplace:challenge-create"))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_challenge_list_shows_publisher_logo(self):
         self.client.force_login(self.supply_user)
@@ -104,17 +131,46 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["challenge"], self.challenge)
 
+    def test_challenge_apply_page_forbidden_for_demand_side_user(self):
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_challenge_detail_hides_apply_action_when_challenge_is_closed(self):
+        self.challenge.status = Challenge.Status.CLOSED
+        self.challenge.save()
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Aplicar al Desafío")
+        self.assertContains(
+            response,
+            "Este desafío no está abierto para recibir propuestas.",
+        )
+
     def test_challenge_apply_duplicate_submission_shows_duplicate_message(self):
         Application.objects.create(
             challenge=self.challenge,
             applicant=self.supply_organization,
             proposal_text="Initial proposal",
+            problem_understanding="Entendimiento inicial",
+            proposed_solution="Solución inicial",
+            capabilities_evidence="Capacidades iniciales",
+            execution_plan="Plan inicial",
         )
         self.client.force_login(self.supply_user)
 
         response = self.client.post(
             reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
-            {"proposal_text": "Second proposal"},
+            self.make_application_payload(),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -124,11 +180,32 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
             "Tu organización ya envió una propuesta para este desafío.",
         )
 
+    def test_challenge_apply_closed_challenge_shows_not_open_message(self):
+        self.challenge.status = Challenge.Status.CLOSED
+        self.challenge.save()
+        self.client.force_login(self.supply_user)
+
+        response = self.client.post(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+            self.make_application_payload(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            None,
+            "Este desafío no está abierto para recibir propuestas.",
+        )
+
     def test_challenge_detail_shows_applicant_logo_for_publisher(self):
         Application.objects.create(
             challenge=self.challenge,
             applicant=self.supply_organization,
             proposal_text="Initial proposal",
+            problem_understanding="Entendimiento inicial",
+            proposed_solution="Solución inicial",
+            capabilities_evidence="Capacidades iniciales",
+            execution_plan="Plan inicial",
         )
         self.client.force_login(self.demand_user)
 
@@ -138,6 +215,19 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.supply_organization.logo.url)
+
+    def test_challenge_apply_requires_all_proposal_components(self):
+        self.client.force_login(self.supply_user)
+        payload = self.make_application_payload()
+        payload["execution_plan"] = ""
+
+        response = self.client.post(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+            payload,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors.get("execution_plan"))
 
 
 class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
@@ -162,10 +252,62 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
             publisher=self.demand_organization,
             title="Challenge",
             description="Description",
+            application_deadline=timezone.localdate() + timedelta(days=7),
+        )
+
+    def test_publish_challenge_sets_published_status_and_deadline(self):
+        future_deadline = timezone.localdate() + timedelta(days=10)
+
+        challenge = publish_challenge(
+            publisher=self.demand_organization,
+            command=PublishChallengeCommand(
+                title="Published challenge",
+                description="Description",
+                application_deadline=future_deadline,
+            ),
+        )
+
+        self.assertEqual(challenge.status, Challenge.Status.PUBLISHED)
+        self.assertEqual(challenge.application_deadline, future_deadline)
+
+    def test_publish_challenge_rejects_invalid_publisher_role_with_validation_error(self):
+        with self.assertRaises(ChallengePublicationValidationError) as captured:
+            publish_challenge(
+                publisher=self.supply_organization,
+                command=PublishChallengeCommand(
+                    title="Invalid challenge",
+                    description="Description",
+                ),
+            )
+
+        self.assertIn(
+            "Solo las organizaciones con rol Solicitante pueden publicar desafíos.",
+            captured.exception.messages,
+        )
+
+    def test_publish_challenge_rejects_past_deadline_for_published_challenge(self):
+        with self.assertRaises(ChallengePublicationValidationError) as captured:
+            publish_challenge(
+                publisher=self.demand_organization,
+                command=PublishChallengeCommand(
+                    title="Invalid challenge",
+                    description="Description",
+                    application_deadline=timezone.localdate() - timedelta(days=1),
+                ),
+            )
+
+        self.assertIn(
+            "La fecha límite de aplicación no puede estar en el pasado para un desafío publicado.",
+            captured.exception.messages,
         )
 
     def test_submit_application_rejects_duplicates(self):
-        command = SubmitApplicationCommand(proposal_text="Initial proposal")
+        command = SubmitApplicationCommand(
+            problem_understanding="Entendimiento inicial",
+            proposed_solution="Solución inicial",
+            capabilities_evidence="Capacidades iniciales",
+            execution_plan="Plan inicial",
+        )
 
         submit_challenge_application(
             challenge=self.challenge,
@@ -181,7 +323,12 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
             )
 
     def test_submit_application_rejects_invalid_applicant_role_with_validation_error(self):
-        command = SubmitApplicationCommand(proposal_text="Proposal")
+        command = SubmitApplicationCommand(
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
 
         with self.assertRaises(ChallengeApplicationValidationError) as captured:
             submit_challenge_application(
@@ -194,3 +341,83 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
             "Solo las organizaciones con rol Proveedor tecnológico pueden aplicar a desafíos.",
             captured.exception.messages,
         )
+
+    def test_submit_application_rejects_closed_challenge(self):
+        self.challenge.status = Challenge.Status.CLOSED
+        self.challenge.save()
+
+        with self.assertRaises(ChallengeApplicationValidationError) as captured:
+            submit_challenge_application(
+                challenge=self.challenge,
+                applicant=self.supply_organization,
+                command=SubmitApplicationCommand(
+                    problem_understanding="Entendimiento",
+                    proposed_solution="Solución",
+                    capabilities_evidence="Capacidades",
+                    execution_plan="Plan",
+                ),
+            )
+
+        self.assertIn(
+            "Este desafío no está abierto para recibir propuestas.",
+            captured.exception.messages,
+        )
+
+    def test_submit_application_rejects_expired_challenge(self):
+        with patch("apps.marketplace.models.timezone.localdate") as mocked_localdate:
+            mocked_localdate.return_value = self.challenge.application_deadline + timedelta(days=1)
+
+            with self.assertRaises(ChallengeApplicationValidationError) as captured:
+                submit_challenge_application(
+                    challenge=self.challenge,
+                    applicant=self.supply_organization,
+                    command=SubmitApplicationCommand(
+                        problem_understanding="Entendimiento",
+                        proposed_solution="Solución",
+                        capabilities_evidence="Capacidades",
+                        execution_plan="Plan",
+                    ),
+                )
+
+        self.assertIn(
+            "Este desafío no está abierto para recibir propuestas.",
+            captured.exception.messages,
+        )
+
+    def test_submit_application_requires_all_structured_components(self):
+        with self.assertRaises(ChallengeApplicationValidationError) as captured:
+            submit_challenge_application(
+                challenge=self.challenge,
+                applicant=self.supply_organization,
+                command=SubmitApplicationCommand(
+                    problem_understanding="",
+                    proposed_solution="Solución",
+                    capabilities_evidence="Capacidades",
+                    execution_plan="Plan",
+                ),
+            )
+
+        self.assertIn(
+            "La propuesta debe incluir: entendimiento del problema.",
+            captured.exception.messages,
+        )
+
+    def test_submitted_application_is_immutable(self):
+        application = submit_challenge_application(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            command=SubmitApplicationCommand(
+                problem_understanding="Entendimiento",
+                proposed_solution="Solución",
+                capabilities_evidence="Capacidades",
+                execution_plan="Plan",
+            ),
+        )
+
+        application.execution_plan = "Plan modificado"
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Una propuesta enviada no puede modificarse después del envío.",
+        ):
+            application.save()

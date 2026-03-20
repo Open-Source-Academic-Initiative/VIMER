@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Adjudicar Desafío - VIMER{% endblock %}
+{% block content %}
+<h2>Adjudicar Desafío</h2>
+<h3>{{ challenge.title }}</h3>
+<p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Registrar adjudicación</button>
+</form>
+<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al desafío</a></p>
+{% endblock %}

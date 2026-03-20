@@ -60,6 +60,11 @@
         </div>
     </nav>
     <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="card">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
         {% block content %}{% endblock %}
     </div>
 </body>

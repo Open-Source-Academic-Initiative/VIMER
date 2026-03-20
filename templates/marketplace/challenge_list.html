@@ -19,6 +19,15 @@
         {% endif %}
         <span>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></span>
     </p>
+    <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+    <p>
+        <strong>Fecha límite:</strong>
+        {% if challenge.application_deadline %}
+            {{ challenge.application_deadline }}
+        {% else %}
+            Sin fecha límite
+        {% endif %}
+    </p>
     <p>{{ challenge.description|truncatewords:30 }}</p>
     <a href="{% url 'marketplace:challenge-detail' challenge.pk %}" class="btn btn-primary">Ver Más</a>
 </div>

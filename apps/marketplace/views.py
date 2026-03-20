@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, FormView, ListView
 from django.urls import reverse_lazy
 from apps.corporate.models import Organization
+from apps.evaluation.models import AwardDecision
 from apps.marketplace.application.exceptions import (
     ChallengeApplicationValidationError,
     DuplicateChallengeApplicationError,
@@ -34,6 +35,32 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
     model = Challenge
     template_name = 'marketplace/challenge_detail.html'
     context_object_name = 'challenge'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        challenge = self.object
+        user_org = getattr(self.request.user, "organization", None)
+        context["award_decision"] = AwardDecision.objects.filter(
+            challenge=challenge
+        ).select_related(
+            "winning_application__applicant",
+            "decided_by",
+        ).first()
+        context["can_start_evaluation"] = (
+            user_org is not None
+            and challenge.publisher_id == user_org.pk
+            and challenge.status == Challenge.Status.PUBLISHED
+            and challenge.applications.exists()
+            and context["award_decision"] is None
+        )
+        context["can_award_challenge"] = (
+            user_org is not None
+            and challenge.publisher_id == user_org.pk
+            and challenge.status == Challenge.Status.UNDER_EVALUATION
+            and challenge.applications.exists()
+            and context["award_decision"] is None
+        )
+        return context
 
 class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
     form_class = ChallengePublicationForm

@@ -3,10 +3,23 @@
 {% block content %}
 <h2>Enviar Propuesta Tecnológica</h2>
 <h3>{{ challenge.title }}</h3>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Enviar Propuesta</button>
-</form>
+<p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+<p>
+    <strong>Fecha límite:</strong>
+    {% if challenge.application_deadline %}
+        {{ challenge.application_deadline }}
+    {% else %}
+        Sin fecha límite
+    {% endif %}
+</p>
+{% if challenge.is_open_for_applications %}
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Enviar Propuesta</button>
+    </form>
+{% else %}
+    <p>Este desafío no está abierto para recibir propuestas.</p>
+{% endif %}
 <p><a href="{% url 'marketplace:challenge-list' %}">Cancelar</a></p>
 {% endblock %}

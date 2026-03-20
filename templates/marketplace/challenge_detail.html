@@ -14,13 +14,24 @@
         <span>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></span>
     </p>
     <p>NIT: {{ challenge.publisher.tax_id }}</p>
+    <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+    <p>
+        <strong>Fecha límite:</strong>
+        {% if challenge.application_deadline %}
+            {{ challenge.application_deadline }}
+        {% else %}
+            Sin fecha límite
+        {% endif %}
+    </p>
     <hr>
     <h3>Descripción</h3>
     <p>{{ challenge.description|linebreaks }}</p>
 </div>
 
-{% if user.organization.role == 'SUPPLY_SIDE' %}
+{% if user.organization.role == 'SUPPLY_SIDE' and challenge.is_open_for_applications %}
     <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Aplicar al Desafío</a>
+{% elif user.organization.role == 'SUPPLY_SIDE' %}
+    <p>Este desafío no está abierto para recibir propuestas.</p>
 {% endif %}
 
 {% if user.organization == challenge.publisher %}
@@ -36,13 +47,36 @@
                             class="avatar avatar-marketplace"
                         >
                     {% endif %}
-                    <span><strong>{{ app.applicant.business_name }}:</strong> {{ app.proposal_text|truncatewords:20 }}</span>
+                    <span><strong>{{ app.applicant.business_name }}:</strong> {{ app.summary_text|truncatewords:20 }}</span>
                 </span>
+                <div>
+                    <strong>Entendimiento:</strong> {{ app.problem_understanding|truncatewords:20 }}<br>
+                    <strong>Capacidades:</strong> {{ app.capabilities_evidence|truncatewords:20 }}<br>
+                    <strong>Plan:</strong> {{ app.execution_plan|truncatewords:20 }}
+                </div>
             </li>
         {% empty %}
             <li>Aún no hay propuestas para este desafío.</li>
         {% endfor %}
     </ul>
+
+    {% if can_start_evaluation %}
+        <form method="post" action="{% url 'evaluation:challenge-evaluation-start' challenge.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Iniciar evaluación</button>
+        </form>
+    {% elif can_award_challenge %}
+        <p><a href="{% url 'evaluation:award-decision-create' challenge.pk %}" class="btn btn-primary">Adjudicar desafío</a></p>
+    {% endif %}
+
+    {% if award_decision %}
+        <h3>Decisión de adjudicación</h3>
+        <div class="card">
+            <p><strong>Propuesta ganadora:</strong> {{ award_decision.winning_application.applicant.business_name }}</p>
+            <p><strong>Comentario:</strong> {{ award_decision.comment }}</p>
+            <p><strong>Decidido por:</strong> {{ award_decision.decided_by.username }}</p>
+        </div>
+    {% endif %}
 {% endif %}
 
 <p><a href="{% url 'marketplace:challenge-list' %}">Volver a la lista</a></p>
