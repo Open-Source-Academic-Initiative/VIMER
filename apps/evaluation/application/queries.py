@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from django.db.models import Count, Prefetch
 
@@ -21,6 +21,8 @@ class ApplicationEvaluationSummary:
     is_complete: bool
     total_score: int
     average_score: float | None
+    ranking_position: int | None
+    eligible_ranking_position: int | None
     criterion_results: tuple[CriterionEvaluationSummary, ...]
 
 
@@ -62,6 +64,8 @@ def build_challenge_application_evaluation_summaries(challenge: Challenge) -> li
             ),
             total_score=total_score,
             average_score=average_score,
+            ranking_position=None,
+            eligible_ranking_position=None,
             criterion_results=tuple(
                 CriterionEvaluationSummary(
                     label=criterion.label,
@@ -83,6 +87,35 @@ def build_challenge_application_evaluation_summaries(challenge: Challenge) -> li
                 )
                 for criterion in criteria
             ),
+        )
+
+    applications.sort(
+        key=lambda application: (
+            0 if application.evaluation_summary.is_complete else 1,
+            -(
+                application.evaluation_summary.average_score
+                if application.evaluation_summary.average_score is not None
+                else -1
+            ),
+            -application.evaluation_summary.total_score,
+            -application.evaluation_summary.evaluated_count,
+            application.applicant.business_name.casefold(),
+            application.pk,
+        )
+    )
+
+    eligible_ranking_position = 0
+    for ranking_position, application in enumerate(applications, start=1):
+        summary = application.evaluation_summary
+        current_eligible_position = None
+        if summary.is_complete:
+            eligible_ranking_position += 1
+            current_eligible_position = eligible_ranking_position
+
+        application.evaluation_summary = replace(
+            summary,
+            ranking_position=ranking_position,
+            eligible_ranking_position=current_eligible_position,
         )
 
     return applications

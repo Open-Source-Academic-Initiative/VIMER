@@ -1,14 +1,17 @@
 from django.dispatch import receiver
 
 from apps.evaluation.domain.events import (
+    ApplicationEvaluationRecorded,
     ChallengeAwarded,
     ChallengeEvaluationStarted,
 )
 from apps.evaluation.domain.signals import (
+    application_evaluation_recorded,
     challenge_awarded,
     challenge_evaluation_started,
 )
 from apps.evaluation.models import ChallengeTimelineEntry
+from apps.marketplace.models import Application
 
 
 @receiver(
@@ -38,5 +41,24 @@ def record_challenge_awarded(sender, *, event, **kwargs):
         actor_id=event.decided_by_user_id,
         award_decision_id=event.award_decision_id,
         description="Se registró la adjudicación del desafío.",
+        occurred_at=event.occurred_at,
+    )
+
+
+@receiver(
+    application_evaluation_recorded,
+    sender=ApplicationEvaluationRecorded,
+    dispatch_uid="evaluation.record_application_evaluation_recorded",
+)
+def record_application_evaluation_recorded(sender, *, event, **kwargs):
+    application = Application.objects.select_related("applicant").get(pk=event.application_id)
+    ChallengeTimelineEntry.objects.create(
+        challenge_id=event.challenge_id,
+        event_type=ChallengeTimelineEntry.EventType.APPLICATION_EVALUATED,
+        actor_id=event.evaluated_by_user_id,
+        description=(
+            "Se registró la evaluación por criterios de la propuesta de "
+            f"'{application.applicant.business_name}'."
+        ),
         occurred_at=event.occurred_at,
     )

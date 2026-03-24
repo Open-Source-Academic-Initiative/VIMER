@@ -113,6 +113,60 @@ Notes:
 
 - This is already explicit in code and should continue evolving as an isolated context.
 
+### Evaluador designado
+
+Business meaning:
+
+- Representative explicitly assigned to score proposals criterion by criterion for one challenge.
+
+Current technical mapping:
+
+- `evaluation.ChallengeEvaluationRoleAssignment(role=EVALUATOR)`
+
+Notes:
+
+- This is not a market role.
+- This role belongs to evaluation governance, not to the market itself.
+
+### Adjudicador designado
+
+Business meaning:
+
+- Representative explicitly assigned to register the final award decision for one challenge.
+
+Current technical mapping:
+
+- `evaluation.ChallengeEvaluationRoleAssignment(role=ADJUDICATOR)`
+
+Notes:
+
+- This is not a market role.
+- Only one designated adjudicator exists per challenge in the current implementation.
+
+### Observador de evaluacion
+
+Business meaning:
+
+- Representative attached to an evaluation team for visibility and governance without direct mutation authority.
+
+Current technical mapping:
+
+- `evaluation.ChallengeEvaluationRoleAssignment(role=OBSERVER)`
+
+Notes:
+
+- This is not a market role.
+
+### Evento de historial del desafio
+
+Business meaning:
+
+- Persisted record of an important evaluation milestone in the history of a challenge.
+
+Current technical mapping:
+
+- `evaluation.ChallengeTimelineEntry`
+
 ### Decisión de adjudicación
 
 Business meaning:
@@ -122,6 +176,26 @@ Business meaning:
 Current technical mapping:
 
 - `evaluation.AwardDecision`
+
+### Snapshot de adjudicacion
+
+Business meaning:
+
+- Persisted evaluation context captured at the moment a winning proposal is adjudicated.
+
+Current technical mapping:
+
+- snapshot fields stored on `evaluation.AwardDecision`
+
+### Notificacion interna
+
+Business meaning:
+
+- Event-driven message delivered to a representative inside the platform inbox.
+
+Current technical mapping:
+
+- `notifications.Notification`
 
 ### Administración de plataforma
 
@@ -177,4 +251,9 @@ A change should be questioned if it introduces new user-facing language that dri
 - `Desafío`
 - `Propuesta`
 - `Evaluación`
+- `Evaluador designado`
+- `Adjudicador designado`
+- `Observador de evaluacion`
+- `Evento de historial del desafio`
+- `Notificacion interna`
 - `Administración de plataforma`

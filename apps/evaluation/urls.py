@@ -4,9 +4,15 @@ from apps.evaluation.views import (
     ApplicationCriterionEvaluationUpdateView,
     AwardDecisionCreateView,
     ChallengeEvaluationStartView,
+    ChallengeEvaluationRoleAssignmentUpdateView,
 )
 
 urlpatterns = [
+    path(
+        "challenge/<int:pk>/roles/",
+        ChallengeEvaluationRoleAssignmentUpdateView.as_view(),
+        name="challenge-evaluation-roles-update",
+    ),
     path(
         "challenge/<int:pk>/start/",
         ChallengeEvaluationStartView.as_view(),

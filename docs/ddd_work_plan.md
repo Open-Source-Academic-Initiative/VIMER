@@ -63,6 +63,7 @@ Objective:
 Actions:
 
 - Create `docs/domain/` for versioned domain references.
+- Add a single canonical ontology document that absorbs the evolving local ontological model.
 - Add ADRs for:
   - bounded context strategy
   - naming strategy between business terms and technical legacy names
@@ -75,6 +76,7 @@ Actions:
 
 Deliverables:
 
+- `docs/domain/ontology_v4.md`
 - `docs/domain/glossary.md`
 - `docs/domain/context_map.md`
 - `docs/domain/invariants.md`
@@ -83,6 +85,7 @@ Deliverables:
 Exit criteria:
 
 - Core domain concepts are documented in Git.
+- The ontology is no longer split across local notes and versioned fragments.
 - New feature work can reference versioned artifacts instead of local notes.
 
 ### 2. Explicit domain enforcement for the current MVP

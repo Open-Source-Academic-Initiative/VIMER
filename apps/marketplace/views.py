@@ -7,7 +7,11 @@ from apps.corporate.models import Organization
 from apps.evaluation.application.queries import (
     build_challenge_application_evaluation_summaries,
 )
-from apps.evaluation.models import AwardDecision, ChallengeTimelineEntry
+from apps.evaluation.models import (
+    AwardDecision,
+    ChallengeEvaluationRoleAssignment,
+    ChallengeTimelineEntry,
+)
 from apps.marketplace.application.exceptions import (
     ChallengeApplicationValidationError,
     DuplicateChallengeApplicationError,
@@ -55,20 +59,61 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
             "actor",
             "award_decision__winning_application__applicant",
         )
+        evaluation_role_assignments = challenge.evaluation_role_assignments.select_related(
+            "user"
+        )
+        context["evaluation_role_assignments"] = evaluation_role_assignments
+        context["evaluation_team"] = {
+            "evaluators": evaluation_role_assignments.filter(
+                role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR
+            ),
+            "adjudicator": evaluation_role_assignments.filter(
+                role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
+            ).first(),
+            "observers": evaluation_role_assignments.filter(
+                role=ChallengeEvaluationRoleAssignment.Role.OBSERVER
+            ),
+        }
         context["evaluation_criteria_items"] = challenge.evaluation_criteria_list()
         context["challenge_applications"] = build_challenge_application_evaluation_summaries(
             challenge
+        )
+        context["can_manage_evaluation_team"] = (
+            user_org is not None
+            and challenge.publisher_id == user_org.pk
+        )
+        context["has_required_evaluation_team"] = (
+            evaluation_role_assignments.filter(
+                role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR
+            ).exists()
+            and evaluation_role_assignments.filter(
+                role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
+            ).exists()
+        )
+        context["can_evaluate_applications"] = (
+            self.request.user.is_authenticated
+            and evaluation_role_assignments.filter(
+                user=self.request.user,
+                role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+            ).exists()
+        )
+        context["can_adjudicate_challenge"] = (
+            self.request.user.is_authenticated
+            and evaluation_role_assignments.filter(
+                user=self.request.user,
+                role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
+            ).exists()
         )
         context["can_start_evaluation"] = (
             user_org is not None
             and challenge.publisher_id == user_org.pk
             and challenge.status == Challenge.Status.PUBLISHED
             and challenge.applications.exists()
+            and context["has_required_evaluation_team"]
             and context["award_decision"] is None
         )
         context["can_award_challenge"] = (
-            user_org is not None
-            and challenge.publisher_id == user_org.pk
+            context["can_adjudicate_challenge"]
             and challenge.status == Challenge.Status.UNDER_EVALUATION
             and challenge.applications.exists()
             and context["award_decision"] is None

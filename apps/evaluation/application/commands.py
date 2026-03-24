@@ -18,3 +18,10 @@ class CriterionAssessmentInput:
 class EvaluateApplicationCommand:
     application_id: int
     assessments: tuple[CriterionAssessmentInput, ...]
+
+
+@dataclass(frozen=True)
+class AssignChallengeEvaluationRolesCommand:
+    evaluator_user_ids: tuple[int, ...]
+    adjudicator_user_id: int
+    observer_user_ids: tuple[int, ...]

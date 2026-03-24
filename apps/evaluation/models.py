@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from apps.marketplace.models import (
@@ -8,6 +9,65 @@ from apps.marketplace.models import (
     Challenge,
     ChallengeEvaluationCriterion,
 )
+
+
+class ChallengeEvaluationRoleAssignment(models.Model):
+    class Role(models.TextChoices):
+        EVALUATOR = "EVALUATOR", _("Evaluador designado")
+        ADJUDICATOR = "ADJUDICATOR", _("Adjudicador designado")
+        OBSERVER = "OBSERVER", _("Observador de evaluación")
+
+    challenge = models.ForeignKey(
+        Challenge,
+        on_delete=models.CASCADE,
+        related_name="evaluation_role_assignments",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="challenge_evaluation_role_assignments",
+    )
+    role = models.CharField(
+        _("Rol de evaluación"),
+        max_length=24,
+        choices=Role.choices,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Asignación de rol de evaluación")
+        verbose_name_plural = _("Asignaciones de roles de evaluación")
+        ordering = ["role", "user__username", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["challenge", "user", "role"],
+                name="unique_challenge_evaluation_role_assignment",
+            ),
+            models.UniqueConstraint(
+                fields=["challenge", "role"],
+                condition=Q(role="ADJUDICATOR"),
+                name="unique_adjudicator_per_challenge",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+
+        if self.challenge_id and self.user_id:
+            if self.user.organization_id != self.challenge.publisher_id:
+                errors["user"] = _(
+                    "Los roles de evaluación solo pueden asignarse a miembros de la organización publicadora."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.challenge} - {self.get_role_display()} - {self.user.username}"
 
 
 class AwardDecision(models.Model):
@@ -22,6 +82,36 @@ class AwardDecision(models.Model):
         related_name="award_decisions",
     )
     comment = models.TextField(_("Comentario de adjudicación"))
+    winning_total_score = models.PositiveIntegerField(
+        _("Puntaje total registrado al adjudicar"),
+        null=True,
+        blank=True,
+    )
+    winning_average_score = models.FloatField(
+        _("Promedio registrado al adjudicar"),
+        null=True,
+        blank=True,
+    )
+    winning_evaluated_criteria_count = models.PositiveIntegerField(
+        _("Cantidad de criterios evaluados al adjudicar"),
+        null=True,
+        blank=True,
+    )
+    winning_criteria_total = models.PositiveIntegerField(
+        _("Cantidad total de criterios al adjudicar"),
+        null=True,
+        blank=True,
+    )
+    winning_ranking_position = models.PositiveIntegerField(
+        _("Posición comparativa registrada al adjudicar"),
+        null=True,
+        blank=True,
+    )
+    winning_eligible_ranking_position = models.PositiveIntegerField(
+        _("Posición elegible registrada al adjudicar"),
+        null=True,
+        blank=True,
+    )
     decided_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -60,6 +150,7 @@ class AwardDecision(models.Model):
 class ChallengeTimelineEntry(models.Model):
     class EventType(models.TextChoices):
         EVALUATION_STARTED = "EVALUATION_STARTED", _("Evaluación iniciada")
+        APPLICATION_EVALUATED = "APPLICATION_EVALUATED", _("Propuesta evaluada")
         CHALLENGE_AWARDED = "CHALLENGE_AWARDED", _("Desafío adjudicado")
 
     challenge = models.ForeignKey(

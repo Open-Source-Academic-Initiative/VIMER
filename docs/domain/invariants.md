@@ -16,6 +16,8 @@ It is meant to connect business intent with concrete enforcement in:
 - database constraints
 - tests
 
+For the canonical cross-document domain model, see `docs/domain/ontology_v4.md`.
+
 ## Status Legend
 
 - `Implemented`: enforced in the current codebase
@@ -292,11 +294,124 @@ Current enforcement:
 - evaluation application service before adjudication
 - evaluation flow and service tests
 
+### INV-18
+
+Rule:
+
+- A Desafío must have at least one designated evaluator and one designated adjudicator before it can enter Evaluación.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- `ChallengeEvaluationRoleAssignment`
+- evaluation application service before state transition
+- evaluation flow and service tests
+
+### INV-19
+
+Rule:
+
+- Evaluation roles can only be assigned to representatives of the publisher organization.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- `ChallengeEvaluationRoleAssignment.clean()`
+- evaluation role-assignment service validation
+- model and flow tests
+
+### INV-20
+
+Rule:
+
+- Only a designated evaluator can register criterion-by-criterion proposal assessments.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- evaluation application service role check
+- evaluation view access control
+- evaluation flow and service tests
+
+### INV-21
+
+Rule:
+
+- Only the designated adjudicator can register the final award decision for a challenge.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- evaluation application service role check
+- adjudication view access control
+- evaluation flow and service tests
+
+### INV-22
+
+Rule:
+
+- A Desafío can have at most one designated adjudicator in the current model.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- conditional database unique constraint on `ChallengeEvaluationRoleAssignment`
+- model validation
+
+### INV-23
+
+Rule:
+
+- An adjudication decision must preserve the winning proposal's evaluation context for later traceability.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- snapshot fields on `AwardDecision`
+- adjudication application service
+- evaluation flow and service tests
+
+### INV-24
+
+Rule:
+
+- Major evaluation milestones must remain auditable after they occur.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- explicit evaluation domain events
+- `ChallengeTimelineEntry` persistence through event consumers
+- evaluation and notifications tests
+
 ## Near-Term Enforcement Priorities
 
 The next invariants to implement in code should be:
 
-1. expand domain-event consumers beyond the current evaluation history timeline
+1. protect blind-evaluation confidentiality through query, view, and template layers
+2. decide whether criterion assessment must support multiple independent evaluators
+3. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
 
 ## Traceability Expectation
 

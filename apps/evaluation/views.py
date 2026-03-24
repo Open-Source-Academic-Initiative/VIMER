@@ -11,6 +11,7 @@ from apps.evaluation.application.queries import (
     build_challenge_application_evaluation_summaries,
 )
 from apps.evaluation.application.services import (
+    assign_challenge_evaluation_roles,
     adjudicate_challenge,
     evaluate_application_by_criteria,
     start_challenge_evaluation,
@@ -18,7 +19,9 @@ from apps.evaluation.application.services import (
 from apps.evaluation.forms import (
     ApplicationCriterionEvaluationForm,
     AwardDecisionForm,
+    ChallengeEvaluationRoleAssignmentForm,
 )
+from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.marketplace.models import Application, Challenge
 
 
@@ -36,6 +39,19 @@ class ChallengePublisherRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
             and user.organization is not None
             and challenge.publisher_id == user.organization_id
         )
+
+
+class ChallengeEvaluationRoleRequiredMixin(ChallengePublisherRequiredMixin):
+    required_role = None
+
+    def test_func(self):
+        if not super().test_func():
+            return False
+        return ChallengeEvaluationRoleAssignment.objects.filter(
+            challenge=self.get_challenge(),
+            user=self.request.user,
+            role=self.required_role,
+        ).exists()
 
 
 class ChallengeEvaluationStartView(ChallengePublisherRequiredMixin, View):
@@ -58,9 +74,46 @@ class ChallengeEvaluationStartView(ChallengePublisherRequiredMixin, View):
         )
 
 
-class AwardDecisionCreateView(ChallengePublisherRequiredMixin, FormView):
+class ChallengeEvaluationRoleAssignmentUpdateView(ChallengePublisherRequiredMixin, FormView):
+    form_class = ChallengeEvaluationRoleAssignmentForm
+    template_name = "evaluation/challenge_evaluation_roles_form.html"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["challenge"] = self.get_challenge()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["challenge"] = self.get_challenge()
+        return context
+
+    def get_success_url(self):
+        return reverse("marketplace:challenge-detail", args=[self.get_challenge().pk])
+
+    def form_valid(self, form):
+        try:
+            assign_challenge_evaluation_roles(
+                challenge=self.get_challenge(),
+                actor=self.request.user,
+                command=form.to_command(),
+            )
+        except ChallengeEvaluationValidationError as exc:
+            for message in exc.messages:
+                form.add_error(None, message)
+            return self.form_invalid(form)
+
+        messages.success(
+            self.request,
+            "El equipo de evaluación fue actualizado.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class AwardDecisionCreateView(ChallengeEvaluationRoleRequiredMixin, FormView):
     form_class = AwardDecisionForm
     template_name = "evaluation/award_decision_form.html"
+    required_role = ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -101,9 +154,13 @@ class AwardDecisionCreateView(ChallengePublisherRequiredMixin, FormView):
         return HttpResponseRedirect(self.get_success_url())
 
 
-class ApplicationCriterionEvaluationUpdateView(ChallengePublisherRequiredMixin, FormView):
+class ApplicationCriterionEvaluationUpdateView(
+    ChallengeEvaluationRoleRequiredMixin,
+    FormView,
+):
     form_class = ApplicationCriterionEvaluationForm
     template_name = "evaluation/application_criterion_evaluation_form.html"
+    required_role = ChallengeEvaluationRoleAssignment.Role.EVALUATOR
 
     def get_application(self):
         if not hasattr(self, "_application"):

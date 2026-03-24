@@ -1,6 +1,9 @@
 from django import forms
+from django.db.models import Case, IntegerField, Value, When
+from django.contrib.auth import get_user_model
 
 from apps.evaluation.application.commands import (
+    AssignChallengeEvaluationRolesCommand,
     AwardDecisionCommand,
     CriterionAssessmentInput,
     EvaluateApplicationCommand,
@@ -9,7 +12,64 @@ from apps.evaluation.application.queries import (
     build_challenge_application_evaluation_summaries,
 )
 from apps.evaluation.models import ApplicationCriterionEvaluation
+from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.marketplace.models import Application, Challenge
+
+
+class ChallengeEvaluationRoleAssignmentForm(forms.Form):
+    evaluator_users = forms.ModelMultipleChoiceField(
+        queryset=get_user_model().objects.none(),
+        label="Evaluadores designados",
+    )
+    adjudicator_user = forms.ModelChoiceField(
+        queryset=get_user_model().objects.none(),
+        label="Adjudicador designado",
+    )
+    observer_users = forms.ModelMultipleChoiceField(
+        queryset=get_user_model().objects.none(),
+        label="Observadores de evaluación",
+        required=False,
+    )
+
+    def __init__(self, *args, challenge: Challenge, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.challenge = challenge
+        member_queryset = challenge.publisher.members.order_by("username")
+        current_assignments = challenge.evaluation_role_assignments.all()
+        evaluator_ids = list(
+            current_assignments.filter(
+                role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR
+            ).values_list("user_id", flat=True)
+        )
+        adjudicator_id = current_assignments.filter(
+            role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
+        ).values_list("user_id", flat=True).first()
+        observer_ids = list(
+            current_assignments.filter(
+                role=ChallengeEvaluationRoleAssignment.Role.OBSERVER
+            ).values_list("user_id", flat=True)
+        )
+
+        self.fields["evaluator_users"].queryset = member_queryset
+        self.fields["adjudicator_user"].queryset = member_queryset
+        self.fields["observer_users"].queryset = member_queryset
+        self.fields["evaluator_users"].initial = evaluator_ids
+        self.fields["adjudicator_user"].initial = adjudicator_id
+        self.fields["observer_users"].initial = observer_ids
+        self.fields["observer_users"].help_text = (
+            "Los observadores pueden seguir el proceso, pero no evaluar ni adjudicar."
+        )
+
+    def to_command(self) -> AssignChallengeEvaluationRolesCommand:
+        return AssignChallengeEvaluationRolesCommand(
+            evaluator_user_ids=tuple(
+                self.cleaned_data["evaluator_users"].values_list("pk", flat=True)
+            ),
+            adjudicator_user_id=self.cleaned_data["adjudicator_user"].pk,
+            observer_user_ids=tuple(
+                self.cleaned_data["observer_users"].values_list("pk", flat=True)
+            ),
+        )
 
 
 class AwardDecisionForm(forms.Form):
@@ -33,13 +93,27 @@ class AwardDecisionForm(forms.Form):
             for application in self.evaluation_summaries
             if application.evaluation_summary.is_complete
         ]
-        self.fields["winning_application"].queryset = challenge.applications.select_related(
-            "applicant"
-        ).filter(
-            pk__in=self.eligible_application_ids
-        )
+        eligible_queryset = challenge.applications.none()
+        if self.eligible_application_ids:
+            eligible_queryset = (
+                challenge.applications.select_related("applicant")
+                .filter(pk__in=self.eligible_application_ids)
+                .order_by(
+                    Case(
+                        *[
+                            When(pk=application_id, then=Value(position))
+                            for position, application_id in enumerate(
+                                self.eligible_application_ids,
+                                start=1,
+                            )
+                        ],
+                        output_field=IntegerField(),
+                    )
+                )
+            )
+        self.fields["winning_application"].queryset = eligible_queryset
         self.fields["winning_application"].help_text = (
-            "Solo aparecen propuestas con todos los criterios evaluados."
+            "Solo aparecen propuestas con todos los criterios evaluados y se listan según el ranking actual."
         )
 
     def to_command(self) -> AwardDecisionCommand:

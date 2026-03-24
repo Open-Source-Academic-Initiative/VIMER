@@ -45,6 +45,43 @@
 {% endif %}
 
     {% if user.organization == challenge.publisher %}
+    <h3>Equipo de evaluación</h3>
+    <div class="card">
+        <p>
+            <strong>Evaluadores designados:</strong>
+            {% for assignment in evaluation_team.evaluators %}
+                {{ assignment.user.username }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+                Aún no definidos
+            {% endfor %}
+        </p>
+        <p>
+            <strong>Adjudicador designado:</strong>
+            {% if evaluation_team.adjudicator %}
+                {{ evaluation_team.adjudicator.user.username }}
+            {% else %}
+                Aún no definido
+            {% endif %}
+        </p>
+        <p>
+            <strong>Observadores:</strong>
+            {% for assignment in evaluation_team.observers %}
+                {{ assignment.user.username }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+                Sin observadores designados
+            {% endfor %}
+        </p>
+        {% if can_manage_evaluation_team %}
+            <p>
+                <a href="{% url 'evaluation:challenge-evaluation-roles-update' challenge.pk %}" class="btn btn-primary">
+                    Gestionar equipo de evaluación
+                </a>
+            </p>
+        {% endif %}
+        {% if not has_required_evaluation_team %}
+            <p>Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación.</p>
+        {% endif %}
+    </div>
     <h3>Interesados en este desafío:</h3>
     <ul>
         {% for app in challenge_applications %}
@@ -66,9 +103,21 @@
                 </div>
                 {% if challenge.status == 'UNDER_EVALUATION' %}
                     <p>
+                        <strong>Posición comparativa actual:</strong>
+                        #{{ app.evaluation_summary.ranking_position }}
+                    </p>
+                    <p>
                         <strong>Evaluación por criterios:</strong>
                         {{ app.evaluation_summary.evaluated_count }}/{{ app.evaluation_summary.criteria_total }}
                         completados
+                    </p>
+                    <p>
+                        <strong>Ranking elegible para adjudicación:</strong>
+                        {% if app.evaluation_summary.eligible_ranking_position %}
+                            #{{ app.evaluation_summary.eligible_ranking_position }}
+                        {% else %}
+                            Pendiente de evaluación completa
+                        {% endif %}
                     </p>
                     {% if app.evaluation_summary.average_score is not None %}
                         <p>
@@ -98,14 +147,16 @@
                             </ul>
                         </details>
                     {% endif %}
-                    <p>
-                        <a
-                            href="{% url 'evaluation:application-criterion-evaluation-update' challenge.pk app.pk %}"
-                            class="btn btn-primary"
-                        >
-                            Evaluar propuesta
-                        </a>
-                    </p>
+                    {% if can_evaluate_applications %}
+                        <p>
+                            <a
+                                href="{% url 'evaluation:application-criterion-evaluation-update' challenge.pk app.pk %}"
+                                class="btn btn-primary"
+                            >
+                                Evaluar propuesta
+                            </a>
+                        </p>
+                    {% endif %}
                 {% endif %}
             </li>
         {% empty %}
@@ -128,6 +179,32 @@
             <p><strong>Propuesta ganadora:</strong> {{ award_decision.winning_application.applicant.business_name }}</p>
             <p><strong>Comentario:</strong> {{ award_decision.comment }}</p>
             <p><strong>Decidido por:</strong> {{ award_decision.decided_by.username }}</p>
+            {% if award_decision.winning_ranking_position %}
+                <p>
+                    <strong>Posición comparativa registrada al adjudicar:</strong>
+                    #{{ award_decision.winning_ranking_position }}
+                </p>
+            {% endif %}
+            {% if award_decision.winning_eligible_ranking_position %}
+                <p>
+                    <strong>Posición elegible registrada al adjudicar:</strong>
+                    #{{ award_decision.winning_eligible_ranking_position }}
+                </p>
+            {% endif %}
+            {% if award_decision.winning_average_score is not None %}
+                <p>
+                    <strong>Promedio registrado al adjudicar:</strong>
+                    {{ award_decision.winning_average_score|floatformat:2 }} / 5
+                    | <strong>Puntaje total registrado:</strong>
+                    {{ award_decision.winning_total_score }}
+                </p>
+            {% endif %}
+            {% if award_decision.winning_evaluated_criteria_count is not None and award_decision.winning_criteria_total is not None %}
+                <p>
+                    <strong>Criterios evaluados al adjudicar:</strong>
+                    {{ award_decision.winning_evaluated_criteria_count }}/{{ award_decision.winning_criteria_total }}
+                </p>
+            {% endif %}
         </div>
     {% endif %}
 

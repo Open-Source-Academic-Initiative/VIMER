@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 class Notification(models.Model):
     class Kind(models.TextChoices):
         EVALUATION_STARTED = "EVALUATION_STARTED", _("Evaluación iniciada")
+        APPLICATION_EVALUATED = "APPLICATION_EVALUATED", _("Propuesta evaluada")
         CHALLENGE_AWARDED = "CHALLENGE_AWARDED", _("Desafío adjudicado")
 
     recipient = models.ForeignKey(

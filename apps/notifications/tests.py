@@ -16,12 +16,25 @@ from apps.evaluation.application.services import (
     evaluate_application_by_criteria,
     start_challenge_evaluation,
 )
+from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.marketplace.models import Application, Challenge
 from apps.notifications.application.services import mark_all_notifications_as_read
 from apps.notifications.models import Notification
 
 
 class NotificationEventIntegrationTests(TestCase):
+    def assign_default_evaluation_roles(self):
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.publisher_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+        )
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.publisher_user,
+            role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
+        )
+
     def build_complete_evaluation_command(self):
         self.challenge.sync_evaluation_criteria_items()
         return EvaluateApplicationCommand(
@@ -105,6 +118,7 @@ class NotificationEventIntegrationTests(TestCase):
             capabilities_evidence="Otras capacidades",
             execution_plan="Otro plan",
         )
+        self.assign_default_evaluation_roles()
 
     def test_start_evaluation_creates_notifications_for_applicant_members(self):
         with self.captureOnCommitCallbacks(execute=True):
@@ -168,6 +182,32 @@ class NotificationEventIntegrationTests(TestCase):
             Notification.objects.filter(
                 recipient=self.other_provider_user,
                 title="Se registró la adjudicación del desafío",
+            ).exists()
+        )
+
+    def test_application_evaluation_creates_notification_for_applicant_members(self):
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            evaluate_application_by_criteria(
+                challenge=self.challenge,
+                application=self.application,
+                actor=self.publisher_user,
+                command=self.build_complete_evaluation_command(),
+            )
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.provider_user,
+                kind=Notification.Kind.APPLICATION_EVALUATED,
+                title="Tu propuesta recibió una evaluación",
+            ).exists()
+        )
+        self.assertFalse(
+            Notification.objects.filter(
+                recipient=self.other_provider_user,
+                kind=Notification.Kind.APPLICATION_EVALUATED,
             ).exists()
         )
 

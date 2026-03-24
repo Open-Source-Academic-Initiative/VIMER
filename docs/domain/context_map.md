@@ -4,6 +4,8 @@
 
 This document defines the current and target bounded-context view of VIMER.
 
+It complements `docs/domain/ontology_v4.md`, which is the canonical ontology.
+
 The current codebase is still organized mostly around:
 
 - `identity`
@@ -63,10 +65,14 @@ Issue:
 Responsibilities today:
 
 - transition from published challenge to evaluation
+- evaluation-team governance with designated evaluators, one designated adjudicator, and optional observers
 - criterion-by-criterion proposal assessment
 - proposal evaluation summaries for comparison and adjudication
+- comparative proposal ranking
 - adjudication decision
 - winning proposal selection with mandatory comment
+- award snapshot traceability
+- persisted challenge evaluation timeline
 
 Current code:
 
@@ -155,9 +161,13 @@ Supplies to:
 Owns:
 
 - proposal review
+- evaluation-team governance
 - criterion assessments
 - proposal evaluation read models / summaries
+- comparative ranking
 - adjudication decision
+- award-decision snapshot traceability
+- challenge-facing evaluation timeline projection
 - evaluation outcomes
 
 Consumes from:
@@ -239,6 +249,10 @@ Long term:
 
 - Evaluation operates on proposals in the context of a challenge.
 
+### Evaluation -> Challenge
+
+- Evaluation persists challenge-facing timeline projections for major milestones.
+
 ### Evaluation -> Notifications
 
 - Evaluation emits events that can be consumed for internal user notifications.
@@ -250,8 +264,7 @@ Long term:
 ## Refactor Priority
 
 1. Split `marketplace` conceptually into `Challenge` and `Application`.
-2. Add lifecycle semantics to `Challenge`.
-3. Add structured proposal semantics to `Application`.
-4. Introduce `Evaluation`.
-5. Expand `Notifications` as a dedicated supporting context.
-6. Revisit technical names later, once behavior stabilizes.
+2. Introduce blind evaluation without leaking applicant identity through query, view, or template layers.
+3. Decide whether evaluation remains single-assessment-per-criterion or evolves toward multiple independent evaluators.
+4. Deepen `Notifications` and audit consumers around evaluation events.
+5. Revisit technical names later, once behavior stabilizes.

@@ -13,11 +13,18 @@
     </ul>
 {% endif %}
 {% if application_evaluation_summaries %}
-    <h4>Resumen comparativo de propuestas</h4>
+    <h4>Ranking comparativo de propuestas</h4>
     <ul>
         {% for application in application_evaluation_summaries %}
             <li>
-                <strong>{{ application.applicant.business_name }}</strong>
+                <strong>#{{ application.evaluation_summary.ranking_position }} {{ application.applicant.business_name }}</strong>
+                <br>
+                <strong>Ranking elegible para adjudicación:</strong>
+                {% if application.evaluation_summary.eligible_ranking_position %}
+                    #{{ application.evaluation_summary.eligible_ranking_position }}
+                {% else %}
+                    Pendiente de evaluación completa
+                {% endif %}
                 <br>
                 <strong>Avance:</strong>
                 {{ application.evaluation_summary.evaluated_count }}/{{ application.evaluation_summary.criteria_total }}

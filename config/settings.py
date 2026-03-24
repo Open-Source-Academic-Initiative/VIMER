@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import environ
 from django.core.exceptions import ImproperlyConfigured
@@ -11,10 +12,18 @@ DEFAULT_ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", "testserver"]
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load values from .env when present.
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+RUNNING_TESTS = "test" in sys.argv
+READ_DOT_ENV_FILE = env.bool("READ_DOT_ENV_FILE", default=not RUNNING_TESTS)
 
-DEBUG = env('DEBUG', default=True)
+# Ignore the local .env by default while running tests so the suite stays stable
+# across workspaces with different development overrides.
+if READ_DOT_ENV_FILE:
+    environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
+
+if RUNNING_TESTS:
+    DEBUG = env.bool("TEST_DEBUG", default=True)
+else:
+    DEBUG = env.bool("DEBUG", default=True)
 if DEBUG:
     SECRET_KEY = env('SECRET_KEY', default='django-insecure-dev-key')
 else:

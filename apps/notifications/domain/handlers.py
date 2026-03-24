@@ -2,16 +2,18 @@ from django.urls import reverse
 from django.dispatch import receiver
 
 from apps.evaluation.domain.events import (
+    ApplicationEvaluationRecorded,
     ChallengeAwarded,
     ChallengeEvaluationStarted,
 )
 from apps.evaluation.domain.signals import (
+    application_evaluation_recorded,
     challenge_awarded,
     challenge_evaluation_started,
 )
 from apps.evaluation.models import AwardDecision
 from apps.identity.models import User
-from apps.marketplace.models import Challenge
+from apps.marketplace.models import Application, Challenge
 from apps.notifications.models import Notification
 
 
@@ -113,5 +115,34 @@ def create_notifications_for_challenge_awarded(sender, *, event, **kwargs):
                 )
             )
 
+    if notifications:
+        Notification.objects.bulk_create(notifications)
+
+
+@receiver(
+    application_evaluation_recorded,
+    sender=ApplicationEvaluationRecorded,
+    dispatch_uid="notifications.on_application_evaluation_recorded",
+)
+def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
+    application = Application.objects.select_related(
+        "challenge",
+        "applicant",
+    ).prefetch_related("applicant__members").get(pk=event.application_id)
+    notifications = [
+        Notification(
+            recipient=recipient,
+            kind=Notification.Kind.APPLICATION_EVALUATED,
+            title="Tu propuesta recibió una evaluación",
+            body=(
+                f"Tu propuesta para '{application.challenge.title}' quedó con "
+                f"{event.evaluated_count}/{event.criteria_total} criterios evaluados, "
+                f"promedio {event.average_score:.2f}/5 y posición actual "
+                f"#{event.ranking_position}."
+            ),
+            link=_build_challenge_link(application.challenge_id),
+        )
+        for recipient in application.applicant.members.all()
+    ]
     if notifications:
         Notification.objects.bulk_create(notifications)

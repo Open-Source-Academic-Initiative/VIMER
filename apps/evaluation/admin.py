@@ -3,13 +3,21 @@ from django.contrib import admin
 from apps.evaluation.models import (
     ApplicationCriterionEvaluation,
     AwardDecision,
+    ChallengeEvaluationRoleAssignment,
     ChallengeTimelineEntry,
 )
 
 
 @admin.register(AwardDecision)
 class AwardDecisionAdmin(admin.ModelAdmin):
-    list_display = ("challenge", "winning_application", "decided_by", "decided_at")
+    list_display = (
+        "challenge",
+        "winning_application",
+        "winning_ranking_position",
+        "winning_total_score",
+        "decided_by",
+        "decided_at",
+    )
     list_filter = ("decided_at",)
     search_fields = ("challenge__title", "comment", "winning_application__applicant__business_name")
 
@@ -31,3 +39,10 @@ class ApplicationCriterionEvaluationAdmin(admin.ModelAdmin):
         "criterion__label",
         "comment",
     )
+
+
+@admin.register(ChallengeEvaluationRoleAssignment)
+class ChallengeEvaluationRoleAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("challenge", "role", "user", "created_at")
+    list_filter = ("role", "created_at")
+    search_fields = ("challenge__title", "user__username", "user__email")

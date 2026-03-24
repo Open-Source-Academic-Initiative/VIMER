@@ -17,6 +17,7 @@ from apps.evaluation.application.commands import (
     EvaluateApplicationCommand,
 )
 from apps.evaluation.application.services import evaluate_application_by_criteria
+from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.marketplace.application.commands import (
     PublishChallengeCommand,
     SubmitApplicationCommand,
@@ -259,6 +260,11 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         )
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save(update_fields=["status"])
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.demand_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+        )
         criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
         evaluate_application_by_criteria(
             challenge=self.challenge,
@@ -290,6 +296,8 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertContains(response, "Promedio actual")
         self.assertContains(response, "4,50 / 5")
         self.assertContains(response, "Detalle por criterio")
+        self.assertContains(response, "Posición comparativa actual")
+        self.assertContains(response, "Ranking elegible para adjudicación")
 
     def test_challenge_create_persists_evaluation_criteria(self):
         self.client.force_login(self.demand_user)

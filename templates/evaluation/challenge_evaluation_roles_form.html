@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Equipo de Evaluación - VIMER{% endblock %}
+{% block content %}
+<h2>Equipo de Evaluación</h2>
+<h3>{{ challenge.title }}</h3>
+<p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+<form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="card">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Guardar equipo</button>
+</form>
+<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al desafío</a></p>
+{% endblock %}
