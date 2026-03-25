@@ -15,6 +15,9 @@ config/
 apps/identity/
 apps/corporate/
 apps/marketplace/
+apps/evaluation/
+apps/notifications/
+docs/
 templates/
 ```
 
@@ -23,7 +26,11 @@ Current validated baseline:
 - MVP flow is working end to end.
 - `identity` already uses an application service for registration.
 - `marketplace` already uses application services for challenge publication and application submission.
+- `evaluation` already exists as an explicit bounded module/app for team governance, scoring, adjudication, timeline, and blind evaluation flows.
+- `notifications` already exists as an explicit bounded module/app fed by evaluation events.
+- Versioned domain references already exist under `docs/domain/`.
 - Core role rules already exist in web, service, model, and database layers.
+- Challenge lifecycle, structured proposal components, explicit evaluation criteria, and multiple evaluators per criterion are already implemented.
 - The project is still development-oriented and is not production-ready yet.
 
 ## Planning Principles
@@ -60,6 +67,10 @@ Objective:
 
 - Move the key domain decisions from ignored local notes into versioned project artifacts.
 
+Status:
+
+- `Implemented`
+
 Actions:
 
 - Create `docs/domain/` for versioned domain references.
@@ -93,6 +104,11 @@ Exit criteria:
 Objective:
 
 - Convert the current MVP rules into named, traceable domain rules.
+
+Status:
+
+- `Implemented` in `marketplace`
+- `Implemented` in `evaluation`
 
 Current rules already present in the codebase:
 
@@ -129,6 +145,10 @@ Exit criteria:
 Objective:
 
 - Stop treating `marketplace` as a single vague bounded context.
+
+Status:
+
+- `Partial`
 
 Actions:
 
@@ -168,6 +188,10 @@ Objective:
 
 - Move from a minimal publication record to a challenge aggregate with lifecycle.
 
+Status:
+
+- `Implemented` for lifecycle, deadlines, and evaluation criteria foundation
+
 Minimum domain additions:
 
 - `status`
@@ -202,6 +226,11 @@ Objective:
 
 - Move from a free-text submission to a domain proposal with structure and lifecycle.
 
+Status:
+
+- `Implemented` for structured submission and immutability
+- `Partial` for draft lifecycle
+
 Minimum domain additions:
 
 - proposal structure with required components
@@ -227,35 +256,40 @@ Exit criteria:
 - A proposal is a domain object with explicit semantics.
 - Submission invariants are represented as code, not only as form behavior.
 
-### 6. Open the `Evaluation` context
+### 6. Deepen the `Evaluation` context
 
 Objective:
 
-- Implement the missing part of the core cycle: evaluation and adjudication.
+- Continue evolving the already-open evaluation context toward richer decision governance.
+
+Status:
+
+- `Implemented` for the core cycle
+- `Next` for weighted criteria, deeper audit, and governance refinements
 
 Minimum domain additions:
 
-- `DecisionDeAdjudicacion`
-- mandatory adjudication comment
-- assignment of evaluation responsibility
+- weighted criteria
+- richer audit and event consumers
+- deeper governance of evaluation decisions
 
 Actions:
 
-- Create a new Django app or a new bounded module for evaluation.
-- Model the adjudication decision independently of challenge publication and proposal submission.
-- Define read and write flows for evaluation.
-- Prepare event emission points for major lifecycle changes.
+- Preserve `apps/evaluation/` as the explicit evaluation context.
+- Extend the current scoring model with criterion weighting if product semantics require non-uniform scoring.
+- Deepen audit read models and event consumers around evaluation activity.
+- Revisit whether adjudication needs additional governance controls beyond the current designated-role model.
 
 Suggested first scope:
 
-- one winning proposal at most per challenge
-- mandatory rationale
-- explicit status updates after adjudication
+- keep one winning proposal at most per challenge
+- preserve mandatory rationale
+- preserve blind evaluation until award
+- enrich audit and scoring semantics without collapsing concerns back into `marketplace`
 
 Exit criteria:
 
-- The central domain cycle becomes executable:
-  `Challenge -> Application -> Evaluation / Adjudication`
+- The current evaluation context reflects the next layer of domain semantics without reintroducing implicit behavior.
 
 ### 7. Semantic convergence
 
@@ -300,116 +334,35 @@ Exit criteria:
 
 ## Recommended Execution Order
 
-1. Governance and versioned domain knowledge
-2. Explicit domain enforcement for the current MVP
-3. Conceptual split of `marketplace`
-4. Evolve `Challenge` into a real aggregate
-5. Evolve `Application` into a real proposal aggregate
-6. Open the `Evaluation` context
-7. Semantic convergence
-8. Operational hardening alongside domain work
+1. Keep versioned domain artifacts synchronized
+2. Deepen `Evaluation` with weighted criteria and richer audit
+3. Continue the conceptual split of `marketplace`
+4. Decide whether `Application` needs a persisted draft lifecycle
+5. Continue semantic convergence
+6. Harden operations alongside domain work
 
 ## Iteration Plan
 
-### Iteration A: domain governance and traceability
+### Completed foundation
 
-Goal:
+- domain governance and traceability
+- explicit invariant enforcement for the current MVP
+- challenge lifecycle
+- structured proposal formalization
+- evaluation and adjudication context
 
-- Make the discovered domain versioned and operational.
+### Current iteration focus
 
-Deliverables:
+- keep `README.md`, `docs/domain/*`, and local tracking notes synchronized
+- preserve multi-evaluator blind evaluation semantics already implemented
+- enrich evaluation audit and event consumers without broadening `marketplace`
 
-- `docs/domain/` base set
-- initial ADRs
-- invariant inventory
-- feature-spec template
+### Next iteration focus
 
-Success signal:
-
-- The team can point to one versioned source of truth for domain decisions.
-
-### Iteration B: enforce current invariants explicitly
-
-Goal:
-
-- Turn existing business rules into named domain behavior.
-
-Deliverables:
-
-- domain rules inside `apps/marketplace/`
-- traceability from invariants to tests
-- missing negative tests for current rules
-
-Success signal:
-
-- The current MVP rules are visible, named, and testable as domain behavior.
-
-### Iteration C: challenge lifecycle
-
-Goal:
-
-- Add lifecycle semantics to `Challenge`.
-
-Deliverables:
-
-- challenge status
-- application deadline
-- state transition rules
-- tests for open/closed behavior
-
-Success signal:
-
-- Applications only happen in valid challenge states.
-
-### Iteration D: proposal formalization
-
-Goal:
-
-- Turn `Application` into a structured proposal aggregate.
-
-Deliverables:
-
-- required proposal components
-- completeness validation
-- immutability or controlled edit policy
-- tests for invalid and valid submissions
-
-Success signal:
-
-- Proposal submission has domain meaning beyond free-form text entry.
-
-### Iteration E: evaluation and adjudication
-
-Goal:
-
-- Complete the core business cycle.
-
-Deliverables:
-
-- evaluation module or app
-- adjudication decision
-- rationale/comment requirement
-- post-adjudication transitions
-
-Success signal:
-
-- A challenge can progress through decision-making, not only publication and application.
-
-### Iteration F: semantic and technical cleanup
-
-Goal:
-
-- Reduce naming and architectural debt once the domain shape stabilizes.
-
-Deliverables:
-
-- naming cleanup plan
-- refactors with safety from tests
-- docs synchronization pass
-
-Success signal:
-
-- The codebase language aligns more naturally with the domain.
+- weighted criteria
+- richer audit consumers and decision governance in `evaluation`
+- clearer internal split of `marketplace` between challenge and application concerns
+- decision on persisted draft lifecycle for `Application`
 
 ## Definition of Done per Domain Feature
 
@@ -423,31 +376,25 @@ Every domain-aligned feature should include:
 6. service-level coverage
 7. documentation update
 
-## First Sprint Proposal
+## Immediate Next Slice Proposal
 
-The first sprint should focus on the minimum work that creates leverage for all later iterations.
+The next slice should focus on the minimum work that increases domain fidelity without reopening already-closed slices.
 
 Scope:
 
-- create `docs/domain/`
-- write `glossary.md`
-- write `invariants.md`
-- add 2 to 3 ADRs
-- extract current marketplace rules to named domain modules
-- add missing negative tests for:
-  - invalid role publishing
-  - invalid role application
-  - duplicate application at service and flow level
-  - challenge closure once statuses exist
+- decide and implement weighted criteria semantics if product wants non-uniform scoring
+- deepen event consumers and audit projections around evaluation activity
+- add more traceable invariant-to-test coverage
+- continue separating challenge-facing and application-facing concerns inside `apps/marketplace/`
 
-Recommended file targets for the first sprint:
+Recommended file targets for the next slice:
 
-- `docs/domain/glossary.md`
+- `apps/evaluation/application/queries.py`
+- `apps/evaluation/application/services.py`
+- `apps/evaluation/domain/invariants.py`
+- `apps/evaluation/tests.py`
+- `docs/domain/ontology_v4.md`
 - `docs/domain/invariants.md`
-- `docs/adr/0001-bounded-context-strategy.md`
-- `docs/adr/0002-naming-strategy.md`
-- `apps/marketplace/domain/`
-- `apps/marketplace/tests.py`
 
 ## Risks to Manage
 
@@ -459,12 +406,11 @@ Recommended file targets for the first sprint:
 
 ## Final Recommendation
 
-The safest and highest-leverage path is:
+The safest and highest-leverage path now is:
 
-- version the domain knowledge first
-- formalize the existing invariants second
-- add lifecycle semantics third
-- introduce evaluation fourth
+- keep the versioned domain corpus authoritative
+- deepen `Evaluation` before widening the surface area
+- continue the conceptual split of `marketplace` without a risky physical rewrite
 - rename technical legacy concepts only when the model is already stable
 
-This keeps the current baseline useful while moving VIMER from "working MVP with implicit domain intuition" to "working MVP with explicit, enforceable domain architecture".
+This keeps the current baseline useful while moving VIMER from "working MVP with explicit domain architecture" toward "working MVP with tighter semantic, tactical, and operational discipline".

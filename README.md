@@ -57,6 +57,7 @@ Versioned domain references:
 - `docs/domain/glossary.md`: preferred business language
 - `docs/domain/context_map.md`: bounded-context view
 - `docs/domain/invariants.md`: traceable rule inventory
+- `docs/project_diagrams.md`: current functional-flow and architecture diagrams
 
 ## Architecture
 
