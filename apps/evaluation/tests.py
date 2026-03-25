@@ -20,6 +20,12 @@ from apps.evaluation.application.services import (
     evaluate_application_by_criteria,
     start_challenge_evaluation,
 )
+from apps.evaluation.domain.invariants import (
+    INV_18_CHALLENGE_REQUIRES_EVALUATION_TEAM_BEFORE_EVALUATION,
+    INV_21_ONLY_DESIGNATED_EVALUATORS_CAN_SCORE_PROPOSALS,
+    INV_22_ONLY_DESIGNATED_ADJUDICATOR_CAN_ADJUDICATE,
+    INV_28_AWARD_REQUIRES_CRITERION_COVERAGE,
+)
 from apps.evaluation.domain.events import (
     ApplicationEvaluationRecorded,
     ChallengeAwarded,
@@ -50,6 +56,13 @@ class EvaluationServiceTests(TestCase):
             challenge=self.challenge,
             user=self.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
+        )
+
+    def assign_secondary_evaluator_role(self):
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.publisher_colleague_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
         )
 
     def build_complete_evaluation_command(self):
@@ -233,6 +246,10 @@ class EvaluationServiceTests(TestCase):
             "Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación.",
             captured.exception.messages,
         )
+        self.assertIn(
+            INV_18_CHALLENGE_REQUIRES_EVALUATION_TEAM_BEFORE_EVALUATION,
+            captured.exception.invariant_ids,
+        )
 
     def test_award_decision_view_shows_structured_evaluation_criteria(self):
         self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
@@ -290,6 +307,10 @@ class EvaluationServiceTests(TestCase):
             "Solo un evaluador designado puede evaluar propuestas.",
             captured.exception.messages,
         )
+        self.assertIn(
+            INV_21_ONLY_DESIGNATED_EVALUATORS_CAN_SCORE_PROPOSALS,
+            captured.exception.invariant_ids,
+        )
 
     def test_evaluate_application_by_criteria_emits_domain_event_after_commit(self):
         received_events = []
@@ -324,8 +345,10 @@ class EvaluationServiceTests(TestCase):
         self.assertEqual(event.application_id, self.application.pk)
         self.assertEqual(event.applicant_organization_id, self.provider.pk)
         self.assertEqual(event.evaluated_by_user_id, self.publisher_user.pk)
+        self.assertEqual(event.blind_reference, "Propuesta 01")
         self.assertEqual(event.evaluated_count, 1)
         self.assertEqual(event.criteria_total, 1)
+        self.assertEqual(event.assessment_count, 1)
         self.assertEqual(event.total_score, 4)
         self.assertEqual(event.average_score, 4.0)
         self.assertEqual(event.ranking_position, 1)
@@ -350,7 +373,7 @@ class EvaluationServiceTests(TestCase):
         self.assertEqual(entry.actor, self.publisher_user)
         self.assertEqual(
             entry.description,
-            "Se registró la evaluación por criterios de la propuesta de 'Proveedor Evaluado'.",
+            "Se registró actividad de evaluación sobre Propuesta 01. Cobertura actual: 1/1 criterios. Evaluaciones acumuladas: 1. Promedio actual: 4.00/5.",
         )
 
     def test_adjudicate_challenge_creates_decision_and_awards_challenge(self):
@@ -375,6 +398,7 @@ class EvaluationServiceTests(TestCase):
         self.assertEqual(decision.winning_average_score, 4.0)
         self.assertEqual(decision.winning_evaluated_criteria_count, 1)
         self.assertEqual(decision.winning_criteria_total, 1)
+        self.assertEqual(decision.winning_assessment_count, 1)
         self.assertEqual(decision.winning_ranking_position, 1)
         self.assertEqual(decision.winning_eligible_ranking_position, 1)
 
@@ -460,6 +484,10 @@ class EvaluationServiceTests(TestCase):
             "La propuesta ganadora debe tener todos sus criterios evaluados antes de adjudicar.",
             captured.exception.messages,
         )
+        self.assertIn(
+            INV_28_AWARD_REQUIRES_CRITERION_COVERAGE,
+            captured.exception.invariant_ids,
+        )
 
     def test_adjudicate_challenge_rejects_non_adjudicator(self):
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
@@ -479,6 +507,10 @@ class EvaluationServiceTests(TestCase):
         self.assertIn(
             "Solo el adjudicador designado puede adjudicar el desafío.",
             captured.exception.messages,
+        )
+        self.assertIn(
+            INV_22_ONLY_DESIGNATED_ADJUDICATOR_CAN_ADJUDICATE,
+            captured.exception.invariant_ids,
         )
 
     def test_adjudicate_challenge_requires_under_evaluation_status(self):
@@ -584,10 +616,95 @@ class EvaluationServiceTests(TestCase):
         self.assertEqual(summary.evaluated_count, 2)
         self.assertEqual(summary.criteria_total, 2)
         self.assertTrue(summary.is_complete)
+        self.assertEqual(summary.assessment_count, 2)
         self.assertEqual(summary.total_score, 9)
         self.assertEqual(summary.average_score, 4.5)
         self.assertEqual(summary.ranking_position, 1)
         self.assertEqual(summary.eligible_ranking_position, 1)
+        self.assertEqual(summary.criterion_results[0].evaluation_count, 1)
+        self.assertEqual(summary.criterion_results[0].average_score, 4.0)
+
+    def test_evaluate_application_by_criteria_updates_existing_assessment_for_same_evaluator(self):
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=self.build_complete_evaluation_command(),
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=EvaluateApplicationCommand(
+                application_id=self.application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=self.challenge.evaluation_criteria_items.get(
+                            position=1
+                        ).pk,
+                        score=5,
+                        comment="Evaluación actualizada por el mismo evaluador.",
+                    ),
+                ),
+            ),
+        )
+
+        self.assertEqual(
+            ApplicationCriterionEvaluation.objects.filter(application=self.application).count(),
+            1,
+        )
+        evaluation = ApplicationCriterionEvaluation.objects.get(application=self.application)
+        self.assertEqual(evaluation.score, 5)
+        self.assertEqual(
+            evaluation.comment,
+            "Evaluación actualizada por el mismo evaluador.",
+        )
+
+    def test_evaluate_application_by_criteria_keeps_one_current_assessment_per_evaluator(self):
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+        self.assign_secondary_evaluator_role()
+
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=self.build_complete_evaluation_command(),
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_colleague_user,
+            command=EvaluateApplicationCommand(
+                application_id=self.application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=self.challenge.evaluation_criteria_items.get(
+                            position=1
+                        ).pk,
+                        score=5,
+                        comment="Segunda evaluación sobre el mismo criterio.",
+                    ),
+                ),
+            ),
+        )
+
+        self.assertEqual(
+            ApplicationCriterionEvaluation.objects.filter(application=self.application).count(),
+            2,
+        )
+        summary = build_challenge_application_evaluation_summaries(self.challenge)[0].evaluation_summary
+        self.assertEqual(summary.evaluated_count, 1)
+        self.assertEqual(summary.criteria_total, 1)
+        self.assertTrue(summary.is_complete)
+        self.assertEqual(summary.assessment_count, 2)
+        self.assertEqual(summary.total_score, 9)
+        self.assertEqual(summary.average_score, 4.5)
+        self.assertEqual(summary.criterion_results[0].evaluation_count, 2)
+        self.assertEqual(summary.criterion_results[0].average_score, 4.5)
 
     def test_build_challenge_application_evaluation_summaries_ranks_complete_applications_first(self):
         self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
@@ -659,10 +776,10 @@ class EvaluationServiceTests(TestCase):
         summaries = build_challenge_application_evaluation_summaries(self.challenge)
 
         self.assertEqual(
-            [application.applicant.business_name for application in summaries],
+            [application.evaluation_summary.blind_reference for application in summaries],
             [
-                "Proveedor Mejor Posicionado",
-                "Proveedor Evaluado",
+                "Propuesta 02",
+                "Propuesta 01",
             ],
         )
         self.assertEqual(summaries[0].evaluation_summary.ranking_position, 1)
@@ -682,6 +799,13 @@ class EvaluationFlowTests(TestCase):
             challenge=self.challenge,
             user=self.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
+        )
+
+    def assign_secondary_evaluator_role(self):
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.publisher_colleague_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
         )
 
     def build_complete_evaluation_command(self):
@@ -835,6 +959,22 @@ class EvaluationFlowTests(TestCase):
             ApplicationCriterionEvaluation.objects.filter(application=self.application).exists()
         )
 
+    def test_application_evaluation_view_hides_applicant_identity_before_award(self):
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+        self.client.force_login(self.publisher_user)
+
+        response = self.client.get(
+            reverse(
+                "evaluation:application-criterion-evaluation-update",
+                args=[self.challenge.pk, self.application.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Propuesta 01")
+        self.assertNotContains(response, self.provider.business_name)
+
     def test_challenge_detail_shows_evaluation_history_for_publisher(self):
         self.client.force_login(self.publisher_user)
 
@@ -882,6 +1022,25 @@ class EvaluationFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Evaluar propuesta")
+
+    def test_award_decision_view_hides_applicant_identity_before_award(self):
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=self.build_complete_evaluation_command(),
+        )
+        self.client.force_login(self.publisher_user)
+
+        response = self.client.get(
+            reverse("evaluation:award-decision-create", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Propuesta 01")
+        self.assertNotContains(response, self.provider.business_name)
 
     def test_non_designated_publisher_member_cannot_access_evaluation_view(self):
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
@@ -994,7 +1153,7 @@ class EvaluationFlowTests(TestCase):
         self.assertContains(response, "Ranking elegible para adjudicación")
         self.assertContains(
             response,
-            "Solo aparecen propuestas con todos los criterios evaluados y se listan según el ranking actual.",
+            "Solo aparecen propuestas con todos los criterios evaluados, listadas según el ranking actual y usando referencias ciegas hasta adjudicar.",
         )
 
     def test_challenge_detail_shows_award_decision_evaluation_snapshot(self):
@@ -1045,3 +1204,16 @@ class EvaluationFlowTests(TestCase):
         self.assertContains(response, "Promedio registrado al adjudicar")
         self.assertContains(response, "4,50 / 5")
         self.assertContains(response, "Criterios evaluados al adjudicar")
+
+    def test_challenge_detail_hides_applicant_identity_before_award(self):
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+        self.client.force_login(self.publisher_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Propuesta 01")
+        self.assertNotContains(response, self.provider.business_name)

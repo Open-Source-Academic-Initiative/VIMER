@@ -16,6 +16,7 @@ from apps.evaluation.application.services import (
     evaluate_application_by_criteria,
     start_challenge_evaluation,
 )
+from apps.evaluation.domain.blind_references import get_application_blind_reference
 from apps.evaluation.forms import (
     ApplicationCriterionEvaluationForm,
     AwardDecisionForm,
@@ -128,7 +129,10 @@ class AwardDecisionCreateView(ChallengeEvaluationRoleRequiredMixin, FormView):
             context["application_evaluation_summaries"] = form.evaluation_summaries
         else:
             context["application_evaluation_summaries"] = (
-                build_challenge_application_evaluation_summaries(self.get_challenge())
+                build_challenge_application_evaluation_summaries(
+                    self.get_challenge(),
+                    reveal_applicant_identity=False,
+                )
             )
         return context
 
@@ -165,7 +169,7 @@ class ApplicationCriterionEvaluationUpdateView(
     def get_application(self):
         if not hasattr(self, "_application"):
             self._application = get_object_or_404(
-                Application.objects.select_related("applicant", "challenge"),
+                Application.objects.select_related("challenge"),
                 pk=self.kwargs["application_pk"],
             )
         return self._application
@@ -179,12 +183,16 @@ class ApplicationCriterionEvaluationUpdateView(
         kwargs = super().get_form_kwargs()
         kwargs["challenge"] = self.get_challenge()
         kwargs["application"] = self.get_application()
+        kwargs["evaluator"] = self.request.user
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["challenge"] = self.get_challenge()
         context["application"] = self.get_application()
+        context["application_blind_reference"] = get_application_blind_reference(
+            self.get_application()
+        )
         return context
 
     def get_success_url(self):

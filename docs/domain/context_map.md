@@ -66,13 +66,14 @@ Responsibilities today:
 
 - transition from published challenge to evaluation
 - evaluation-team governance with designated evaluators, one designated adjudicator, and optional observers
-- criterion-by-criterion proposal assessment
+- criterion-by-criterion proposal assessment by one or more designated evaluators
 - proposal evaluation summaries for comparison and adjudication
 - comparative proposal ranking
 - adjudication decision
 - winning proposal selection with mandatory comment
 - award snapshot traceability
 - persisted challenge evaluation timeline
+- event-driven notifications for applicants and the evaluation team
 
 Current code:
 
@@ -248,6 +249,7 @@ Long term:
 ### Challenge + Application -> Evaluation
 
 - Evaluation operates on proposals in the context of a challenge.
+- Publisher-facing evaluation read models should not leak outside the publisher organization boundary.
 
 ### Evaluation -> Challenge
 
@@ -264,7 +266,6 @@ Long term:
 ## Refactor Priority
 
 1. Split `marketplace` conceptually into `Challenge` and `Application`.
-2. Introduce blind evaluation without leaking applicant identity through query, view, or template layers.
-3. Decide whether evaluation remains single-assessment-per-criterion or evolves toward multiple independent evaluators.
-4. Deepen `Notifications` and audit consumers around evaluation events.
-5. Revisit technical names later, once behavior stabilizes.
+2. Deepen `Notifications` and audit consumers around evaluation events.
+3. Introduce weighted criteria if the product needs non-uniform scoring semantics.
+4. Revisit technical names later, once behavior stabilizes.

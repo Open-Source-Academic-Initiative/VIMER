@@ -156,6 +156,7 @@ Current technical mapping:
 Notes:
 
 - This is not a market role.
+- The same representative may hold more than one evaluation-governance role for the same challenge in the current implementation.
 
 ### Evento de historial del desafio
 
@@ -196,6 +197,31 @@ Business meaning:
 Current technical mapping:
 
 - `notifications.Notification`
+
+### Referencia ciega de propuesta
+
+Business meaning:
+
+- Stable blind label used to compare and evaluate a proposal without exposing the applicant identity before adjudication.
+
+Current technical mapping:
+
+- blind references derived in `apps/evaluation/`
+
+### Evaluacion vigente de criterio
+
+Business meaning:
+
+- Current criterion score and comment registered by one designated evaluator for one proposal.
+
+Current technical mapping:
+
+- `evaluation.ApplicationCriterionEvaluation`
+
+Notes:
+
+- The same evaluator updates this current assessment instead of creating a second active row for the same proposal and criterion.
+- Different evaluators may each contribute their own current assessment for the same criterion.
 
 ### Administración de plataforma
 

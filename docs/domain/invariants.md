@@ -330,6 +330,22 @@ Current enforcement:
 
 Rule:
 
+- Only the publisher organization can manage and execute evaluation operations for its challenge.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- evaluation application service ownership checks
+- evaluation-team management flow
+- evaluation and marketplace tests
+
+### INV-21
+
+Rule:
+
 - Only a designated evaluator can register criterion-by-criterion proposal assessments.
 
 Status:
@@ -342,7 +358,7 @@ Current enforcement:
 - evaluation view access control
 - evaluation flow and service tests
 
-### INV-21
+### INV-22
 
 Rule:
 
@@ -358,7 +374,7 @@ Current enforcement:
 - adjudication view access control
 - evaluation flow and service tests
 
-### INV-22
+### INV-23
 
 Rule:
 
@@ -373,7 +389,7 @@ Current enforcement:
 - conditional database unique constraint on `ChallengeEvaluationRoleAssignment`
 - model validation
 
-### INV-23
+### INV-24
 
 Rule:
 
@@ -389,7 +405,7 @@ Current enforcement:
 - adjudication application service
 - evaluation flow and service tests
 
-### INV-24
+### INV-25
 
 Rule:
 
@@ -405,13 +421,63 @@ Current enforcement:
 - `ChallengeTimelineEntry` persistence through event consumers
 - evaluation and notifications tests
 
+### INV-26
+
+Rule:
+
+- Applicant identity must remain hidden in publisher-facing evaluation and adjudication flows until the challenge is adjudicated.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- blind application references in evaluation read models
+- blind labels in adjudication form choices
+- blind evaluation and adjudication templates
+- publisher challenge-detail rendering rules before/after award
+- evaluation and marketplace tests
+
+### INV-27
+
+Rule:
+
+- A designated evaluator can have at most one current persisted criterion assessment per `(Propuesta, Criterio de evaluación)`.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- database unique constraint on `(application, criterion, evaluated_by)`
+- evaluation application service uses `update_or_create()` for the acting evaluator
+- evaluation flow and service tests
+
+### INV-28
+
+Rule:
+
+- A `Propuesta` becomes eligible for adjudication once every challenge criterion has at least one registered assessment.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- evaluation domain rule and adjudication application service
+- aggregate evaluation summaries over distinct covered criteria
+- evaluation flow and service tests
+
 ## Near-Term Enforcement Priorities
 
 The next invariants to implement in code should be:
 
-1. protect blind-evaluation confidentiality through query, view, and template layers
-2. decide whether criterion assessment must support multiple independent evaluators
-3. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
+1. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
+2. decide whether criteria should become weighted instead of purely ordered
+3. define whether proposal drafts deserve a first-class persisted lifecycle
 
 ## Traceability Expectation
 

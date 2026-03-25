@@ -13,10 +13,14 @@ from django.utils import timezone
 from apps.corporate.avatar_utils import generate_default_logo
 from apps.corporate.models import Organization
 from apps.evaluation.application.commands import (
+    AwardDecisionCommand,
     CriterionAssessmentInput,
     EvaluateApplicationCommand,
 )
-from apps.evaluation.application.services import evaluate_application_by_criteria
+from apps.evaluation.application.services import (
+    adjudicate_challenge,
+    evaluate_application_by_criteria,
+)
 from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.marketplace.application.commands import (
     PublishChallengeCommand,
@@ -203,8 +207,12 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
             "Este desafío no está abierto para recibir propuestas.",
         )
 
-    def test_challenge_detail_shows_applicant_logo_for_publisher(self):
-        Application.objects.create(
+    def test_challenge_detail_shows_applicant_logo_for_publisher_after_award(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        application = Application.objects.create(
             challenge=self.challenge,
             applicant=self.supply_organization,
             proposal_text="Initial proposal",
@@ -212,6 +220,42 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
             proposed_solution="Solución inicial",
             capabilities_evidence="Capacidades iniciales",
             execution_plan="Plan inicial",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.demand_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+        )
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.demand_user,
+            role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
+        )
+        criterion = self.challenge.evaluation_criteria_items.get(position=1)
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=application,
+            actor=self.demand_user,
+            command=EvaluateApplicationCommand(
+                application_id=application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=criterion.pk,
+                        score=4,
+                        comment="Buen encaje técnico.",
+                    ),
+                ),
+            ),
+        )
+        adjudicate_challenge(
+            challenge=self.challenge,
+            actor=self.demand_user,
+            command=AwardDecisionCommand(
+                winning_application_id=application.pk,
+                comment="Seleccionada para adjudicación.",
+            ),
         )
         self.client.force_login(self.demand_user)
 
@@ -298,6 +342,77 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertContains(response, "Detalle por criterio")
         self.assertContains(response, "Posición comparativa actual")
         self.assertContains(response, "Ranking elegible para adjudicación")
+
+    def test_challenge_detail_hides_applicant_identity_for_publisher_before_award(self):
+        Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            proposal_text="Initial proposal",
+            problem_understanding="Entendimiento inicial",
+            proposed_solution="Solución inicial",
+            capabilities_evidence="Capacidades iniciales",
+            execution_plan="Plan inicial",
+        )
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Propuesta 01")
+        self.assertNotContains(response, self.supply_organization.business_name)
+
+    def test_challenge_detail_hides_evaluation_read_models_from_non_publisher(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        application = Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            proposal_text="Initial proposal",
+            problem_understanding="Entendimiento inicial",
+            proposed_solution="Solución inicial",
+            capabilities_evidence="Capacidades iniciales",
+            execution_plan="Plan inicial",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.demand_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=application,
+            actor=self.demand_user,
+            command=EvaluateApplicationCommand(
+                application_id=application.pk,
+                assessments=tuple(
+                    CriterionAssessmentInput(
+                        criterion_id=criterion.pk,
+                        score=4,
+                        comment=f"Evaluación para {criterion.label}.",
+                    )
+                    for criterion in self.challenge.evaluation_criteria_items.order_by("position")
+                ),
+            ),
+        )
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Promedio actual")
+        self.assertNotContains(response, "Posición comparativa actual")
+        self.assertNotContains(response, "Detalle por criterio")
+        self.assertEqual(response.context["challenge_applications"], [])
+        self.assertEqual(list(response.context["timeline_entries"]), [])
+        self.assertIsNone(response.context["award_decision"])
 
     def test_challenge_create_persists_evaluation_criteria(self):
         self.client.force_login(self.demand_user)

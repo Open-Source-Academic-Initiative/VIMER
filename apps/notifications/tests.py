@@ -34,6 +34,11 @@ class NotificationEventIntegrationTests(TestCase):
             user=self.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
         )
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.publisher_observer_user,
+            role=ChallengeEvaluationRoleAssignment.Role.OBSERVER,
+        )
 
     def build_complete_evaluation_command(self):
         self.challenge.sync_evaluation_criteria_items()
@@ -78,6 +83,12 @@ class NotificationEventIntegrationTests(TestCase):
         self.publisher_user = User.objects.create_user(
             username="publisher_notifications",
             email="publisher-notifications@example.com",
+            password="ClaveSegura123",
+            organization=self.publisher,
+        )
+        self.publisher_observer_user = User.objects.create_user(
+            username="publisher_observer_notifications",
+            email="publisher-observer-notifications@example.com",
             password="ClaveSegura123",
             organization=self.publisher,
         )
@@ -208,6 +219,20 @@ class NotificationEventIntegrationTests(TestCase):
             Notification.objects.filter(
                 recipient=self.other_provider_user,
                 kind=Notification.Kind.APPLICATION_EVALUATED,
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.publisher_observer_user,
+                kind=Notification.Kind.APPLICATION_EVALUATED,
+                title="Se registró actividad de evaluación",
+            ).exists()
+        )
+        self.assertFalse(
+            Notification.objects.filter(
+                recipient=self.publisher_user,
+                kind=Notification.Kind.APPLICATION_EVALUATED,
+                title="Se registró actividad de evaluación",
             ).exists()
         )
 

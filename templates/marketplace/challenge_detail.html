@@ -82,20 +82,24 @@
             <p>Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación.</p>
         {% endif %}
     </div>
-    <h3>Interesados en este desafío:</h3>
+        <h3>Interesados en este desafío:</h3>
     <ul>
         {% for app in challenge_applications %}
             <li>
-                <span class="org-chip">
-                    {% if app.applicant.logo %}
-                        <img
-                            src="{{ app.applicant.logo.url }}"
-                            alt="Logo de {{ app.applicant.business_name }}"
-                            class="avatar avatar-marketplace"
-                        >
-                    {% endif %}
-                    <span><strong>{{ app.applicant.business_name }}:</strong> {{ app.summary_text|truncatewords:20 }}</span>
-                </span>
+                {% if show_applicant_identity %}
+                    <span class="org-chip">
+                        {% if app.applicant.logo %}
+                            <img
+                                src="{{ app.applicant.logo.url }}"
+                                alt="Logo de {{ app.applicant.business_name }}"
+                                class="avatar avatar-marketplace"
+                            >
+                        {% endif %}
+                        <span><strong>{{ app.applicant.business_name }}:</strong> {{ app.summary_text|truncatewords:20 }}</span>
+                    </span>
+                {% else %}
+                    <p><strong>{{ app.evaluation_summary.blind_reference }}:</strong> {{ app.summary_text|truncatewords:20 }}</p>
+                {% endif %}
                 <div>
                     <strong>Entendimiento:</strong> {{ app.problem_understanding|truncatewords:20 }}<br>
                     <strong>Capacidades:</strong> {{ app.capabilities_evidence|truncatewords:20 }}<br>
@@ -110,6 +114,10 @@
                         <strong>Evaluación por criterios:</strong>
                         {{ app.evaluation_summary.evaluated_count }}/{{ app.evaluation_summary.criteria_total }}
                         completados
+                    </p>
+                    <p>
+                        <strong>Evaluaciones registradas:</strong>
+                        {{ app.evaluation_summary.assessment_count }}
                     </p>
                     <p>
                         <strong>Ranking elegible para adjudicación:</strong>
@@ -134,11 +142,17 @@
                                 {% for result in app.evaluation_summary.criterion_results %}
                                     <li>
                                         <strong>{{ result.label }}:</strong>
-                                        {% if result.score is not None %}
-                                            {{ result.score }}/5. {{ result.comment }}
-                                            {% if result.evaluated_by_username %}
-                                                ({{ result.evaluated_by_username }})
-                                            {% endif %}
+                                        {% if result.evaluation_count %}
+                                            promedio {{ result.average_score|floatformat:2 }}/5
+                                            con {{ result.evaluation_count }} evaluacion{{ result.evaluation_count|pluralize:"es" }}
+                                            <ul>
+                                                {% for evaluation in result.evaluations %}
+                                                    <li>
+                                                        {{ evaluation.score }}/5. {{ evaluation.comment }}
+                                                        ({{ evaluation.evaluated_by_username }}, {{ evaluation.evaluated_at }})
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
                                         {% else %}
                                             Pendiente
                                         {% endif %}

@@ -11,10 +11,19 @@ from apps.evaluation.application.exceptions import ChallengeEvaluationValidation
 from apps.evaluation.application.queries import (
     build_challenge_application_evaluation_summaries,
 )
+from apps.evaluation.domain.exceptions import EvaluationDomainRuleViolation
 from apps.evaluation.domain.events import (
     ApplicationEvaluationRecorded,
     ChallengeAwarded,
     ChallengeEvaluationStarted,
+)
+from apps.evaluation.domain.rules import (
+    ensure_application_has_required_criterion_coverage_for_award,
+    ensure_actor_belongs_to_publisher_organization,
+    ensure_actor_is_designated_adjudicator,
+    ensure_actor_is_designated_evaluator,
+    ensure_challenge_has_required_evaluation_team,
+    ensure_requested_evaluation_role_members_belong_to_publisher_organization,
 )
 from apps.evaluation.domain.signals import (
     publish_application_evaluation_recorded,
@@ -30,18 +39,18 @@ def _ensure_structured_criteria_items(challenge: Challenge) -> None:
     challenge.sync_evaluation_criteria_items()
 
 
-def _challenge_has_required_evaluation_team(challenge: Challenge) -> bool:
-    assignments = challenge.evaluation_role_assignments
-    return (
-        assignments.filter(role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR).exists()
-        and assignments.filter(
-            role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
-        ).exists()
-    )
-
-
-def _actor_has_evaluation_role(*, challenge: Challenge, actor, role: str) -> bool:
-    return challenge.evaluation_role_assignments.filter(user=actor, role=role).exists()
+def _collect_rule_violation(
+    *,
+    messages: list[str],
+    invariant_ids: list[str],
+    callback,
+) -> None:
+    try:
+        callback()
+    except EvaluationDomainRuleViolation as exc:
+        messages.extend(exc.messages)
+        if exc.invariant_id:
+            invariant_ids.append(exc.invariant_id)
 
 
 @transaction.atomic
@@ -52,11 +61,17 @@ def assign_challenge_evaluation_roles(
     command: AssignChallengeEvaluationRolesCommand,
 ) -> Challenge:
     messages = []
+    invariant_ids = []
 
-    if actor.organization_id != challenge.publisher_id:
-        messages.append(
-            "Solo la organización publicadora puede definir el equipo de evaluación."
-        )
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_actor_belongs_to_publisher_organization(
+            challenge=challenge,
+            actor=actor,
+            message="Solo la organización publicadora puede definir el equipo de evaluación.",
+        ),
+    )
 
     if challenge.status in {Challenge.Status.AWARDED, Challenge.Status.ARCHIVED}:
         messages.append(
@@ -69,25 +84,23 @@ def assign_challenge_evaluation_roles(
     if not command.adjudicator_user_id:
         messages.append("Debes asignar un adjudicador designado.")
 
-    publisher_member_ids = set(
-        challenge.publisher.members.values_list("pk", flat=True)
-    )
     requested_user_ids = set(command.evaluator_user_ids) | set(command.observer_user_ids)
     requested_user_ids.add(command.adjudicator_user_id)
 
-    if command.adjudicator_user_id and command.adjudicator_user_id not in publisher_member_ids:
-        messages.append(
-            "El adjudicador designado debe pertenecer a la organización publicadora."
-        )
-
-    invalid_user_ids = requested_user_ids - publisher_member_ids
-    if invalid_user_ids:
-        messages.append(
-            "Todos los roles de evaluación deben asignarse a miembros de la organización publicadora."
-        )
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_requested_evaluation_role_members_belong_to_publisher_organization(
+            challenge=challenge,
+            requested_user_ids=requested_user_ids,
+        ),
+    )
 
     if messages:
-        raise ChallengeEvaluationValidationError(messages)
+        raise ChallengeEvaluationValidationError(
+            messages,
+            invariant_ids=invariant_ids,
+        )
 
     ChallengeEvaluationRoleAssignment.objects.filter(challenge=challenge).delete()
     assignments = [
@@ -119,21 +132,20 @@ def assign_challenge_evaluation_roles(
     return challenge
 
 
-def _application_has_complete_criterion_evaluations(application: Application) -> bool:
-    total_criteria = application.challenge.evaluation_criteria_items.count()
-    if total_criteria == 0:
-        return False
-
-    evaluated_criteria = application.criterion_evaluations.count()
-    return evaluated_criteria == total_criteria
-
-
 @transaction.atomic
 def start_challenge_evaluation(*, challenge: Challenge, actor) -> Challenge:
     messages = []
+    invariant_ids = []
 
-    if actor.organization_id != challenge.publisher_id:
-        messages.append("Solo la organización publicadora puede iniciar la evaluación.")
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_actor_belongs_to_publisher_organization(
+            challenge=challenge,
+            actor=actor,
+            message="Solo la organización publicadora puede iniciar la evaluación.",
+        ),
+    )
 
     if challenge.status != Challenge.Status.PUBLISHED:
         messages.append("Solo los desafíos publicados pueden pasar a evaluación.")
@@ -144,16 +156,20 @@ def start_challenge_evaluation(*, challenge: Challenge, actor) -> Challenge:
     if not challenge.has_evaluation_criteria():
         messages.append("No puedes iniciar evaluación sin criterios de evaluación definidos.")
 
-    if not _challenge_has_required_evaluation_team(challenge):
-        messages.append(
-            "Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación."
-        )
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_challenge_has_required_evaluation_team(challenge),
+    )
 
     if AwardDecision.objects.filter(challenge=challenge).exists():
         messages.append("Este desafío ya tiene una decisión de adjudicación registrada.")
 
     if messages:
-        raise ChallengeEvaluationValidationError(messages)
+        raise ChallengeEvaluationValidationError(
+            messages,
+            invariant_ids=invariant_ids,
+        )
 
     _ensure_structured_criteria_items(challenge)
     challenge.status = Challenge.Status.UNDER_EVALUATION
@@ -178,15 +194,26 @@ def evaluate_application_by_criteria(
     command: EvaluateApplicationCommand,
 ) -> Application:
     messages = []
+    invariant_ids = []
 
-    if actor.organization_id != challenge.publisher_id:
-        messages.append("Solo la organización publicadora puede evaluar propuestas.")
-    elif not _actor_has_evaluation_role(
-        challenge=challenge,
-        actor=actor,
-        role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
-    ):
-        messages.append("Solo un evaluador designado puede evaluar propuestas.")
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_actor_belongs_to_publisher_organization(
+            challenge=challenge,
+            actor=actor,
+            message="Solo la organización publicadora puede evaluar propuestas.",
+        ),
+    )
+    if not messages:
+        _collect_rule_violation(
+            messages=messages,
+            invariant_ids=invariant_ids,
+            callback=lambda: ensure_actor_is_designated_evaluator(
+                challenge=challenge,
+                actor=actor,
+            ),
+        )
 
     if challenge.status != Challenge.Status.UNDER_EVALUATION:
         messages.append("Solo los desafíos en evaluación admiten evaluaciones por criterio.")
@@ -206,7 +233,10 @@ def evaluate_application_by_criteria(
         messages.append("Debes evaluar todos los criterios definidos para la propuesta.")
 
     if messages:
-        raise ChallengeEvaluationValidationError(messages)
+        raise ChallengeEvaluationValidationError(
+            messages,
+            invariant_ids=invariant_ids,
+        )
 
     criterion_map = {criterion.pk: criterion for criterion in criteria}
     for assessment in command.assessments:
@@ -222,10 +252,10 @@ def evaluate_application_by_criteria(
         ApplicationCriterionEvaluation.objects.update_or_create(
             application=application,
             criterion=criterion_map[assessment.criterion_id],
+            evaluated_by=actor,
             defaults={
                 "score": assessment.score,
                 "comment": assessment.comment,
-                "evaluated_by": actor,
             },
         )
 
@@ -251,8 +281,10 @@ def evaluate_application_by_criteria(
             applicant_organization_id=application.applicant_id,
             publisher_organization_id=challenge.publisher_id,
             evaluated_by_user_id=actor.pk,
+            blind_reference=application_summary.blind_reference,
             evaluated_count=application_summary.evaluated_count,
             criteria_total=application_summary.criteria_total,
+            assessment_count=application_summary.assessment_count,
             total_score=application_summary.total_score,
             average_score=application_summary.average_score,
             ranking_position=application_summary.ranking_position,
@@ -272,15 +304,26 @@ def adjudicate_challenge(
     command: AwardDecisionCommand,
 ) -> AwardDecision:
     messages = []
+    invariant_ids = []
 
-    if actor.organization_id != challenge.publisher_id:
-        messages.append("Solo la organización publicadora puede adjudicar el desafío.")
-    elif not _actor_has_evaluation_role(
-        challenge=challenge,
-        actor=actor,
-        role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
-    ):
-        messages.append("Solo el adjudicador designado puede adjudicar el desafío.")
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_actor_belongs_to_publisher_organization(
+            challenge=challenge,
+            actor=actor,
+            message="Solo la organización publicadora puede adjudicar el desafío.",
+        ),
+    )
+    if not messages:
+        _collect_rule_violation(
+            messages=messages,
+            invariant_ids=invariant_ids,
+            callback=lambda: ensure_actor_is_designated_adjudicator(
+                challenge=challenge,
+                actor=actor,
+            ),
+        )
 
     if challenge.status != Challenge.Status.UNDER_EVALUATION:
         messages.append("Solo los desafíos en evaluación pueden adjudicarse.")
@@ -297,11 +340,14 @@ def adjudicate_challenge(
         messages.append("Debes seleccionar una propuesta válida para adjudicar.")
     elif winning_application.challenge_id != challenge.pk:
         messages.append("La propuesta seleccionada no pertenece a este desafío.")
-    elif not _application_has_complete_criterion_evaluations(winning_application):
-        messages.append(
-            "La propuesta ganadora debe tener todos sus criterios evaluados antes de adjudicar."
-        )
     else:
+        _collect_rule_violation(
+            messages=messages,
+            invariant_ids=invariant_ids,
+            callback=lambda: ensure_application_has_required_criterion_coverage_for_award(
+                winning_application
+            ),
+        )
         challenge_summaries = build_challenge_application_evaluation_summaries(challenge)
         winning_application_with_summary = next(
             (
@@ -324,7 +370,10 @@ def adjudicate_challenge(
         messages.append("Debes registrar un comentario de adjudicación.")
 
     if messages:
-        raise ChallengeEvaluationValidationError(messages)
+        raise ChallengeEvaluationValidationError(
+            messages,
+            invariant_ids=invariant_ids,
+        )
 
     decision = AwardDecision(
         challenge=challenge,
@@ -334,6 +383,7 @@ def adjudicate_challenge(
         winning_average_score=winning_application_summary.average_score,
         winning_evaluated_criteria_count=winning_application_summary.evaluated_count,
         winning_criteria_total=winning_application_summary.criteria_total,
+        winning_assessment_count=winning_application_summary.assessment_count,
         winning_ranking_position=winning_application_summary.ranking_position,
         winning_eligible_ranking_position=(
             winning_application_summary.eligible_ranking_position

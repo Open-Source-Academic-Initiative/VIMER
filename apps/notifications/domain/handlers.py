@@ -12,6 +12,7 @@ from apps.evaluation.domain.signals import (
     challenge_evaluation_started,
 )
 from apps.evaluation.models import AwardDecision
+from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.identity.models import User
 from apps.marketplace.models import Application, Challenge
 from apps.notifications.models import Notification
@@ -128,7 +129,10 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
     application = Application.objects.select_related(
         "challenge",
         "applicant",
-    ).prefetch_related("applicant__members").get(pk=event.application_id)
+    ).prefetch_related(
+        "applicant__members",
+        "challenge__evaluation_role_assignments__user",
+    ).get(pk=event.application_id)
     notifications = [
         Notification(
             recipient=recipient,
@@ -137,6 +141,7 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
             body=(
                 f"Tu propuesta para '{application.challenge.title}' quedó con "
                 f"{event.evaluated_count}/{event.criteria_total} criterios evaluados, "
+                f"{event.assessment_count} evaluaciones registradas, "
                 f"promedio {event.average_score:.2f}/5 y posición actual "
                 f"#{event.ranking_position}."
             ),
@@ -144,5 +149,34 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
         )
         for recipient in application.applicant.members.all()
     ]
+    team_recipient_ids = sorted(
+        {
+            assignment.user_id
+            for assignment in application.challenge.evaluation_role_assignments.all()
+            if assignment.role
+            in {
+                ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+                ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
+                ChallengeEvaluationRoleAssignment.Role.OBSERVER,
+            }
+            and assignment.user_id != event.evaluated_by_user_id
+        }
+    )
+    if team_recipient_ids:
+        for recipient in User.objects.filter(pk__in=team_recipient_ids):
+            notifications.append(
+                Notification(
+                    recipient=recipient,
+                    kind=Notification.Kind.APPLICATION_EVALUATED,
+                    title="Se registró actividad de evaluación",
+                    body=(
+                        f"{event.blind_reference} quedó con "
+                        f"{event.evaluated_count}/{event.criteria_total} criterios cubiertos, "
+                        f"{event.assessment_count} evaluaciones registradas y "
+                        f"promedio {event.average_score:.2f}/5."
+                    ),
+                    link=_build_challenge_link(application.challenge_id),
+                )
+            )
     if notifications:
         Notification.objects.bulk_create(notifications)

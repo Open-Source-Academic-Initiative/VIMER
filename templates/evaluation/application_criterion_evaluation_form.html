@@ -2,9 +2,10 @@
 {% block title %}Evaluar Propuesta - VIMER{% endblock %}
 {% block content %}
 <h2>Evaluar Propuesta</h2>
-<h3>{{ application.applicant.business_name }}</h3>
+<h3>{{ application_blind_reference }}</h3>
 <p><strong>Desafío:</strong> {{ challenge.title }}</p>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+<p>La identidad del postulante permanece oculta hasta que se registre la adjudicación.</p>
 
 <form method="post">
     {% csrf_token %}

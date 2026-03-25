@@ -27,8 +27,10 @@ class ApplicationEvaluationRecorded:
     applicant_organization_id: int
     publisher_organization_id: int
     evaluated_by_user_id: int
+    blind_reference: str
     evaluated_count: int
     criteria_total: int
+    assessment_count: int
     total_score: int
     average_score: float | None
     ranking_position: int | None

@@ -10,10 +10,10 @@ Current status:
 - Stable development baseline.
 - A public landing page is available at `/`.
 - The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, and application submission.
-- Write-side use cases are routed through explicit application services in `identity` and `marketplace`.
+- Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 80 tests.
+- The automated test suite currently passes with 87 tests.
 - Django Admin now prevents a platform superuser from deleting its own account.
 - Organizations can upload a custom logo during signup, limited to PNG/JPG; otherwise a procedural default avatar is generated automatically.
 - Organization logos/avatars are visible in marketplace publications and proposal listings.
@@ -22,6 +22,7 @@ Current status:
 - Challenges now capture explicit evaluation criteria, required before evaluation can start.
 - Challenges now persist those evaluation criteria as structured entries that can be reused in evaluation flows.
 - Evaluation now supports criterion-by-criterion assessments for each proposal before final adjudication.
+- Evaluation now supports multiple designated evaluators contributing independently to the same proposal criterion.
 - Publisher-facing challenge and adjudication views now expose aggregated evaluation summaries per proposal.
 - Publisher-facing evaluation flows now expose an explicit comparative ranking between proposals based on completed criterion assessments.
 - Applications are accepted only while a challenge is published and still open for submission.
@@ -33,6 +34,7 @@ Current status:
 - A new internal notifications context now consumes evaluation events and exposes an in-app inbox with unread counts.
 - Award decisions now persist a snapshot of the winning proposal's evaluation state for later traceability.
 - Criterion-by-criterion proposal evaluation now emits its own domain event, feeding timeline and applicant notifications.
+- Proposal-evaluation activity now also notifies the evaluation team and enriches publisher-facing audit views.
 - The local test suite now ignores the workspace `.env` by default, reducing environment-specific failures.
 - Containerized serving now uses `gunicorn` instead of Django's development server.
 - Challenges now support a formal evaluation team with designated evaluators, one designated adjudicator, and optional observers.
@@ -77,6 +79,7 @@ Write-side application layer:
 ```text
 apps/identity/application/     Registration command, exceptions, and service
 apps/marketplace/application/  Challenge publication and application services
+apps/evaluation/application/   Evaluation-team, scoring, and adjudication services
 apps/notifications/application/ Notification read-state service
 ```
 
@@ -106,12 +109,15 @@ Main models:
 - Evaluation and adjudication flow for challenge publishers.
 - Evaluation team management with designated evaluators, adjudicator, and observers.
 - Criterion-by-criterion proposal evaluation during `UNDER_EVALUATION`.
-- Aggregated evaluation summaries per proposal, including average score and criterion detail.
+- Blind evaluation and adjudication views that hide applicant identity until award.
+- Aggregated evaluation summaries per proposal, including coverage, registered assessment count, average score, and criterion detail.
 - Explicit comparative proposal ranking in publisher-facing evaluation and adjudication views.
+- Multiple independent evaluator assessments per criterion, with one current persisted assessment per `(proposal, criterion, evaluator)`.
 - Persisted evaluation snapshot on award decisions, including ranking and score context.
 - Evaluation history timeline for challenge publishers.
 - Internal notifications inbox with unread counter and mark-all-read flow.
 - Proposal-evaluation notifications for applicant organizations after scoring is registered.
+- Proposal-evaluation activity notifications for the evaluation team.
 - Test execution isolated by default from local `.env` overrides.
 - Basic Django admin integration.
 - Platform superuser safeguard against self-deletion in Django Admin.
@@ -124,7 +130,13 @@ Main models:
 - Only `SUPPLY_SIDE` (`Proveedor tecnológico`) organizations can apply to challenges.
 - Challenges only accept applications while they remain published and open for submission.
 - A challenge must define evaluation criteria before it can move into evaluation.
-- A winning proposal must have all its criteria evaluated before it can be adjudicated.
+- A winning proposal becomes eligible for adjudication once each criterion has at least one registered assessment.
+- Only the publisher organization can manage and execute evaluation operations for its challenge.
+- Evaluation roles can only be assigned to members of the publisher organization.
+- At least one designated evaluator and one designated adjudicator are required before evaluation can start.
+- Only designated evaluators can score proposals.
+- Only the designated adjudicator can adjudicate.
+- A designated evaluator keeps only one current assessment per `(proposal, criterion, evaluator)`; rescoring updates that evaluator's current assessment.
 - An organization cannot apply twice to the same challenge.
 - A submitted proposal must include all required structured components.
 - A submitted proposal cannot be modified after submission.
@@ -138,7 +150,7 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 80 tests.
+- `python manage.py test` currently passes with 87 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
@@ -151,9 +163,9 @@ Strengths:
 - Challenges now materialize structured evaluation-criteria entries, including migration backfill for existing text-based criteria.
 - Applications now store structured proposal components and enforce immutability after submission.
 - Evaluation now lives in its own Django app and closes the loop through criterion assessment plus adjudication.
-- Evaluation views now provide an explicit proposal ranking to support adjudication decisions.
+- Evaluation views now provide an explicit proposal ranking plus multi-evaluator assessment detail to support adjudication decisions.
 - Award decisions now keep an evaluation snapshot so adjudication remains auditable after later UI changes.
-- Evaluation event consumers now also react to proposal scoring, not only to start and award milestones.
+- Evaluation event consumers now also react to proposal scoring with timeline projections, applicant notifications, and evaluation-team notifications.
 - Evaluation permissions now follow formal designated roles instead of any publisher member being able to mutate the process.
 - The test runner is now isolated from local `.env` overrides unless explicitly requested.
 - Notifications now live in their own Django app and consume evaluation domain events.
@@ -184,11 +196,13 @@ Priority issues identified during the audit were fixed:
 - Added challenge lifecycle semantics with explicit status and optional application deadline.
 - Added explicit evaluation criteria on challenges and required them before a challenge can enter evaluation.
 - Added structured evaluation-criteria entries for challenges and backfilled them from existing text criteria.
-- Added criterion-by-criterion proposal assessments and required complete evaluation before adjudicating a winning proposal.
+- Added criterion-by-criterion proposal assessments and required criterion coverage before adjudicating a winning proposal.
 - Added reusable evaluation summaries so publishers can compare proposals during review and adjudication.
-- Added explicit comparative proposal ranking in evaluation and adjudication views, prioritizing complete evaluations and stronger scores.
-- Added persisted adjudication snapshots with ranking, score, and evaluation-completeness context for the winning proposal.
+- Added explicit comparative proposal ranking in evaluation and adjudication views, prioritizing criterion coverage, stronger averages, and richer assessment volume.
+- Added persisted adjudication snapshots with ranking, score, evaluation-completeness, and assessment-count context for the winning proposal.
 - Added explicit proposal-evaluation events with timeline persistence and applicant-facing notifications.
+- Evolved proposal assessment from a single-evaluator model to multiple independent evaluators per criterion, with aggregate scoring across all registered assessments.
+- Added evaluation-team notifications and richer publisher-facing audit detail when proposal-scoring activity is recorded.
 - Isolated test settings from the local `.env` by default through `READ_DOT_ENV_FILE`.
 - Switched containerized serving from `runserver` to `gunicorn`.
 - Added formal evaluation-role assignments with designated evaluators, a designated adjudicator, observer roles, UI management, and permission enforcement.
@@ -196,7 +210,7 @@ Priority issues identified during the audit were fixed:
 - Formalized proposal submission with structured required components and immutable submitted applications.
 - Added an explicit evaluation context with challenge transition to evaluation, adjudication, mandatory comment, and one winning proposal per challenge.
 - Added an internal notifications context with event-driven inbox entries, unread counts, and mark-all-read behavior.
-- Expanded automated coverage to 80 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, and formal evaluation-role enforcement.
+- Expanded automated coverage to 87 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, and multiple-evaluator aggregation/update semantics.
 
 ## Main routes
 
@@ -209,6 +223,7 @@ Priority issues identified during the audit were fixed:
 - `/marketplace/challenge/<id>/`: challenge detail
 - `/marketplace/challenge/<id>/apply/`: proposal submission
 - `/evaluation/challenge/<id>/start/`: start challenge evaluation
+- `/evaluation/challenge/<id>/roles/`: manage evaluation team
 - `/evaluation/challenge/<id>/application/<application_id>/evaluate/`: evaluate a proposal by criterion
 - `/evaluation/challenge/<id>/award/`: register adjudication decision
 - `/notifications/`: notifications inbox

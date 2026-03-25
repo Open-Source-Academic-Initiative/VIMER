@@ -11,7 +11,6 @@ from apps.evaluation.domain.signals import (
     challenge_evaluation_started,
 )
 from apps.evaluation.models import ChallengeTimelineEntry
-from apps.marketplace.models import Application
 
 
 @receiver(
@@ -51,14 +50,15 @@ def record_challenge_awarded(sender, *, event, **kwargs):
     dispatch_uid="evaluation.record_application_evaluation_recorded",
 )
 def record_application_evaluation_recorded(sender, *, event, **kwargs):
-    application = Application.objects.select_related("applicant").get(pk=event.application_id)
     ChallengeTimelineEntry.objects.create(
         challenge_id=event.challenge_id,
         event_type=ChallengeTimelineEntry.EventType.APPLICATION_EVALUATED,
         actor_id=event.evaluated_by_user_id,
         description=(
-            "Se registró la evaluación por criterios de la propuesta de "
-            f"'{application.applicant.business_name}'."
+            f"Se registró actividad de evaluación sobre {event.blind_reference}. "
+            f"Cobertura actual: {event.evaluated_count}/{event.criteria_total} criterios. "
+            f"Evaluaciones acumuladas: {event.assessment_count}. "
+            f"Promedio actual: {event.average_score:.2f}/5."
         ),
         occurred_at=event.occurred_at,
     )

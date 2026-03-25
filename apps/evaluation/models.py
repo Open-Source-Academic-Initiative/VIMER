@@ -102,6 +102,11 @@ class AwardDecision(models.Model):
         null=True,
         blank=True,
     )
+    winning_assessment_count = models.PositiveIntegerField(
+        _("Cantidad total de evaluaciones registradas al adjudicar"),
+        null=True,
+        blank=True,
+    )
     winning_ranking_position = models.PositiveIntegerField(
         _("Posición comparativa registrada al adjudicar"),
         null=True,
@@ -221,11 +226,11 @@ class ApplicationCriterionEvaluation(models.Model):
     class Meta:
         verbose_name = _("Evaluación de criterio")
         verbose_name_plural = _("Evaluaciones de criterio")
-        ordering = ["criterion__position", "id"]
+        ordering = ["criterion__position", "evaluated_by__username", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["application", "criterion"],
-                name="unique_application_evaluation_per_criterion",
+                fields=["application", "criterion", "evaluated_by"],
+                name="unique_application_evaluation_per_criterion_and_evaluator",
             ),
         ]
 

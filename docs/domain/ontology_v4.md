@@ -75,6 +75,8 @@ These are not market roles. They are operational roles inside the evaluation pro
 - Meaning: representative explicitly linked to the evaluation team for visibility/governance without mutation authority
 - Status: `Implemented`
 - Technical mapping: `evaluation.ChallengeEvaluationRoleAssignment(role=OBSERVER)`
+- Note:
+  - the same representative may hold more than one evaluation-governance role for the same challenge in the current model
 
 ### Platform Governance
 
@@ -211,7 +213,8 @@ These are not market roles. They are operational roles inside the evaluation pro
   - belongs to one `Propuesta`
   - targets one challenge criterion
   - records score, comment, evaluator, and timestamp
-  - currently only one persisted evaluation per `(application, criterion)`
+  - allows one current persisted evaluation per `(application, criterion, evaluator)`
+  - supports multiple independent evaluators on the same criterion
 
 ### Decision de adjudicacion
 
@@ -233,6 +236,7 @@ These are not market roles. They are operational roles inside the evaluation pro
   - preserves average score
   - preserves evaluated criteria count
   - preserves total criteria count
+  - preserves registered assessment count
   - preserves overall and eligible ranking positions
   - exists for later traceability even if read models evolve
 
@@ -269,9 +273,12 @@ These concepts are part of the ontology even when they are not first-class persi
   - evaluated criteria count
   - criteria total
   - completion status
+  - registered assessment count
   - total score
   - average score
   - criterion-by-criterion detail
+  - per-criterion evaluation count and average
+  - per-evaluator audit detail
 
 ### Ranking comparativo de propuestas
 
@@ -283,8 +290,8 @@ These concepts are part of the ontology even when they are not first-class persi
   - prioritizes complete evaluations
   - then stronger average score
   - then total score
-  - then evaluated count
-  - current implementation uses applicant business name and primary key as deterministic tie-breakers
+  - then registered assessment count
+  - then primary key as deterministic tie-breaker
 - Note:
   - this is ranking, not weighted scoring
 
@@ -302,6 +309,7 @@ These concepts are part of the ontology even when they are not first-class persi
 - Evaluation-team members must belong to the publisher organization
 - Exactly one designated adjudicator is allowed per challenge
 - At least one designated evaluator and one designated adjudicator are required before evaluation starts
+- The same representative may simultaneously be evaluator and adjudicator if the publisher organization decides so
 - Status: `Implemented`
 
 ### Evaluation execution
@@ -360,12 +368,15 @@ These concepts are part of the ontology even when they are not first-class persi
   - criterion-by-criterion proposal evaluation is registered
 - Carries:
   - applicant and publisher references
+  - blind proposal reference
   - score totals
   - completion counters
+  - assessment count
   - ranking positions
 - Consumers today:
   - challenge timeline persistence
   - applicant notifications
+  - evaluation-team notifications
 
 ### ChallengeAwarded
 
@@ -382,7 +393,7 @@ These concepts are part of the ontology even when they are not first-class persi
 - One `Organización` can submit many `Propuestas` if it is a `Proveedor tecnológico`
 - One `Desafío` can receive many `Propuestas`
 - One `Desafío` owns many `Criterios de evaluación`
-- One `Propuesta` can have at most one persisted assessment per criterion in the current model
+- One `Propuesta` can have many persisted criterion assessments, but at most one current assessment per `(criterion, evaluator)`
 - One `Desafío` can have many evaluation-role assignments
 - One `Desafío` can have at most one `Decision de adjudicación`
 - One `Decision de adjudicación` selects exactly one winning `Propuesta`
@@ -401,32 +412,40 @@ These concepts are part of the ontology even when they are not first-class persi
 - Structured proposal completeness before submission
 - Submitted proposal immutability
 - Evaluation criteria required before evaluation starts
-- Winning proposal must be fully evaluated before adjudication
+- Award eligibility requires criterion coverage
 - Evaluation team required before evaluation starts
 - Evaluation roles restricted to publisher-organization members
 - Only designated evaluators may score
 - Only designated adjudicator may adjudicate
 - At most one adjudicator per challenge
 - At most one award decision per challenge
+- Applicant identity remains blind until award
+- At most one current assessment per `(proposal, criterion, evaluator)`
 - Award decision preserves an evaluation snapshot
 
 ## Explicitly Implemented But Still Semantically Limited
 
 ### Blind evaluation
 
-- Status: `Planned`
-- Current limitation:
-  - applicant identity is still visible in evaluation/adjudication flows
-- Consequence:
-  - confidentiality is not yet protected at query, view, or template level
+- Status: `Implemented`
+- Semantics:
+  - applicant identity remains hidden during publisher-facing evaluation and adjudication flows
+  - blind references are used instead of applicant names until adjudication is registered
+  - applicant identity becomes visible again after adjudication
+- Enforcement today:
+  - blind read models
+  - blind form labels
+  - blind evaluation/adjudication templates
+  - challenge timeline descriptions without applicant identity leakage before award
 
 ### Multiple independent evaluators per criterion
 
-- Status: `Planned`
-- Current limitation:
-  - one persisted evaluation per `(application, criterion)`
-- Consequence:
-  - the current model supports designated evaluator permissions, but not a richer many-evaluator scoring scheme
+- Status: `Implemented`
+- Semantics:
+  - different designated evaluators may each register their own current assessment for the same criterion
+  - the same evaluator updates its current assessment instead of producing a second active row
+  - proposal aggregates are computed across all registered current assessments
+  - adjudication eligibility depends on criterion coverage, not on every evaluator scoring every criterion
 
 ### Weighted criteria
 
@@ -453,4 +472,3 @@ A change should be questioned if it introduces code, documentation, or UI behavi
 - challenge, application, evaluation, and notifications remain distinct conceptual contexts
 - adjudication remains traceable through a persisted decision plus snapshot
 - major evaluation milestones remain event-emitting and auditable
-

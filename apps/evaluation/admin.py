@@ -15,6 +15,7 @@ class AwardDecisionAdmin(admin.ModelAdmin):
         "winning_application",
         "winning_ranking_position",
         "winning_total_score",
+        "winning_assessment_count",
         "decided_by",
         "decided_at",
     )

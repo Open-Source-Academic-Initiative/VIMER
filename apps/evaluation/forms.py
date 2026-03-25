@@ -2,6 +2,9 @@ from django import forms
 from django.db.models import Case, IntegerField, Value, When
 from django.contrib.auth import get_user_model
 
+from apps.evaluation.domain.blind_references import (
+    build_challenge_application_blind_reference_map,
+)
 from apps.evaluation.application.commands import (
     AssignChallengeEvaluationRolesCommand,
     AwardDecisionCommand,
@@ -14,6 +17,15 @@ from apps.evaluation.application.queries import (
 from apps.evaluation.models import ApplicationCriterionEvaluation
 from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.marketplace.models import Application, Challenge
+
+
+class BlindApplicationChoiceField(forms.ModelChoiceField):
+    def __init__(self, *args, blind_reference_map: dict[int, str], **kwargs):
+        self.blind_reference_map = blind_reference_map
+        super().__init__(*args, **kwargs)
+
+    def label_from_instance(self, obj):
+        return self.blind_reference_map.get(obj.pk, f"Propuesta #{obj.pk}")
 
 
 class ChallengeEvaluationRoleAssignmentForm(forms.Form):
@@ -73,10 +85,6 @@ class ChallengeEvaluationRoleAssignmentForm(forms.Form):
 
 
 class AwardDecisionForm(forms.Form):
-    winning_application = forms.ModelChoiceField(
-        queryset=Application.objects.none(),
-        label="Propuesta ganadora",
-    )
     comment = forms.CharField(
         widget=forms.Textarea,
         label="Comentario de adjudicación",
@@ -86,8 +94,10 @@ class AwardDecisionForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.challenge = challenge
         self.evaluation_summaries = build_challenge_application_evaluation_summaries(
-            challenge
+            challenge,
+            reveal_applicant_identity=False,
         )
+        blind_reference_map = build_challenge_application_blind_reference_map(challenge)
         self.eligible_application_ids = [
             application.pk
             for application in self.evaluation_summaries
@@ -96,8 +106,7 @@ class AwardDecisionForm(forms.Form):
         eligible_queryset = challenge.applications.none()
         if self.eligible_application_ids:
             eligible_queryset = (
-                challenge.applications.select_related("applicant")
-                .filter(pk__in=self.eligible_application_ids)
+                challenge.applications.filter(pk__in=self.eligible_application_ids)
                 .order_by(
                     Case(
                         *[
@@ -111,9 +120,14 @@ class AwardDecisionForm(forms.Form):
                     )
                 )
             )
-        self.fields["winning_application"].queryset = eligible_queryset
+        self.fields["winning_application"] = BlindApplicationChoiceField(
+            queryset=eligible_queryset,
+            label="Propuesta ganadora",
+            blind_reference_map=blind_reference_map,
+        )
+        self.order_fields(["winning_application", "comment"])
         self.fields["winning_application"].help_text = (
-            "Solo aparecen propuestas con todos los criterios evaluados y se listan según el ranking actual."
+            "Solo aparecen propuestas con todos los criterios evaluados, listadas según el ranking actual y usando referencias ciegas hasta adjudicar."
         )
 
     def to_command(self) -> AwardDecisionCommand:
@@ -124,15 +138,25 @@ class AwardDecisionForm(forms.Form):
 
 
 class ApplicationCriterionEvaluationForm(forms.Form):
-    def __init__(self, *args, challenge: Challenge, application: Application, **kwargs):
+    def __init__(
+        self,
+        *args,
+        challenge: Challenge,
+        application: Application,
+        evaluator,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.challenge = challenge
         self.application = application
+        self.evaluator = evaluator
         self.challenge.sync_evaluation_criteria_items()
         criteria = challenge.evaluation_criteria_items.order_by("position")
         existing_evaluations = {
             evaluation.criterion_id: evaluation
-            for evaluation in application.criterion_evaluations.select_related("criterion")
+            for evaluation in application.criterion_evaluations.select_related("criterion").filter(
+                evaluated_by=evaluator
+            )
         }
 
         for criterion in criteria:
