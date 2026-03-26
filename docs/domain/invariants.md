@@ -471,12 +471,100 @@ Current enforcement:
 - aggregate evaluation summaries over distinct covered criteria
 - evaluation flow and service tests
 
+### INV-29
+
+Rule:
+
+- In the current product phase, all challenge criteria should have equal value and no explicit weighting.
+
+Status:
+
+- `Planned`
+
+Approved target enforcement:
+
+- approved product policy in `evaluation_scoring_and_award_policy.md`
+- scoring and ranking logic should average criteria equally once implemented
+
+### INV-30
+
+Rule:
+
+- If a criterion receives multiple evaluations, that criterion should contribute through its own average and not gain additional competitive weight from evaluator volume alone.
+
+Status:
+
+- `Planned`
+
+Approved target enforcement:
+
+- evaluation read models and adjudication logic should aggregate by criterion average first
+
+### INV-31
+
+Rule:
+
+- A challenge should only be adjudicated when every active proposal has complete criterion coverage.
+
+Status:
+
+- `Planned`
+
+Approved target enforcement:
+
+- adjudication service should block while active proposals remain incomplete
+- adjudication UI should expose pending blind proposal references and missing criterion counts
+
+### INV-32
+
+Rule:
+
+- Incomplete proposals should be shown separately as not yet eligible instead of competing in the main ranking.
+
+Status:
+
+- `Planned`
+
+Approved target enforcement:
+
+- evaluation read models and adjudication views should distinguish complete and incomplete proposals
+
+### INV-33
+
+Rule:
+
+- Real ties in the best available ranking position should remain explicit, share the same compact visible position, and be resolved by the designated adjudicator.
+
+Status:
+
+- `Planned`
+
+Approved target enforcement:
+
+- evaluation ranking should preserve tied positions
+- adjudication snapshot should preserve tie context
+
+### INV-34
+
+Rule:
+
+- Adjudicating outside the best available ranking position should require a structured exceptional-reason code and a mandatory free-text justification.
+
+Status:
+
+- `Planned`
+
+Approved target enforcement:
+
+- adjudication flow should warn, require confirmation, and record reason plus justification
+- better-ranked proposals should remain visible for audit
+
 ## Near-Term Enforcement Priorities
 
 The next invariants to implement in code should be:
 
 1. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
-2. decide whether criteria should become weighted instead of purely ordered
+2. implement the approved equal-weight scoring and tie-aware adjudication policy
 3. define whether proposal drafts deserve a first-class persisted lifecycle
 
 ## Traceability Expectation

@@ -5,12 +5,7 @@ from django.views.generic import DetailView, FormView, ListView
 from django.urls import reverse_lazy
 from apps.corporate.models import Organization
 from apps.evaluation.application.queries import (
-    build_challenge_application_evaluation_summaries,
-)
-from apps.evaluation.models import (
-    AwardDecision,
-    ChallengeEvaluationRoleAssignment,
-    ChallengeTimelineEntry,
+    build_challenge_publisher_detail_read_model,
 )
 from apps.marketplace.application.exceptions import (
     ChallengeApplicationValidationError,
@@ -60,91 +55,33 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         challenge = self.object
-        user_org = getattr(self.request.user, "organization", None)
+        detail_read_model = build_challenge_publisher_detail_read_model(
+            challenge=challenge,
+            requester=self.request.user,
+        )
         context["evaluation_criteria_items"] = challenge.evaluation_criteria_list()
-        context["award_decision"] = None
-        context["timeline_entries"] = []
-        context["evaluation_role_assignments"] = []
+        context["award_decision"] = detail_read_model.award_decision
+        context["timeline_entries"] = list(detail_read_model.timeline_entries)
+        context["evaluation_role_assignments"] = list(
+            detail_read_model.evaluation_role_assignments
+        )
         context["evaluation_team"] = {
-            "evaluators": [],
-            "adjudicator": None,
-            "observers": [],
+            "evaluators": list(detail_read_model.evaluation_team.evaluators),
+            "adjudicator": detail_read_model.evaluation_team.adjudicator,
+            "observers": list(detail_read_model.evaluation_team.observers),
         }
-        context["challenge_applications"] = []
+        context["challenge_applications"] = list(detail_read_model.challenge_applications)
         context["can_manage_evaluation_team"] = (
-            user_org is not None
-            and challenge.publisher_id == user_org.pk
+            detail_read_model.can_manage_evaluation_team
         )
-        context["show_applicant_identity"] = False
-        context["has_required_evaluation_team"] = False
-        context["can_evaluate_applications"] = False
-        context["can_adjudicate_challenge"] = False
-
-        if context["can_manage_evaluation_team"]:
-            context["award_decision"] = AwardDecision.objects.filter(
-                challenge=challenge
-            ).select_related(
-                "winning_application__applicant",
-                "decided_by",
-            ).first()
-            context["timeline_entries"] = ChallengeTimelineEntry.objects.filter(
-                challenge=challenge
-            ).select_related(
-                "actor",
-                "award_decision__winning_application__applicant",
-            )
-            context["show_applicant_identity"] = context["award_decision"] is not None
-            evaluation_role_assignments = challenge.evaluation_role_assignments.select_related(
-                "user"
-            )
-            context["evaluation_role_assignments"] = evaluation_role_assignments
-            context["evaluation_team"] = {
-                "evaluators": evaluation_role_assignments.filter(
-                    role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR
-                ),
-                "adjudicator": evaluation_role_assignments.filter(
-                    role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
-                ).first(),
-                "observers": evaluation_role_assignments.filter(
-                    role=ChallengeEvaluationRoleAssignment.Role.OBSERVER
-                ),
-            }
-            context["challenge_applications"] = (
-                build_challenge_application_evaluation_summaries(
-                    challenge,
-                    reveal_applicant_identity=context["show_applicant_identity"],
-                )
-            )
-            context["has_required_evaluation_team"] = (
-                evaluation_role_assignments.filter(
-                    role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR
-                ).exists()
-                and evaluation_role_assignments.filter(
-                    role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
-                ).exists()
-            )
-            context["can_evaluate_applications"] = evaluation_role_assignments.filter(
-                user=self.request.user,
-                role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
-            ).exists()
-            context["can_adjudicate_challenge"] = evaluation_role_assignments.filter(
-                user=self.request.user,
-                role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
-            ).exists()
-
-        context["can_start_evaluation"] = (
-            context["can_manage_evaluation_team"]
-            and challenge.status == Challenge.Status.PUBLISHED
-            and challenge.applications.exists()
-            and context["has_required_evaluation_team"]
-            and context["award_decision"] is None
+        context["show_applicant_identity"] = detail_read_model.show_applicant_identity
+        context["has_required_evaluation_team"] = (
+            detail_read_model.has_required_evaluation_team
         )
-        context["can_award_challenge"] = (
-            context["can_adjudicate_challenge"]
-            and challenge.status == Challenge.Status.UNDER_EVALUATION
-            and challenge.applications.exists()
-            and context["award_decision"] is None
-        )
+        context["can_evaluate_applications"] = detail_read_model.can_evaluate_applications
+        context["can_adjudicate_challenge"] = detail_read_model.can_adjudicate_challenge
+        context["can_start_evaluation"] = detail_read_model.can_start_evaluation
+        context["can_award_challenge"] = detail_read_model.can_award_challenge
         return context
 
 class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):

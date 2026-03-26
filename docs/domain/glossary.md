@@ -223,6 +223,47 @@ Notes:
 - The same evaluator updates this current assessment instead of creating a second active row for the same proposal and criterion.
 - Different evaluators may each contribute their own current assessment for the same criterion.
 
+### Cobertura completa de criterios
+
+Business meaning:
+
+- State in which a proposal has at least one registered evaluation for every challenge criterion.
+
+Notes:
+
+- Complete coverage is not the same as every evaluator scoring every criterion.
+- In the approved scoring policy, adjudication is blocked until every active proposal has complete coverage.
+
+### Propuesta no elegible aún
+
+Business meaning:
+
+- Proposal that still has pending criteria and therefore should not appear in the competitive ranking yet.
+
+Notes:
+
+- This is a derived evaluation status, not yet a persisted lifecycle state.
+
+### Empate técnico
+
+Business meaning:
+
+- Situation in which two or more proposals share the same best available ranking outcome after the approved scoring rules are applied.
+
+Notes:
+
+- A technical tie should remain visible and should not be hidden by arbitrary secondary ranking signals.
+
+### Adjudicación excepcional
+
+Business meaning:
+
+- Human award decision that selects a complete proposal outside the best available ranking position.
+
+Notes:
+
+- This requires explicit warning, structured reason, and mandatory free-text justification.
+
 ### Administración de plataforma
 
 Business meaning:

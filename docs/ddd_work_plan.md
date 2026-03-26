@@ -265,18 +265,20 @@ Objective:
 Status:
 
 - `Implemented` for the core cycle
-- `Next` for weighted criteria, deeper audit, and governance refinements
+- `Next` for equal-weight scoring policy implementation, deeper audit, and governance refinements
 
 Minimum domain additions:
 
-- weighted criteria
+- approved equal-weight per-criterion scoring
+- tie-aware adjudication governance
 - richer audit and event consumers
 - deeper governance of evaluation decisions
 
 Actions:
 
 - Preserve `apps/evaluation/` as the explicit evaluation context.
-- Extend the current scoring model with criterion weighting if product semantics require non-uniform scoring.
+- Implement the approved equal-weight scoring and tie-aware adjudication policy from `docs/domain/evaluation_scoring_and_award_policy.md`.
+- Revisit criterion weighting only if product semantics later require non-uniform scoring.
 - Deepen audit read models and event consumers around evaluation activity.
 - Revisit whether adjudication needs additional governance controls beyond the current designated-role model.
 
@@ -337,7 +339,7 @@ Exit criteria:
 ## Recommended Execution Order
 
 1. Keep versioned domain artifacts synchronized
-2. Deepen `Evaluation` with weighted criteria and richer audit
+2. Deepen `Evaluation` with the approved equal-weight scoring policy and richer audit
 3. Continue the conceptual split of `marketplace`
 4. Decide whether `Application` needs a persisted draft lifecycle
 5. Continue semantic convergence
@@ -361,7 +363,7 @@ Exit criteria:
 
 ### Next iteration focus
 
-- weighted criteria
+- implement the approved equal-weight scoring and tie-aware adjudication policy
 - richer audit consumers and decision governance in `evaluation`
 - clearer internal split of `marketplace` between challenge and application concerns
 - decision on persisted draft lifecycle for `Application`
@@ -384,7 +386,7 @@ The next slice should focus on the minimum work that increases domain fidelity w
 
 Scope:
 
-- decide and implement weighted criteria semantics if product wants non-uniform scoring
+- implement the approved equal-weight scoring and tie-aware adjudication policy
 - deepen event consumers and audit projections around evaluation activity
 - add more traceable invariant-to-test coverage
 - continue separating challenge-facing and application-facing concerns inside `apps/marketplace/`

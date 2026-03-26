@@ -6,7 +6,12 @@ from django.db.models import Prefetch
 from apps.evaluation.domain.blind_references import (
     build_challenge_application_blind_reference_map,
 )
-from apps.evaluation.models import ApplicationCriterionEvaluation
+from apps.evaluation.models import (
+    ApplicationCriterionEvaluation,
+    AwardDecision,
+    ChallengeEvaluationRoleAssignment,
+    ChallengeTimelineEntry,
+)
 from apps.marketplace.models import Application, Challenge
 
 
@@ -38,6 +43,29 @@ class ApplicationEvaluationSummary:
     ranking_position: int | None
     eligible_ranking_position: int | None
     criterion_results: tuple[CriterionEvaluationSummary, ...]
+
+
+@dataclass(frozen=True)
+class EvaluationTeamSnapshot:
+    evaluators: tuple[ChallengeEvaluationRoleAssignment, ...]
+    adjudicator: ChallengeEvaluationRoleAssignment | None
+    observers: tuple[ChallengeEvaluationRoleAssignment, ...]
+
+
+@dataclass(frozen=True)
+class ChallengePublisherDetailReadModel:
+    award_decision: AwardDecision | None
+    timeline_entries: tuple[ChallengeTimelineEntry, ...]
+    evaluation_role_assignments: tuple[ChallengeEvaluationRoleAssignment, ...]
+    evaluation_team: EvaluationTeamSnapshot
+    challenge_applications: tuple[Application, ...]
+    can_manage_evaluation_team: bool
+    show_applicant_identity: bool
+    has_required_evaluation_team: bool
+    can_evaluate_applications: bool
+    can_adjudicate_challenge: bool
+    can_start_evaluation: bool
+    can_award_challenge: bool
 
 
 def build_challenge_application_evaluation_summaries(
@@ -149,3 +177,115 @@ def build_challenge_application_evaluation_summaries(
         )
 
     return applications
+
+
+def build_challenge_publisher_detail_read_model(
+    *,
+    challenge: Challenge,
+    requester,
+) -> ChallengePublisherDetailReadModel:
+    requester_org_id = getattr(requester, "organization_id", None)
+    can_manage_evaluation_team = requester_org_id == challenge.publisher_id
+
+    if not can_manage_evaluation_team:
+        return ChallengePublisherDetailReadModel(
+            award_decision=None,
+            timeline_entries=(),
+            evaluation_role_assignments=(),
+            evaluation_team=EvaluationTeamSnapshot(
+                evaluators=(),
+                adjudicator=None,
+                observers=(),
+            ),
+            challenge_applications=(),
+            can_manage_evaluation_team=False,
+            show_applicant_identity=False,
+            has_required_evaluation_team=False,
+            can_evaluate_applications=False,
+            can_adjudicate_challenge=False,
+            can_start_evaluation=False,
+            can_award_challenge=False,
+        )
+
+    award_decision = AwardDecision.objects.filter(
+        challenge=challenge
+    ).select_related(
+        "winning_application__applicant",
+        "decided_by",
+    ).first()
+    timeline_entries = tuple(
+        ChallengeTimelineEntry.objects.filter(
+            challenge=challenge
+        ).select_related(
+            "actor",
+            "award_decision__winning_application__applicant",
+        )
+    )
+    evaluation_role_assignments = tuple(
+        challenge.evaluation_role_assignments.select_related("user")
+    )
+    evaluators = tuple(
+        assignment
+        for assignment in evaluation_role_assignments
+        if assignment.role == ChallengeEvaluationRoleAssignment.Role.EVALUATOR
+    )
+    adjudicator = next(
+        (
+            assignment
+            for assignment in evaluation_role_assignments
+            if assignment.role == ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
+        ),
+        None,
+    )
+    observers = tuple(
+        assignment
+        for assignment in evaluation_role_assignments
+        if assignment.role == ChallengeEvaluationRoleAssignment.Role.OBSERVER
+    )
+    show_applicant_identity = award_decision is not None
+    challenge_applications = tuple(
+        build_challenge_application_evaluation_summaries(
+            challenge,
+            reveal_applicant_identity=show_applicant_identity,
+        )
+    )
+    has_required_evaluation_team = bool(evaluators) and adjudicator is not None
+    can_evaluate_applications = any(
+        assignment.user_id == requester.pk
+        and assignment.role == ChallengeEvaluationRoleAssignment.Role.EVALUATOR
+        for assignment in evaluation_role_assignments
+    )
+    can_adjudicate_challenge = any(
+        assignment.user_id == requester.pk
+        and assignment.role == ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
+        for assignment in evaluation_role_assignments
+    )
+
+    return ChallengePublisherDetailReadModel(
+        award_decision=award_decision,
+        timeline_entries=timeline_entries,
+        evaluation_role_assignments=evaluation_role_assignments,
+        evaluation_team=EvaluationTeamSnapshot(
+            evaluators=evaluators,
+            adjudicator=adjudicator,
+            observers=observers,
+        ),
+        challenge_applications=challenge_applications,
+        can_manage_evaluation_team=True,
+        show_applicant_identity=show_applicant_identity,
+        has_required_evaluation_team=has_required_evaluation_team,
+        can_evaluate_applications=can_evaluate_applications,
+        can_adjudicate_challenge=can_adjudicate_challenge,
+        can_start_evaluation=(
+            challenge.status == Challenge.Status.PUBLISHED
+            and challenge.applications.exists()
+            and has_required_evaluation_team
+            and award_decision is None
+        ),
+        can_award_challenge=(
+            can_adjudicate_challenge
+            and challenge.status == Challenge.Status.UNDER_EVALUATION
+            and challenge.applications.exists()
+            and award_decision is None
+        ),
+    )

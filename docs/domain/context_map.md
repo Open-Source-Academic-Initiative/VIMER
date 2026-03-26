@@ -69,6 +69,7 @@ Responsibilities today:
 - criterion-by-criterion proposal assessment by one or more designated evaluators
 - proposal evaluation summaries for comparison and adjudication
 - comparative proposal ranking
+- tie-aware adjudication support and traceability
 - adjudication decision
 - winning proposal selection with mandatory comment
 - award snapshot traceability
@@ -267,5 +268,5 @@ Long term:
 
 1. Split `marketplace` conceptually into `Challenge` and `Application`.
 2. Deepen `Notifications` and audit consumers around evaluation events.
-3. Introduce weighted criteria if the product needs non-uniform scoring semantics.
+3. Implement the approved equal-weight scoring and tie-aware adjudication policy.
 4. Revisit technical names later, once behavior stabilizes.

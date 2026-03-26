@@ -38,6 +38,7 @@ Current status:
 - The local test suite now ignores the workspace `.env` by default, reducing environment-specific failures.
 - The heaviest test modules now reuse immutable fixtures through `setUpTestData()`, reducing suite runtime sharply without weakening isolation.
 - A repository-level `Makefile` now exposes `make test-fast` and `make verify-fast` for the optimized validation path.
+- An equal-weight scoring and tie-aware adjudication policy is now documented as an approved product decision pending implementation.
 - Containerized serving now uses `gunicorn` instead of Django's development server.
 - Challenges now support a formal evaluation team with designated evaluators, one designated adjudicator, and optional observers.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
@@ -59,6 +60,7 @@ Versioned domain references:
 - `docs/domain/glossary.md`: preferred business language
 - `docs/domain/context_map.md`: bounded-context view
 - `docs/domain/invariants.md`: traceable rule inventory
+- `docs/domain/evaluation_scoring_and_award_policy.md`: approved scoring and adjudication policy pending implementation
 - `docs/project_diagrams.md`: current functional-flow and architecture diagrams
 - `docs/testing_strategy.md`: current automated-validation and test-optimization guidance
 
@@ -180,6 +182,7 @@ Current limitations:
 - Deployment security still depends on correct environment configuration.
 - Test coverage is still limited.
 - SQLite is still the default database.
+- The newly approved equal-weight scoring and adjudication policy is not fully implemented yet.
 - `README.md` should be kept in sync as the local iteration evolves, since some operational details change faster than the core architecture.
 
 ## Fixes applied during this consolidation
@@ -321,6 +324,7 @@ The previous full-suite baseline before the optimization pass was `396.022s`.
 - Evaluate additional database constraints to reinforce remaining domain invariants.
 - Improve form and template UX.
 - Define a persistence and deployment strategy beyond SQLite.
+- Implement the approved equal-weight scoring, tie handling, and adjudication-exception policy from `docs/domain/evaluation_scoring_and_award_policy.md`.
 
 ## Documentation notes
 

@@ -266,7 +266,7 @@ These concepts are part of the ontology even when they are not first-class persi
 
 ### Resumen de evaluacion de propuesta
 
-- Status: `Implemented`
+- Status: `Implemented`, with approved next-step policy pending
 - Technical mapping:
   - `apps/evaluation/application/queries.py::ApplicationEvaluationSummary`
 - Semantics:
@@ -279,21 +279,30 @@ These concepts are part of the ontology even when they are not first-class persi
   - criterion-by-criterion detail
   - per-criterion evaluation count and average
   - per-evaluator audit detail
+- Current implementation note:
+  - aggregate totals are still computed across all registered current assessments
+- Approved next policy:
+  - proposal-level scoring must use the average of criterion averages so that each criterion keeps equal value
 
 ### Ranking comparativo de propuestas
 
-- Status: `Implemented`
+- Status: `Partial`
 - Technical mapping:
   - built in `apps/evaluation/application/queries.py`
-- Semantics:
+- Current implementation semantics:
   - orders proposals for publisher-facing comparison
   - prioritizes complete evaluations
   - then stronger average score
   - then total score
   - then registered assessment count
   - then primary key as deterministic tie-breaker
-- Note:
-  - this is ranking, not weighted scoring
+- Approved next policy:
+  - complete proposals participate in the competitive ranking
+  - incomplete proposals remain visible but outside the competitive ranking as not yet eligible
+  - all criteria keep equal value
+  - multiple evaluations for the same criterion are reduced to that criterion average before proposal-level comparison
+  - proposals with the same result share the same compact visible position
+  - persistent top-position ties are resolved by the designated adjudicator through explicit human judgment
 
 ## Permission Model
 
@@ -342,6 +351,24 @@ These concepts are part of the ontology even when they are not first-class persi
   - immutable after submission
 - Missing:
   - explicit persisted draft state
+
+### Politica vigente de scoring y adjudicacion
+
+- Status: `Planned`
+- Canonical reference:
+  - `docs/domain/evaluation_scoring_and_award_policy.md`
+- Approved product decision:
+  - all criteria have equal value in the current phase of VIMER
+  - criterion order is used for presentation and traceability only
+  - multiple evaluations on one criterion collapse into that criterion average
+  - a proposal final score must be computed from the average of criterion averages
+  - the same scoring logic must be used for evaluation, ranking, adjudication, and persisted snapshots
+  - a challenge may only be awarded when every active proposal has complete criterion coverage
+  - incomplete proposals remain visible but outside the competitive ranking as not yet eligible
+  - ties remain explicit, share the same compact visible position, and preserve tie context in the award snapshot
+  - ties in the best available position are resolved by the designated adjudicator through a mandatory adjudication comment
+  - exceptional awards outside the best available ranking require an explicit warning, confirmation, structured reason, and mandatory free-text justification
+  - evaluation remains blind until adjudication, after which publisher-side visibility may reveal the identities of all proposals
 
 ### Notificacion lifecycle
 
@@ -444,16 +471,17 @@ These concepts are part of the ontology even when they are not first-class persi
 - Semantics:
   - different designated evaluators may each register their own current assessment for the same criterion
   - the same evaluator updates its current assessment instead of producing a second active row
-  - proposal aggregates are computed across all registered current assessments
+  - the current implementation computes proposal aggregates across all registered current assessments
+  - the approved next policy keeps multiple evaluators but reduces each criterion to its own average before proposal-level comparison
   - adjudication eligibility depends on criterion coverage, not on every evaluator scoring every criterion
 
 ### Weighted criteria
 
-- Status: `Planned`
-- Current limitation:
-  - criteria have ordering, not weighting
+- Status: `Planned only if product direction changes later`
+- Current product decision:
+  - criteria remain equally weighted in the current phase
 - Consequence:
-  - ranking is comparative but not weighted by criterion importance
+  - ranking must remain comparative and equal-weighted rather than weighted by criterion importance
 
 ### Physical bounded-context separation
 
