@@ -13,6 +13,7 @@ Current status:
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
 - `apps/marketplace/` now keeps `Challenge` and `Application` in the same physical Django app, but with separate internal modules for services, domain rules, forms, views, and tests.
 - Marketplace and evaluation UI, plus business-oriented tests in both subdomains, now prefer the canonical business terms around `Desafío` and `Propuesta`, while preserving technical legacy names in persistence.
+- The current Phase 6 semantic-alignment slice is now closed for marketplace and evaluation UI, business-oriented tests, and core project documentation.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
 - The automated test suite currently passes with 109 tests.

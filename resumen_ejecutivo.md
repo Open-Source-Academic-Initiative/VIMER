@@ -17,6 +17,7 @@ La fotografia correcta hoy es esta:
 - Los criterios de evaluacion ya no viven solo como texto libre; tambien existen como entradas estructuradas persistidas por desafio.
 - `Application` ya funciona como una propuesta estructurada con lifecycle persistido `DRAFT -> SUBMITTED`, componentes obligatorios al enviar e inmutabilidad post-envio.
 - El copy visible de marketplace y evaluation, junto con las pruebas de negocio de ambos subdominios, ya reflejan el lenguaje ubicuo de `Desafío` y `Propuesta`, sin renombrar aun artefactos tecnicos de persistencia.
+- El cierre previsto de Fase 6 ya quedo materializado en el alcance actual: UI visible, pruebas de negocio y documentacion principal ya convergieron al lenguaje ubicuo aprobado.
 - `Evaluation` ya existe como contexto explicito con:
   - inicio formal de evaluacion;
   - evaluacion por criterio;
@@ -106,6 +107,7 @@ Durante esta iteracion local se implemento o consolido lo siguiente:
   - `gunicorn` como servidor en `Dockerfile` y `docker-compose.yml`
 - Sincronizacion de documentacion principal con el estado real del codigo.
 - Cierre completo de la separacion tactica minima de `marketplace` sin romper el app fisico.
+- Cierre completo del slice actual de convergencia semantica entre marketplace, evaluation y la documentacion principal.
 
 ## Estado funcional actual
 

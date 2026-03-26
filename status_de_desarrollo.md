@@ -43,6 +43,7 @@ El estado general puede resumirse asi:
 - Los empates tecnicos ya quedan visibles con posicion compacta compartida y resolucion humana por adjudicador.
 - La adjudicacion excepcional fuera del mejor lugar disponible ya esta implementada y requiere confirmacion, motivo estructurado y justificacion obligatoria.
 - `apps/marketplace/` ya no depende de buckets genericos para challenge y application: la separacion tactica interna ya existe tambien en forms, views, consumo de urls y pruebas.
+- El cierre previsto de Fase 6 ya quedo ejecutado en el alcance actual: marketplace y evaluation usan mejor el lenguaje ubicuo en UI visible, pruebas de negocio y documentos principales.
 - La suite ya no depende por defecto del `.env` del workspace para correr pruebas.
 - La estrategia de serving en contenedores ya no depende de `runserver`; ahora usa `gunicorn`.
 - El proceso de evaluacion ya no depende solo de pertenecer a la organizacion publicadora: ahora existe un equipo formal con evaluadores designados, un adjudicador designado y observadores.
@@ -483,6 +484,7 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 - El lifecycle persistido `DRAFT -> SUBMITTED` para `Propuesta` ya fue traducido al codigo ejecutable y permanece privado al postulante hasta el envio final.
 - El split tactico de `marketplace` ya existe internamente en servicios, reglas, forms, views y pruebas, aunque no como separacion fisica de apps Django.
 - El copy visible de marketplace y evaluation, junto con las pruebas de negocio de ambos subdominios, ya reflejan el lenguaje ubicuo canonico de `Desafio` y `Propuesta`.
+- La convergencia semantica prevista para esta fase ya no aparece solo como direccion editorial: quedo reflejada en pantallas visibles, nombres de suites de negocio y documentos rectores.
 - `CriterioDeEvaluacion` ya existe en forma implementada como criterio estructurado por desafio, pero aun no esta plenamente alineado con el lenguaje canonico del modelo.
 - `Challenge` y `Application` siguen siendo nombres tecnicos heredados en persistencia y modulos Django.
 - La ontologia existe como artefacto documental, pero todavia no se refleja plenamente en nombres, APIs, vistas, validaciones e interfaces del codigo.

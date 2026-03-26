@@ -366,6 +366,7 @@ Exit criteria:
 - preserve the current internal split of `marketplace` and keep new behavior inside the right ownership slice
 - maintain and refine the persisted draft lifecycle for `Application`
 - preserve the semantic convergence already applied in marketplace and evaluation UI copy and business-oriented tests without forcing technical model renames yet
+- keep README, executive notes, and local status tracking synchronized with that semantic convergence on each iteration
 
 ## Definition of Done per Domain Feature
 
