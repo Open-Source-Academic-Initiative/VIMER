@@ -16,6 +16,7 @@ La fotografia correcta hoy es esta:
 - `Challenge` ya expresa estado, fecha limite y criterios de evaluacion.
 - Los criterios de evaluacion ya no viven solo como texto libre; tambien existen como entradas estructuradas persistidas por desafio.
 - `Application` ya funciona como una propuesta estructurada con lifecycle persistido `DRAFT -> SUBMITTED`, componentes obligatorios al enviar e inmutabilidad post-envio.
+- El copy visible del marketplace y las pruebas de negocio del subdominio ya avanzaron otro paso hacia el lenguaje ubicuo de `Desafío` y `Propuesta`, sin renombrar aun artefactos tecnicos de persistencia.
 - `Evaluation` ya existe como contexto explicito con:
   - inicio formal de evaluacion;
   - evaluacion por criterio;

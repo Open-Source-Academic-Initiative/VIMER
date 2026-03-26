@@ -152,7 +152,7 @@ class MarketplaceSharedFixtureMixin:
         )
 
 
-class ChallengeFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+class DesafioFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
     def test_challenge_create_page_loads_for_demand_side_user(self):
         self.client.force_login(self.demand_user)
 
@@ -401,7 +401,7 @@ class ChallengeFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCas
         self.assertContains(response, self.supply_organization.logo.url)
 
 
-class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+class PropuestaFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
     def test_challenge_apply_page_includes_challenge_context(self):
         self.client.force_login(self.supply_user)
 
@@ -431,7 +431,7 @@ class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestC
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Aplicar al Desafío")
+        self.assertNotContains(response, "Postularme al desafío")
         self.assertContains(
             response,
             "Este desafío no está abierto para guardar o enviar propuestas.",
@@ -567,7 +567,7 @@ class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestC
         self.assertContains(response, "Aún no hay propuestas para este desafío.")
 
 
-class ChallengeServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+class DesafioServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
     def test_publish_challenge_sets_published_status_and_deadline(self):
         future_deadline = timezone.localdate() + timedelta(days=10)
 
@@ -685,7 +685,7 @@ class ChallengeServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTest
         )
 
 
-class ApplicationServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+class PropuestaServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
     def test_save_application_draft_allows_incomplete_components(self):
         draft = save_application_draft(
             challenge=self.challenge,

@@ -47,7 +47,7 @@
             {% if requester_application and requester_application.status == 'DRAFT' %}
                 Continuar borrador
             {% else %}
-                Aplicar al Desafío
+                Postularme al desafío
             {% endif %}
         </a>
         {% if requester_application and requester_application.status == 'DRAFT' %}
@@ -99,7 +99,7 @@
             <p>Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación.</p>
         {% endif %}
     </div>
-    <h3>Interesados en este desafío:</h3>
+    <h3>Postulaciones recibidas</h3>
     <ul>
         {% for app in challenge_applications %}
             <li>

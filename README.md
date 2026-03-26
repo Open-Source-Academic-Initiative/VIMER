@@ -12,6 +12,7 @@ Current status:
 - The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, draft proposal save, and final application submission.
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
 - `apps/marketplace/` now keeps `Challenge` and `Application` in the same physical Django app, but with separate internal modules for services, domain rules, forms, views, and tests.
+- Marketplace UI and business-oriented marketplace tests now prefer the canonical business terms around `Desafío` and `Propuesta`, while preserving technical legacy names in persistence.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
 - The automated test suite currently passes with 109 tests.
