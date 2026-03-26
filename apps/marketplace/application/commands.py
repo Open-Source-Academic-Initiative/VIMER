@@ -17,3 +17,11 @@ class SubmitApplicationCommand:
     proposed_solution: str
     capabilities_evidence: str
     execution_plan: str
+
+
+@dataclass(frozen=True)
+class SaveApplicationDraftCommand:
+    problem_understanding: str = ""
+    proposed_solution: str = ""
+    capabilities_evidence: str = ""
+    execution_plan: str = ""

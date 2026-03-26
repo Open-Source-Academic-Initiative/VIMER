@@ -84,6 +84,7 @@ class NotificationEventIntegrationTests(TestCase):
         cls.application = Application.objects.create(
             challenge=cls.challenge,
             applicant=cls.provider,
+            status=Application.Status.SUBMITTED,
             proposal_text="Resumen",
             problem_understanding="Entendimiento",
             proposed_solution="Solución",
@@ -93,6 +94,7 @@ class NotificationEventIntegrationTests(TestCase):
         cls.other_application = Application.objects.create(
             challenge=cls.challenge,
             applicant=cls.other_provider,
+            status=Application.Status.SUBMITTED,
             proposal_text="Resumen alterno",
             problem_understanding="Otro entendimiento",
             proposed_solution="Otra solución",
@@ -165,6 +167,37 @@ class NotificationEventIntegrationTests(TestCase):
             ).exists()
         )
         self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.other_provider_user,
+                title="Tu propuesta entró en evaluación",
+            ).exists()
+        )
+
+    def test_start_evaluation_ignores_private_draft_applications_in_notifications(self):
+        self.other_application.delete()
+        Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.other_provider,
+            status=Application.Status.DRAFT,
+            problem_understanding="Borrador",
+            proposed_solution="",
+            capabilities_evidence="",
+            execution_plan="",
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            start_challenge_evaluation(
+                challenge=self.challenge,
+                actor=self.publisher_user,
+            )
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.provider_user,
+                title="Tu propuesta entró en evaluación",
+            ).exists()
+        )
+        self.assertFalse(
             Notification.objects.filter(
                 recipient=self.other_provider_user,
                 title="Tu propuesta entró en evaluación",

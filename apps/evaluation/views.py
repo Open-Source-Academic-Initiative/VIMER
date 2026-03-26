@@ -201,7 +201,7 @@ class ApplicationCriterionEvaluationUpdateView(
     def get_application(self):
         if not hasattr(self, "_application"):
             self._application = get_object_or_404(
-                Application.objects.select_related("challenge"),
+                Application.objects.submitted().select_related("challenge"),
                 pk=self.kwargs["application_pk"],
             )
         return self._application

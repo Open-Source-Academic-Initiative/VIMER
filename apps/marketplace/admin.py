@@ -22,5 +22,6 @@ class ChallengeAdmin(admin.ModelAdmin):
 
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):
-    list_display = ('challenge', 'applicant', 'applied_at')
-    list_filter = ('applied_at',)
+    list_display = ('challenge', 'applicant', 'status', 'applied_at', 'updated_at')
+    list_filter = ('status', 'applied_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at')

@@ -211,10 +211,26 @@ class ChallengeEvaluationCriterion(models.Model):
     def __str__(self):
         return f"{self.challenge}: {self.label}"
 
+
+class ApplicationQuerySet(models.QuerySet):
+    def drafts(self):
+        return self.filter(status="DRAFT")
+
+    def submitted(self):
+        return self.filter(status="SUBMITTED")
+
+
 class Application(models.Model):
     """
     Proposal submitted by a proveedor tecnológico organization for a challenge.
     """
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", _("Borrador")
+        SUBMITTED = "SUBMITTED", _("Enviada")
+
+    objects = ApplicationQuerySet.as_manager()
+
     challenge = models.ForeignKey(
         Challenge,
         on_delete=models.CASCADE,
@@ -247,8 +263,19 @@ class Application(models.Model):
         blank=True,
         default="",
     )
-    
-    applied_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        _("Estado"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    applied_at = models.DateTimeField(
+        _("Fecha de envío"),
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = _("Postulación")
@@ -262,53 +289,101 @@ class Application(models.Model):
 
     def clean(self):
         errors = {}
+        original = None
+        if self.pk:
+            original = Application.objects.filter(pk=self.pk).first()
 
         if self.applicant and self.applicant.role != Organization.MarketRole.SUPPLY_SIDE:
             errors["applicant"] = _(
                 "Solo las organizaciones con rol Proveedor tecnológico pueden aplicar a desafíos."
             )
 
-        if self.challenge and not self.challenge.is_open_for_applications():
+        requires_open_challenge = (
+            self.status == self.Status.DRAFT
+            or original is None
+            or (original is not None and original.status == self.Status.DRAFT)
+        )
+        if (
+            self.challenge
+            and requires_open_challenge
+            and not self.challenge.is_open_for_applications()
+        ):
             errors["challenge"] = _(
-                "Este desafío no está abierto para recibir propuestas."
+                "Este desafío no está abierto para guardar o enviar propuestas."
             )
 
-        required_components = {
-            "problem_understanding": self.problem_understanding,
-            "proposed_solution": self.proposed_solution,
-            "capabilities_evidence": self.capabilities_evidence,
-            "execution_plan": self.execution_plan,
-        }
-        for field_name, value in required_components.items():
-            if not (value or "").strip():
-                errors[field_name] = _("Este campo es obligatorio para enviar la propuesta.")
-
-        if self.pk:
-            original = Application.objects.filter(pk=self.pk).first()
-            if original is not None:
-                immutable_fields = (
-                    "challenge_id",
-                    "applicant_id",
-                    "proposal_text",
-                    "problem_understanding",
-                    "proposed_solution",
-                    "capabilities_evidence",
-                    "execution_plan",
-                )
-                if any(
-                    getattr(original, field_name) != getattr(self, field_name)
-                    for field_name in immutable_fields
-                ):
-                    errors["__all__"] = _(
-                        "Una propuesta enviada no puede modificarse después del envío."
+        if self.status == self.Status.SUBMITTED:
+            required_components = {
+                "problem_understanding": self.problem_understanding,
+                "proposed_solution": self.proposed_solution,
+                "capabilities_evidence": self.capabilities_evidence,
+                "execution_plan": self.execution_plan,
+            }
+            for field_name, value in required_components.items():
+                if not (value or "").strip():
+                    errors[field_name] = _(
+                        "Este campo es obligatorio para enviar la propuesta."
                     )
+            if self.applied_at is None:
+                errors["applied_at"] = _(
+                    "Una propuesta enviada debe registrar su fecha de envío."
+                )
+
+        if original is not None:
+            identity_fields = ("challenge_id", "applicant_id")
+            if any(
+                getattr(original, field_name) != getattr(self, field_name)
+                for field_name in identity_fields
+            ):
+                errors["__all__"] = _(
+                    "La identidad de la propuesta no puede modificarse."
+                )
+
+            immutable_fields = (
+                "status",
+                "proposal_text",
+                "problem_understanding",
+                "proposed_solution",
+                "capabilities_evidence",
+                "execution_plan",
+                "applied_at",
+            )
+            if original.status == self.Status.SUBMITTED and any(
+                getattr(original, field_name) != getattr(self, field_name)
+                for field_name in immutable_fields
+            ):
+                errors["__all__"] = _(
+                    "Una propuesta enviada no puede modificarse después del envío."
+                )
 
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if self.status == self.Status.SUBMITTED:
+            if self.applied_at is None:
+                self.applied_at = timezone.now()
+            if not (self.proposal_text or "").strip():
+                self.proposal_text = self._build_application_summary()
+        else:
+            self.applied_at = None
+            self.proposal_text = (self.proposal_text or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+
+    def has_required_components(self) -> bool:
+        return all(
+            (value or "").strip()
+            for value in (
+                self.problem_understanding,
+                self.proposed_solution,
+                self.capabilities_evidence,
+                self.execution_plan,
+            )
+        )
+
+    def is_editable_draft(self) -> bool:
+        return self.status == self.Status.DRAFT and self.challenge.is_open_for_applications()
 
     @property
     def summary_text(self) -> str:
@@ -316,3 +391,13 @@ class Application(models.Model):
 
     def __str__(self):
         return f"Propuesta de {self.applicant} para {self.challenge}"
+
+    def _build_application_summary(self) -> str:
+        return "\n\n".join(
+            [
+                f"Entendimiento del problema: {(self.problem_understanding or '').strip()}",
+                f"Solución propuesta: {(self.proposed_solution or '').strip()}",
+                f"Capacidades y evidencia: {(self.capabilities_evidence or '').strip()}",
+                f"Plan de ejecución: {(self.execution_plan or '').strip()}",
+            ]
+        )

@@ -129,6 +129,7 @@ These are not market roles. They are operational roles inside the evaluation pro
 
 - Status: `Implemented conceptually`, `Implemented internally`, `Partial physically`
 - Owns:
+  - persisted draft lifecycle
   - proposal submission
   - submission completeness
   - duplicate submission prevention
@@ -344,12 +345,14 @@ These concepts are part of the ontology even when they are not first-class persi
 
 ### Propuesta lifecycle
 
-- Status: `Partial`
+- Status: `Implemented`
 - Current semantics:
-  - structured proposal submitted once
-  - immutable after submission
-- Missing:
-  - explicit persisted draft state
+  - a proposal can exist as `DRAFT` or `SUBMITTED`
+  - there is at most one proposal aggregate per `(challenge, applicant)`
+  - drafts can be created and edited only while the challenge is open
+  - final submission promotes the same draft aggregate instead of creating a second proposal
+  - submitted proposals are immutable after submission
+  - drafts remain private to the applicant organization and stay outside publisher/evaluation read models
 
 ### Politica vigente de scoring y adjudicacion
 

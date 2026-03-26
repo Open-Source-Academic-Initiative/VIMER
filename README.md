@@ -9,12 +9,12 @@ VIMER is a Django MVP designed to connect organizations acting as `Solicitantes`
 Current status:
 - Stable development baseline.
 - A public landing page is available at `/`.
-- The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, and application submission.
+- The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, draft proposal save, and final application submission.
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
 - `apps/marketplace/` now keeps `Challenge` and `Application` in the same physical Django app, but with separate internal modules for services, domain rules, forms, views, and tests.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 99 tests.
+- The automated test suite currently passes with 109 tests.
 - Django Admin now prevents a platform superuser from deleting its own account.
 - Organizations can upload a custom logo during signup, limited to PNG/JPG; otherwise a procedural default avatar is generated automatically.
 - Organization logos/avatars are visible in marketplace publications and proposal listings.
@@ -26,9 +26,11 @@ Current status:
 - Evaluation now supports multiple designated evaluators contributing independently to the same proposal criterion.
 - Publisher-facing challenge and adjudication views now expose aggregated evaluation summaries per proposal.
 - Publisher-facing evaluation flows now expose an explicit comparative ranking between proposals based on completed criterion assessments.
+- Applications now support an explicit `DRAFT -> SUBMITTED` lifecycle.
+- Draft proposals remain private to the applicant organization and can only be created or edited while a challenge is still open for submission.
 - Applications are accepted only while a challenge is published and still open for submission.
 - Proposals now use structured required components instead of relying only on a single free-text field.
-- Submitted proposals are immutable after submission.
+- Submitted proposals are immutable after submission and re-use the same persisted aggregate that started as a draft.
 - The evaluation context is now explicit and supports adjudication with a mandatory decision comment.
 - Evaluation outcomes now emit explicit domain events after transaction commit.
 - Challenge detail for publishers now includes an evaluation history timeline built from those domain events.
@@ -182,7 +184,7 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 99 tests.
+- `python manage.py test` currently passes with 109 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
@@ -193,7 +195,7 @@ Strengths:
 - Challenges now carry an explicit lifecycle state and optional application deadline.
 - Challenges now store explicit evaluation criteria and expose them in publication/detail flows.
 - Challenges now materialize structured evaluation-criteria entries, including migration backfill for existing text-based criteria.
-- Applications now store structured proposal components and enforce immutability after submission.
+- Applications now store structured proposal components, persist an explicit draft lifecycle, and enforce immutability after submission.
 - Marketplace challenge and proposal concerns are now separated internally across services, domain rules, forms, views, and tests.
 - Evaluation now lives in its own Django app and closes the loop through criterion assessment plus adjudication.
 - Evaluation views now provide an explicit proposal ranking plus multi-evaluator assessment detail to support adjudication decisions.
@@ -244,10 +246,10 @@ Priority issues identified during the audit were fixed:
 - Added formal evaluation-role assignments with designated evaluators, a designated adjudicator, observer roles, UI management, and permission enforcement.
 - Optimized the heaviest test modules to reuse immutable fixtures via `setUpTestData()` and documented a standard fast-validation path through `make test-fast`.
 - Prevented applications against challenges that are closed or no longer open for submission.
-- Formalized proposal submission with structured required components and immutable submitted applications.
+- Formalized proposal lifecycle with private drafts, structured required components, draft promotion on final submission, and immutable submitted applications.
 - Added an explicit evaluation context with challenge transition to evaluation, adjudication, mandatory comment, and one winning proposal per challenge.
 - Added an internal notifications context with event-driven inbox entries, unread counts, and mark-all-read behavior.
-- Expanded automated coverage to 99 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, equal-weight criterion scoring, incomplete-proposal adjudication blocking, compact tie handling, exceptional adjudication governance, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, multiple-evaluator aggregation/update semantics, draft-visibility regressions, model-level logo validation, and structured-criteria reconciliation.
+- Expanded automated coverage to 109 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, persisted draft-save and draft-promotion flows, post-submission immutability, evaluation/adjudication flows, equal-weight criterion scoring, incomplete-proposal adjudication blocking, compact tie handling, exceptional adjudication governance, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, multiple-evaluator aggregation/update semantics, draft-visibility regressions, model-level logo validation, and structured-criteria reconciliation.
 - Marketplace subdomain coverage is now organized explicitly into challenge flow tests, application flow tests, challenge service tests, and application service tests.
 
 ## Main routes
@@ -340,7 +342,7 @@ Current measured suite timings after the fixture optimization:
 
 - `python manage.py test`: `56.357s` test runtime (`58.91s` wall clock)
 - `python manage.py test --parallel 2`: `32.090s` test runtime (`34.68s` wall clock)
-- `python manage.py test --parallel 4`: `31.696s` test runtime on the latest full validation
+- `python manage.py test --parallel 4`: `39.967s` test runtime on the latest full validation after the draft lifecycle implementation
 
 The previous full-suite baseline before the optimization pass was `396.022s`.
 

@@ -34,7 +34,7 @@ def create_notifications_for_evaluation_started(sender, *, event, **kwargs):
     recipient_ids = sorted(
         {
             member.pk
-            for application in challenge.applications.all()
+            for application in challenge.applications.submitted()
             for member in application.applicant.members.all()
         }
     )
@@ -90,7 +90,7 @@ def create_notifications_for_challenge_awarded(sender, *, event, **kwargs):
 
     applicant_orgs = {
         application.applicant_id: application.applicant
-        for application in challenge.applications.all()
+        for application in challenge.applications.submitted()
     }
     for organization in applicant_orgs.values():
         for recipient in organization.members.all():

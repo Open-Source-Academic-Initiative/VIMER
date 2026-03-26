@@ -144,7 +144,9 @@ class AwardDecisionForm(forms.Form):
         eligible_queryset = challenge.applications.none()
         if self.eligible_application_ids:
             eligible_queryset = (
-                challenge.applications.filter(pk__in=self.eligible_application_ids)
+                challenge.applications.submitted().filter(
+                    pk__in=self.eligible_application_ids
+                )
                 .order_by(
                     Case(
                         *[

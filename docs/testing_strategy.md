@@ -22,6 +22,7 @@ The current optimization is intentionally conservative and Django-native:
 - per-test `setUp()` is now limited to lightweight ORM refreshes for mutable shared objects
 - test execution ignores the local workspace `.env` by default through `READ_DOT_ENV_FILE=False`
 - the default fast path uses Django's multiprocess runner through `manage.py test --parallel`
+- the suite now covers persisted application drafts, draft-to-submitted promotion, and draft privacy across marketplace, evaluation, and notifications
 
 This project's tests are primarily database- and ORM-bound. In this profile:
 
@@ -37,7 +38,7 @@ Measured on the current local server profile used during the optimization pass:
 - optimized sequential run: `56.357s`
 - optimized parallel run with `--parallel 2`: `32.090s`
 - best measured optimized parallel run with `--parallel 4`: `30.723s`
-- latest full validation after the scoring/adjudication implementation with `--parallel 4`: `31.696s`
+- latest full validation after the persisted draft lifecycle implementation with `--parallel 4`: `39.967s`
 
 Observed wall-clock timings including database setup/teardown:
 

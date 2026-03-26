@@ -230,13 +230,12 @@ Objective:
 
 Status:
 
-- `Implemented` for structured submission and immutability
-- `Partial` for draft lifecycle
+- `Implemented`
 
 Minimum domain additions:
 
 - proposal structure with required components
-- optional draft state before final submission
+- explicit persisted draft state before final submission
 - post-submission immutability policy
 
 Suggested mandatory components:
@@ -249,7 +248,7 @@ Suggested mandatory components:
 Actions:
 
 - Replace or extend `proposal_text` with a structured proposal model.
-- Decide whether drafts are needed in this phase or the next one.
+- Keep the persisted `DRAFT -> SUBMITTED` lifecycle explicit in model, service, and UI flows.
 - Define what can change before and after submission.
 - Add validation rules for completeness.
 
@@ -341,7 +340,7 @@ Exit criteria:
 1. Keep versioned domain artifacts synchronized
 2. Deepen `Evaluation` with richer audit and governance
 3. Preserve the internal split discipline of `marketplace`
-4. Decide whether `Application` needs a persisted draft lifecycle
+4. Preserve the implemented `Application` draft lifecycle without leaking drafts into evaluation
 5. Continue semantic convergence
 6. Harden operations alongside domain work
 
@@ -365,7 +364,7 @@ Exit criteria:
 
 - richer audit consumers and decision governance in `evaluation`
 - preserve the current internal split of `marketplace` and keep new behavior inside the right ownership slice
-- decision on persisted draft lifecycle for `Application`
+- maintain and refine the persisted draft lifecycle for `Application`
 
 ## Definition of Done per Domain Feature
 

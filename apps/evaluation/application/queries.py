@@ -130,7 +130,7 @@ def build_challenge_application_evaluation_summaries(
     criteria = list(challenge.evaluation_criteria_items.order_by("position"))
     criteria_total = len(criteria)
     blind_reference_map = build_challenge_application_blind_reference_map(challenge)
-    queryset = challenge.applications.prefetch_related(
+    queryset = challenge.applications.submitted().prefetch_related(
         Prefetch(
             "criterion_evaluations",
             queryset=ApplicationCriterionEvaluation.objects.select_related(
@@ -381,14 +381,14 @@ def build_challenge_publisher_detail_read_model(
         can_adjudicate_challenge=can_adjudicate_challenge,
         can_start_evaluation=(
             challenge.status == Challenge.Status.PUBLISHED
-            and challenge.applications.exists()
+            and challenge.applications.submitted().exists()
             and has_required_evaluation_team
             and award_decision is None
         ),
         can_award_challenge=(
             can_adjudicate_challenge
             and challenge.status == Challenge.Status.UNDER_EVALUATION
-            and challenge.applications.exists()
+            and challenge.applications.submitted().exists()
             and award_decision is None
             and not pending_award_applications
             and bool(best_available_applications)

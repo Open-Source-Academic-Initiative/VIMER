@@ -5,7 +5,9 @@ def build_challenge_application_blind_reference_map(
     challenge: Challenge,
 ) -> dict[int, str]:
     application_ids = list(
-        challenge.applications.order_by("applied_at", "pk").values_list("pk", flat=True)
+        challenge.applications.submitted()
+        .order_by("applied_at", "pk")
+        .values_list("pk", flat=True)
     )
     width = max(2, len(str(len(application_ids) or 1)))
     return {

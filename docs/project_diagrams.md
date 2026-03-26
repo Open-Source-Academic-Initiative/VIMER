@@ -26,8 +26,8 @@ flowchart TD
     I --> J[Challenge status: PUBLISHED]
     J --> K[Define structured evaluation criteria]
 
-    H --> L[Submit structured proposal]
-    L --> M[Application persisted once per organization and challenge]
+    H --> L[Save draft or submit structured proposal]
+    L --> M[Application persisted once per organization and challenge with DRAFT -> SUBMITTED lifecycle]
 
     K --> N[Publisher assigns evaluation team]
     M --> O[Challenge has proposals]

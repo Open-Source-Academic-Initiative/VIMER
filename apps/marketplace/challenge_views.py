@@ -10,7 +10,7 @@ from apps.evaluation.application.queries import (
 )
 from apps.marketplace.application.services import publish_challenge
 from apps.marketplace.challenge_forms import ChallengePublicationForm
-from apps.marketplace.models import Challenge
+from apps.marketplace.models import Application, Challenge
 
 
 class RoleRequiredMixin(UserPassesTestMixin):
@@ -88,6 +88,13 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
         context["award_blocking_messages"] = list(
             detail_read_model.award_blocking_messages
         )
+        requester_application = None
+        if getattr(self.request.user, "organization_id", None) is not None:
+            requester_application = Application.objects.filter(
+                challenge=challenge,
+                applicant_id=self.request.user.organization_id,
+            ).first()
+        context["requester_application"] = requester_application
         return context
 
 

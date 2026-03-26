@@ -136,11 +136,14 @@ Evidencia:
 - Existe vista, formulario y caso de uso para postular a un desafio.
 - Solo organizaciones con rol `Proveedor tecnologico` pueden aplicar.
 - No se permite duplicar postulaciones para un mismo desafio.
+- La misma ruta de postulacion ya permite guardar borrador o enviar propuesta final.
+- Si existe un borrador previo, la misma ruta lo reabre y lo actualiza.
+- Los borradores permanecen privados y no entran en evaluacion ni en vistas publisher-facing hasta el envio final.
 
 Valoracion:
 
 - El flujo esta implementado y probado.
-- Ademas, se corrigio recientemente un problema semantico en el manejo de excepciones: ya no se confunden errores de validacion de dominio con errores de duplicado.
+- Ademas, ya existe lifecycle persistido de borrador para `Propuesta`, con reglas distintas para guardado parcial y envio final.
 
 ### 3.7 Requerimiento: area administrativa minima
 
@@ -218,7 +221,7 @@ Estado: Parcial
 
 Situacion actual:
 
-- La suite automatizada pasa completamente con 99 pruebas.
+- La suite automatizada pasa completamente con 109 pruebas.
 - Hay cobertura de registro, validacion de NIT, contrasenas debiles, logout, landing page, publicacion/postulacion basica, errores de duplicado/rol, validacion de imagenes PNG/JPG, generacion procedural de avatar/logo, renderizado del logo en publicaciones del marketplace y proteccion del superusuario frente a autoeliminacion en admin.
 - Ya hay cobertura adicional sobre scoring igualitario por criterio, ranking competitivo con empates compactos, bloqueo de adjudicacion por propuestas incompletas, adjudicacion excepcional auditada, snapshot enriquecido de adjudicacion, eventos de evaluacion por propuesta y notificaciones al proveedor evaluado.
 
@@ -474,11 +477,10 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 
 ### 6.2 Brecha restante entre modelo y codigo
 
-- El codigo aun no implementa varios de los elementos formalizados:
-  - ciclo de vida persistido de borrador para `Propuesta`.
 - La evaluacion ciega ya existe en query models, vistas y templates publisher-facing, y la identidad del postulante solo se revela al adjudicar.
 - Los roles formales de evaluacion ya existen en el software, y el modelo multi-evaluador por criterio tambien ya fue traducido al codigo ejecutable.
 - La politica aprobada de scoring igualitario, ranking con empates visibles y adjudicacion excepcional gobernada ya fue traducida al codigo ejecutable.
+- El lifecycle persistido `DRAFT -> SUBMITTED` para `Propuesta` ya fue traducido al codigo ejecutable y permanece privado al postulante hasta el envio final.
 - El split tactico de `marketplace` ya existe internamente en servicios, reglas, forms, views y pruebas, aunque no como separacion fisica de apps Django.
 - `CriterioDeEvaluacion` ya existe en forma implementada como criterio estructurado por desafio, pero aun no esta plenamente alineado con el lenguaje canonico del modelo.
 - `Challenge` y `Application` siguen siendo nombres tecnicos heredados en persistencia y modulos Django.
@@ -581,7 +583,7 @@ Objetivo:
 Entregables:
 
 - `Challenge` con `estado`, `CriterioDeEvaluacion` y `FechaLimiteDeAplicacion`;
-- `Application` con cuatro componentes obligatorios de `Propuesta`;
+- `Application` con cuatro componentes obligatorios de `Propuesta` y lifecycle persistido `DRAFT -> SUBMITTED`;
 - `ValidadorDeRolSolicitante` como servicio de dominio nombrado;
 - pruebas por invariantes criticas;
 - revision de terminos y nombres en codigo y documentacion.
@@ -598,7 +600,7 @@ Objetivo:
 
 Entregables:
 
-- `Borrador` persistido para `Propuesta`;
+- `Borrador` persistido para `Propuesta`, ya implementado;
 - separacion entre `AdjudicadorDesignado` y `ObservadorDeEvaluacion`;
 - ampliar los eventos de dominio explicitos y sus consumidores mas alla de inicio/adjudicacion;
 - refactor de nombres tecnicos `Challenge` y `Application` cuando haya ventana segura.

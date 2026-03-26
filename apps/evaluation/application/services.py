@@ -156,7 +156,7 @@ def start_challenge_evaluation(*, challenge: Challenge, actor) -> Challenge:
     if challenge.status != Challenge.Status.PUBLISHED:
         messages.append("Solo los desafíos publicados pueden pasar a evaluación.")
 
-    if not challenge.applications.exists():
+    if not challenge.applications.submitted().exists():
         messages.append("No puedes iniciar evaluación sin propuestas registradas.")
 
     if not challenge.has_evaluation_criteria():
@@ -337,7 +337,7 @@ def adjudicate_challenge(
     if AwardDecision.objects.filter(challenge=challenge).exists():
         messages.append("Este desafío ya tiene una decisión de adjudicación registrada.")
 
-    winning_application = Application.objects.filter(
+    winning_application = Application.objects.submitted().filter(
         pk=command.winning_application_id
     ).select_related("challenge", "applicant").first()
     winning_application_summary = None

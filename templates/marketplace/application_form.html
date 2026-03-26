@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Aplicar a Desafío - VIMER{% endblock %}
+{% block title %}Postulación al Desafío - VIMER{% endblock %}
 {% block content %}
-<h2>Enviar Propuesta Tecnológica</h2>
+<h2>Postulación Tecnológica</h2>
 <h3>{{ challenge.title }}</h3>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
 <p>
@@ -12,14 +12,37 @@
         Sin fecha límite
     {% endif %}
 </p>
-{% if challenge.is_open_for_applications %}
+{% if existing_application and existing_application.status == 'SUBMITTED' %}
+    <div class="card">
+        <p><strong>Estado de tu propuesta:</strong> {{ existing_application.get_status_display }}</p>
+        <p>Tu organización ya envió una propuesta para este desafío. La propuesta enviada queda en solo lectura.</p>
+        <p><strong>Entendimiento del problema:</strong> {{ existing_application.problem_understanding|linebreaks }}</p>
+        <p><strong>Solución propuesta:</strong> {{ existing_application.proposed_solution|linebreaks }}</p>
+        <p><strong>Capacidades y evidencia:</strong> {{ existing_application.capabilities_evidence|linebreaks }}</p>
+        <p><strong>Plan de ejecución:</strong> {{ existing_application.execution_plan|linebreaks }}</p>
+        <p><strong>Fecha de envío:</strong> {{ existing_application.applied_at }}</p>
+    </div>
+{% elif challenge.is_open_for_applications %}
+    {% if existing_application and existing_application.status == 'DRAFT' %}
+        <div class="card">
+            <p><strong>Estado actual:</strong> Borrador privado</p>
+            <p>Este borrador solo es visible para tu organización hasta que lo envíes.</p>
+        </div>
+    {% endif %}
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Enviar Propuesta</button>
+        <button type="submit" name="intent" value="draft" class="btn btn-secondary">Guardar borrador</button>
+        <button type="submit" name="intent" value="submit" class="btn btn-primary">Enviar propuesta</button>
     </form>
 {% else %}
-    <p>Este desafío no está abierto para recibir propuestas.</p>
+    <p>Este desafío no está abierto para guardar o enviar propuestas.</p>
+    {% if existing_application and existing_application.status == 'DRAFT' %}
+        <div class="card">
+            <p><strong>Tienes un borrador privado guardado.</strong></p>
+            <p>Ya no puede editarse porque el desafío dejó de estar abierto para postulaciones.</p>
+        </div>
+    {% endif %}
 {% endif %}
 <p><a href="{% url 'marketplace:challenge-list' %}">Cancelar</a></p>
 {% endblock %}

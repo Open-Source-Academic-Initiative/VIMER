@@ -145,7 +145,7 @@ Supplies to:
 Owns:
 
 - proposal submission
-- proposal lifecycle
+- proposal lifecycle (`DRAFT -> SUBMITTED`)
 - submission completeness rules
 - duplicate submission prevention
 

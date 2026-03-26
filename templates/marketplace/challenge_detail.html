@@ -38,10 +38,27 @@
     {% endif %}
 </div>
 
-{% if user.organization and user.organization.role == 'SUPPLY_SIDE' and challenge.is_open_for_applications %}
-    <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Aplicar al Desafío</a>
-{% elif user.organization and user.organization.role == 'SUPPLY_SIDE' %}
-    <p>Este desafío no está abierto para recibir propuestas.</p>
+{% if user.organization and user.organization.role == 'SUPPLY_SIDE' %}
+    {% if requester_application and requester_application.status == 'SUBMITTED' %}
+        <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Ver mi postulación enviada</a>
+        <p>Tu organización ya envió una propuesta para este desafío.</p>
+    {% elif challenge.is_open_for_applications %}
+        <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">
+            {% if requester_application and requester_application.status == 'DRAFT' %}
+                Continuar borrador
+            {% else %}
+                Aplicar al Desafío
+            {% endif %}
+        </a>
+        {% if requester_application and requester_application.status == 'DRAFT' %}
+            <p>Tienes un borrador privado guardado para este desafío.</p>
+        {% endif %}
+    {% else %}
+        <p>Este desafío no está abierto para guardar o enviar propuestas.</p>
+        {% if requester_application and requester_application.status == 'DRAFT' %}
+            <p>Tu borrador privado quedó sin editar porque el período de postulación ya cerró.</p>
+        {% endif %}
+    {% endif %}
 {% endif %}
 
     {% if user.organization and user.organization == challenge.publisher %}

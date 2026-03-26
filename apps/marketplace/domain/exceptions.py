@@ -27,3 +27,7 @@ class IncompleteChallengeApplication(MarketplaceDomainError):
 
 class SubmittedApplicationImmutable(MarketplaceDomainError):
     pass
+
+
+class ExistingSubmittedApplication(MarketplaceDomainError):
+    pass

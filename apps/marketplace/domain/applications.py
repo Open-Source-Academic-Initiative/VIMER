@@ -3,6 +3,7 @@ from apps.marketplace.domain.exceptions import (
     ChallengeApplicationNotAllowed,
     ChallengeNotOpenForApplications,
     DuplicateChallengeApplication,
+    ExistingSubmittedApplication,
     IncompleteChallengeApplication,
 )
 from apps.marketplace.domain.invariants import (
@@ -10,6 +11,7 @@ from apps.marketplace.domain.invariants import (
     INV_07_ONE_APPLICATION_PER_CHALLENGE_AND_APPLICANT,
     INV_11_CHALLENGE_MUST_BE_OPEN_FOR_APPLICATIONS,
     INV_13_APPLICATION_REQUIRES_ALL_COMPONENTS,
+    INV_14_SUBMITTED_APPLICATION_IS_IMMUTABLE,
 )
 from apps.marketplace.models import Application, Challenge
 
@@ -27,11 +29,22 @@ def ensure_organization_can_submit_application(
         )
 
 
+def get_existing_application_for_organization(
+    challenge: Challenge,
+    applicant: Organization,
+) -> Application | None:
+    return (
+        Application.objects.filter(challenge=challenge, applicant=applicant)
+        .order_by("pk")
+        .first()
+    )
+
+
 def ensure_organization_has_not_applied_to_challenge(
     challenge: Challenge,
     applicant: Organization,
 ) -> None:
-    if Application.objects.filter(challenge=challenge, applicant=applicant).exists():
+    if get_existing_application_for_organization(challenge, applicant) is not None:
         raise DuplicateChallengeApplication(
             "Tu organización ya envió una propuesta para este desafío.",
             invariant_id=INV_07_ONE_APPLICATION_PER_CHALLENGE_AND_APPLICANT,
@@ -41,7 +54,7 @@ def ensure_organization_has_not_applied_to_challenge(
 def ensure_challenge_is_open_for_applications(challenge: Challenge) -> None:
     if not challenge.is_open_for_applications():
         raise ChallengeNotOpenForApplications(
-            "Este desafío no está abierto para recibir propuestas.",
+            "Este desafío no está abierto para guardar o enviar propuestas.",
             invariant_id=INV_11_CHALLENGE_MUST_BE_OPEN_FOR_APPLICATIONS,
         )
 
@@ -69,6 +82,16 @@ def ensure_submitted_application_is_complete(
             + ", ".join(missing_components)
             + ".",
             invariant_id=INV_13_APPLICATION_REQUIRES_ALL_COMPONENTS,
+        )
+
+
+def ensure_existing_application_is_not_submitted(
+    application: Application | None,
+) -> None:
+    if application is not None and application.status == Application.Status.SUBMITTED:
+        raise ExistingSubmittedApplication(
+            "Tu organización ya envió una propuesta para este desafío.",
+            invariant_id=INV_14_SUBMITTED_APPLICATION_IS_IMMUTABLE,
         )
 
 

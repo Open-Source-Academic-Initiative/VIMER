@@ -101,6 +101,7 @@ class EvaluationServiceTests(TestCase):
         cls.application = Application.objects.create(
             challenge=cls.challenge,
             applicant=cls.provider,
+            status=Application.Status.SUBMITTED,
             proposal_text="Resumen",
             problem_understanding="Entendimiento",
             proposed_solution="Solución",
@@ -159,6 +160,7 @@ class EvaluationServiceTests(TestCase):
         return Application.objects.create(
             challenge=self.challenge,
             applicant=applicant,
+            status=Application.Status.SUBMITTED,
             proposal_text=f"Resumen {business_name}",
             problem_understanding="Entendimiento",
             proposed_solution="Solución",
@@ -184,6 +186,29 @@ class EvaluationServiceTests(TestCase):
 
         self.challenge.refresh_from_db()
         self.assertEqual(self.challenge.status, Challenge.Status.UNDER_EVALUATION)
+
+    def test_start_challenge_evaluation_ignores_private_draft_applications(self):
+        self.application.delete()
+        Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.provider,
+            status=Application.Status.DRAFT,
+            problem_understanding="Borrador",
+            proposed_solution="",
+            capabilities_evidence="",
+            execution_plan="",
+        )
+
+        with self.assertRaises(ChallengeEvaluationValidationError) as captured:
+            start_challenge_evaluation(
+                challenge=self.challenge,
+                actor=self.publisher_user,
+            )
+
+        self.assertIn(
+            "No puedes iniciar evaluación sin propuestas registradas.",
+            captured.exception.messages,
+        )
 
     def test_start_challenge_evaluation_emits_domain_event_after_commit(self):
         received_events = []
@@ -744,6 +769,7 @@ class EvaluationServiceTests(TestCase):
         second_application = Application.objects.create(
             challenge=self.challenge,
             applicant=second_provider,
+            status=Application.Status.SUBMITTED,
             proposal_text="Resumen dos",
             problem_understanding="Entendimiento dos",
             proposed_solution="Solución dos",
@@ -808,6 +834,29 @@ class EvaluationServiceTests(TestCase):
         self.assertEqual(summaries[0].evaluation_summary.eligible_ranking_position, 1)
         self.assertEqual(summaries[1].evaluation_summary.ranking_position, 2)
         self.assertEqual(summaries[1].evaluation_summary.eligible_ranking_position, 2)
+
+    def test_build_challenge_application_evaluation_summaries_ignores_private_drafts(self):
+        draft_provider = Organization.objects.create(
+            tax_id="910000199",
+            business_name="Proveedor Borrador",
+            chamber_of_commerce_record="CC-EVAL-199",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-borrador@example.com",
+            contact_phone="3001990000",
+        )
+        Application.objects.create(
+            challenge=self.challenge,
+            applicant=draft_provider,
+            status=Application.Status.DRAFT,
+            problem_understanding="Borrador",
+            proposed_solution="",
+            capabilities_evidence="",
+            execution_plan="",
+        )
+
+        summaries = build_challenge_application_evaluation_summaries(self.challenge)
+
+        self.assertEqual([application.pk for application in summaries], [self.application.pk])
 
     def test_build_challenge_application_evaluation_summaries_averages_by_criterion_before_ranking(self):
         self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
@@ -1162,6 +1211,7 @@ class EvaluationFlowTests(TestCase):
         cls.application = Application.objects.create(
             challenge=cls.challenge,
             applicant=cls.provider,
+            status=Application.Status.SUBMITTED,
             proposal_text="Resumen",
             problem_understanding="Entendimiento",
             proposed_solution="Solución",
@@ -1496,6 +1546,7 @@ class EvaluationFlowTests(TestCase):
         Application.objects.create(
             challenge=self.challenge,
             applicant=other_provider,
+            status=Application.Status.SUBMITTED,
             proposal_text="Resumen alterno",
             problem_understanding="Otro entendimiento",
             proposed_solution="Otra solución",

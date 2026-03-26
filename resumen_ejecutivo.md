@@ -15,7 +15,7 @@ La fotografia correcta hoy es esta:
 - El write-side principal ya no depende solo de vistas y forms; ahora se apoya en servicios de aplicacion explicitos.
 - `Challenge` ya expresa estado, fecha limite y criterios de evaluacion.
 - Los criterios de evaluacion ya no viven solo como texto libre; tambien existen como entradas estructuradas persistidas por desafio.
-- `Application` ya funciona como una propuesta estructurada con componentes obligatorios e inmutabilidad post-envio.
+- `Application` ya funciona como una propuesta estructurada con lifecycle persistido `DRAFT -> SUBMITTED`, componentes obligatorios al enviar e inmutabilidad post-envio.
 - `Evaluation` ya existe como contexto explicito con:
   - inicio formal de evaluacion;
   - evaluacion por criterio;
@@ -64,10 +64,15 @@ Durante esta iteracion local se implemento o consolido lo siguiente:
   - `evaluation_criteria`
   - criterios estructurados derivados y persistidos
 - Evolucion de `Application` con:
+  - `status`
+  - `created_at`
+  - `updated_at`
   - `problem_understanding`
   - `proposed_solution`
   - `capabilities_evidence`
   - `execution_plan`
+  - borradores persistidos privados del postulante
+  - promocion del mismo agregado de borrador a propuesta enviada
   - inmutabilidad post-envio
 - Nuevo contexto `apps/evaluation/` con:
   - `AwardDecision`
@@ -110,6 +115,7 @@ Hoy el sistema ya cubre de forma coherente estos flujos:
 - landing publica
 - publicacion de desafios por organizaciones `Solicitante`
 - postulacion de propuestas por organizaciones `Proveedor tecnologico`
+- guardado de borradores privados y reanudacion del mismo borrador desde la misma ruta de postulacion
 - validacion de duplicados por desafio/aplicante
 - visualizacion de logos/avatares en marketplace
 - separacion interna clara entre concern de publicacion de desafios y concern de postulacion de propuestas
@@ -133,11 +139,11 @@ Hoy el sistema ya cubre de forma coherente estos flujos:
 
 - `manage.py check`: OK
 - `manage.py test`: OK
-- suite actual validada: 99 tests
+- suite actual validada: 109 tests
 - benchmark actual de pruebas:
   - secuencial: `56.357s`
   - paralelo `--parallel 2`: `32.090s`
-  - paralelo `--parallel 4`: `31.696s` en la validacion final mas reciente
+  - paralelo `--parallel 4`: `39.967s` en la validacion final mas reciente
 - mejor benchmark historico paralelo medido en esta maquina: `30.723s`
 - baseline historica previa a la optimizacion de fixtures: `396.022s`
 - comando rapido recomendado para validacion local: `make test-fast`
@@ -147,6 +153,7 @@ Hoy el sistema ya cubre de forma coherente estos flujos:
   - `apps/marketplace/migrations/0005_application_capabilities_evidence_and_more.py`
   - `apps/marketplace/migrations/0006_challenge_evaluation_criteria.py`
   - `apps/marketplace/migrations/0007_challengeevaluationcriterion.py`
+  - `apps/marketplace/migrations/0008_application_lifecycle.py`
   - `apps/evaluation/migrations/0001_initial.py`
   - `apps/evaluation/migrations/0002_challengetimelineentry.py`
   - `apps/evaluation/migrations/0003_applicationcriterionevaluation.py`
@@ -193,6 +200,7 @@ Aunque el salto de calidad fue importante, todavia hay limites claros:
 - ya existe evaluacion ciega en los flujos publisher-facing de evaluacion y adjudicacion
 - ya existe un modelo de multiples evaluadores por criterio, con una evaluacion vigente por `(propuesta, criterio, evaluador)`
 - todos los criterios tienen hoy el mismo valor; no existe ponderacion y esa es una decision activa de producto
+- los borradores de propuesta ya existen como lifecycle persistido, pero siguen siendo deliberadamente privados y fuera de evaluacion hasta el envio final
 - la adjudicacion ya es funcional y trazable, pero sigue siendo minima en gobierno avanzado de evaluacion
 - `apps/marketplace/` sigue siendo un app fisico compartido, aunque su separacion tactica interna ya no depende de buckets genericos
 - no se recalculo una metrica global de coverage actualizada
@@ -215,7 +223,7 @@ VIMER ya tiene:
 
 El proyecto todavia no esta listo para produccion, pero ya esta claramente por encima de una baseline CRUD: ahora tiene una base arquitectonica y semantica mucho mas apta para seguir iterando con disciplina.
 
-Tambien quedo en una posicion operativa mucho mejor para iterar: la suite automatizada paso de una referencia historica de `396.022s` a una validacion final reciente de `31.696s` en corrida paralela completa, manteniendo como mejor benchmark medido `30.723s`, sin reducir cobertura funcional ni bajar el nivel de validacion.
+Tambien quedo en una posicion operativa mucho mejor para iterar: la suite automatizada paso de una referencia historica de `396.022s` a una validacion final reciente de `39.967s` en corrida paralela completa, manteniendo como mejor benchmark medido `30.723s`, sin reducir cobertura funcional ni bajar el nivel de validacion.
 
 ## Siguiente paso recomendado
 

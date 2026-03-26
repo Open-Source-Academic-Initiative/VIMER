@@ -22,10 +22,14 @@ from apps.evaluation.application.services import (
     evaluate_application_by_criteria,
 )
 from apps.evaluation.models import ChallengeEvaluationRoleAssignment
-from apps.marketplace.application.applications import submit_challenge_application
+from apps.marketplace.application.applications import (
+    save_application_draft,
+    submit_challenge_application,
+)
 from apps.marketplace.application.challenges import publish_challenge
 from apps.marketplace.application.commands import (
     PublishChallengeCommand,
+    SaveApplicationDraftCommand,
     SubmitApplicationCommand,
 )
 from apps.marketplace.application.exceptions import (
@@ -128,11 +132,23 @@ class MarketplaceSharedFixtureMixin:
         return Application.objects.create(
             challenge=self.challenge,
             applicant=self.supply_organization,
+            status=Application.Status.SUBMITTED,
             proposal_text="Initial proposal",
             problem_understanding="Entendimiento inicial",
             proposed_solution="Solución inicial",
             capabilities_evidence="Capacidades iniciales",
             execution_plan="Plan inicial",
+        )
+
+    def create_draft_application(self):
+        return Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            status=Application.Status.DRAFT,
+            problem_understanding="Entendimiento borrador",
+            proposed_solution="",
+            capabilities_evidence="Capacidades borrador",
+            execution_plan="",
         )
 
 
@@ -418,7 +434,7 @@ class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestC
         self.assertNotContains(response, "Aplicar al Desafío")
         self.assertContains(
             response,
-            "Este desafío no está abierto para recibir propuestas.",
+            "Este desafío no está abierto para guardar o enviar propuestas.",
         )
 
     def test_challenge_apply_duplicate_submission_shows_duplicate_message(self):
@@ -437,6 +453,77 @@ class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestC
             "Tu organización ya envió una propuesta para este desafío.",
         )
 
+    def test_challenge_detail_shows_continue_draft_action_for_existing_draft(self):
+        self.create_draft_application()
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Continuar borrador")
+        self.assertContains(response, "Tienes un borrador privado guardado")
+
+    def test_challenge_apply_page_reopens_existing_draft(self):
+        draft = self.create_draft_application()
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["existing_application"].pk, draft.pk)
+        self.assertContains(response, "Guardar borrador")
+        self.assertContains(response, draft.problem_understanding)
+
+    def test_challenge_apply_draft_save_accepts_incomplete_payload(self):
+        self.client.force_login(self.supply_user)
+        payload = {
+            "problem_understanding": "Borrador inicial",
+            "proposed_solution": "",
+            "capabilities_evidence": "",
+            "execution_plan": "",
+            "intent": "draft",
+        }
+
+        response = self.client.post(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+            payload,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+        )
+        application = Application.objects.get(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+        )
+        self.assertEqual(application.status, Application.Status.DRAFT)
+        self.assertEqual(application.problem_understanding, "Borrador inicial")
+        self.assertIsNone(application.applied_at)
+
+    def test_challenge_apply_submit_reuses_existing_draft(self):
+        draft = self.create_draft_application()
+        self.client.force_login(self.supply_user)
+        payload = self.make_application_payload() | {"intent": "submit"}
+
+        response = self.client.post(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+            payload,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk]),
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.status, Application.Status.SUBMITTED)
+        self.assertIsNotNone(draft.applied_at)
+        self.assertEqual(Application.objects.count(), 1)
+
     def test_challenge_apply_closed_challenge_shows_not_open_message(self):
         self.challenge.status = Challenge.Status.CLOSED
         self.challenge.save()
@@ -451,7 +538,7 @@ class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestC
         self.assertFormError(
             response.context["form"],
             None,
-            "Este desafío no está abierto para recibir propuestas.",
+            "Este desafío no está abierto para guardar o enviar propuestas.",
         )
 
     def test_challenge_apply_requires_all_proposal_components(self):
@@ -466,6 +553,18 @@ class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestC
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["form"].errors.get("execution_plan"))
+
+    def test_publisher_detail_hides_private_draft_applications(self):
+        self.create_draft_application()
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["challenge_applications"], [])
+        self.assertContains(response, "Aún no hay propuestas para este desafío.")
 
 
 class ChallengeServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
@@ -587,6 +686,49 @@ class ChallengeServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTest
 
 
 class ApplicationServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+    def test_save_application_draft_allows_incomplete_components(self):
+        draft = save_application_draft(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            command=SaveApplicationDraftCommand(
+                problem_understanding="Borrador",
+                proposed_solution="",
+                capabilities_evidence="",
+                execution_plan="",
+            ),
+        )
+
+        self.assertEqual(draft.status, Application.Status.DRAFT)
+        self.assertEqual(draft.problem_understanding, "Borrador")
+        self.assertIsNone(draft.applied_at)
+
+    def test_submit_application_promotes_existing_draft(self):
+        draft = save_application_draft(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            command=SaveApplicationDraftCommand(
+                problem_understanding="Borrador",
+                proposed_solution="",
+                capabilities_evidence="",
+                execution_plan="",
+            ),
+        )
+
+        submitted = submit_challenge_application(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            command=SubmitApplicationCommand(
+                problem_understanding="Entendimiento",
+                proposed_solution="Solución",
+                capabilities_evidence="Capacidades",
+                execution_plan="Plan",
+            ),
+        )
+
+        self.assertEqual(submitted.pk, draft.pk)
+        self.assertEqual(submitted.status, Application.Status.SUBMITTED)
+        self.assertIsNotNone(submitted.applied_at)
+
     def test_submit_application_rejects_duplicates(self):
         command = SubmitApplicationCommand(
             problem_understanding="Entendimiento inicial",
@@ -645,7 +787,7 @@ class ApplicationServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTe
             )
 
         self.assertIn(
-            "Este desafío no está abierto para recibir propuestas.",
+            "Este desafío no está abierto para guardar o enviar propuestas.",
             captured.exception.messages,
         )
 
@@ -668,7 +810,7 @@ class ApplicationServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTe
                 )
 
         self.assertIn(
-            "Este desafío no está abierto para recibir propuestas.",
+            "Este desafío no está abierto para guardar o enviar propuestas.",
             captured.exception.messages,
         )
 

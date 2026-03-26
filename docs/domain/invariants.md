@@ -244,6 +244,38 @@ Current enforcement:
 - model-level immutability check after first save
 - service and model tests for attempted post-submission edits
 
+### INV-40
+
+Rule:
+
+- A Propuesta should have an explicit persisted lifecycle state.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- `Application.status` with `DRAFT` and `SUBMITTED`
+- lifecycle-aware application services for draft save and final submission
+- flow, service, and model tests
+
+### INV-41
+
+Rule:
+
+- A draft Propuesta can only be created or edited while the Desafío remains open for submission.
+
+Status:
+
+- `Implemented`
+
+Current enforcement:
+
+- challenge openness check before draft save and final submission
+- model validation on `Application`
+- flow and service tests
+
 ### INV-15
 
 Rule:
@@ -572,7 +604,7 @@ Current enforcement:
 The next invariants to implement in code should be:
 
 1. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
-2. define whether proposal drafts deserve a first-class persisted lifecycle
+2. preserve the implemented draft/submitted proposal lifecycle without leaking drafts into evaluation
 3. deepen evaluation audit and governance beyond the current adjudication controls
 
 ## Traceability Expectation

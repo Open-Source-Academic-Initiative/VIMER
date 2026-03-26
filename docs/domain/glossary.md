@@ -290,6 +290,7 @@ These terms are acceptable in code while the migration is incomplete, but should
 ### `Application`
 
 - Technical persistence and module name for `Propuesta`.
+- Today it also carries the persisted `DRAFT -> SUBMITTED` lifecycle of the proposal aggregate.
 - This name is especially risky because it collides with the architectural term `application layer`.
 
 ### `DEMAND_SIDE`
