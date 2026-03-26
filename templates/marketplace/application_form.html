@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Postulación al Desafío - VIMER{% endblock %}
+{% block title %}Propuesta para el Desafío - VIMER{% endblock %}
 {% block content %}
-<h2>Postulación Tecnológica</h2>
+<h2>Propuesta Tecnológica</h2>
 <h3>{{ challenge.title }}</h3>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
 <p>
@@ -40,7 +40,7 @@
     {% if existing_application and existing_application.status == 'DRAFT' %}
         <div class="card">
             <p><strong>Tienes un borrador privado guardado.</strong></p>
-            <p>Ya no puede editarse porque el desafío dejó de estar abierto para postulaciones.</p>
+            <p>Ya no puede editarse porque el desafío dejó de estar abierto para recibir propuestas.</p>
         </div>
     {% endif %}
 {% endif %}

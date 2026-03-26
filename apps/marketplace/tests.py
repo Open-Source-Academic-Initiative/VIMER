@@ -431,7 +431,7 @@ class PropuestaFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCas
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Postularme al desafío")
+        self.assertNotContains(response, "Presentar propuesta")
         self.assertContains(
             response,
             "Este desafío no está abierto para guardar o enviar propuestas.",

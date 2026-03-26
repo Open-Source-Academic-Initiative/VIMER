@@ -12,7 +12,7 @@ Current status:
 - The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, draft proposal save, and final application submission.
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
 - `apps/marketplace/` now keeps `Challenge` and `Application` in the same physical Django app, but with separate internal modules for services, domain rules, forms, views, and tests.
-- Marketplace UI and business-oriented marketplace tests now prefer the canonical business terms around `Desafío` and `Propuesta`, while preserving technical legacy names in persistence.
+- Marketplace and evaluation UI, plus business-oriented tests in both subdomains, now prefer the canonical business terms around `Desafío` and `Propuesta`, while preserving technical legacy names in persistence.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
 - The automated test suite currently passes with 109 tests.
@@ -343,7 +343,7 @@ Current measured suite timings after the fixture optimization:
 
 - `python manage.py test`: `56.357s` test runtime (`58.91s` wall clock)
 - `python manage.py test --parallel 2`: `32.090s` test runtime (`34.68s` wall clock)
-- `python manage.py test --parallel 4`: `39.967s` test runtime on the latest full validation after the draft lifecycle implementation
+- `python manage.py test --parallel 4`: `39.382s` test runtime on the latest full validation after the Phase 6 semantic-alignment closure
 
 The previous full-suite baseline before the optimization pass was `396.022s`.
 

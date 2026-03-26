@@ -482,7 +482,7 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 - La politica aprobada de scoring igualitario, ranking con empates visibles y adjudicacion excepcional gobernada ya fue traducida al codigo ejecutable.
 - El lifecycle persistido `DRAFT -> SUBMITTED` para `Propuesta` ya fue traducido al codigo ejecutable y permanece privado al postulante hasta el envio final.
 - El split tactico de `marketplace` ya existe internamente en servicios, reglas, forms, views y pruebas, aunque no como separacion fisica de apps Django.
-- El copy visible del marketplace y las pruebas de negocio del subdominio ya avanzaron parcialmente hacia el lenguaje ubicuo canonico de `Desafio` y `Propuesta`.
+- El copy visible de marketplace y evaluation, junto con las pruebas de negocio de ambos subdominios, ya reflejan el lenguaje ubicuo canonico de `Desafio` y `Propuesta`.
 - `CriterioDeEvaluacion` ya existe en forma implementada como criterio estructurado por desafio, pero aun no esta plenamente alineado con el lenguaje canonico del modelo.
 - `Challenge` y `Application` siguen siendo nombres tecnicos heredados en persistencia y modulos Django.
 - La ontologia existe como artefacto documental, pero todavia no se refleja plenamente en nombres, APIs, vistas, validaciones e interfaces del codigo.

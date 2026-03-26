@@ -45,7 +45,7 @@ from apps.evaluation.models import (
 from apps.marketplace.models import Application, Challenge
 
 
-class EvaluationServiceTests(TestCase):
+class EvaluacionServiceTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.publisher = Organization.objects.create(
@@ -1163,7 +1163,7 @@ class EvaluationServiceTests(TestCase):
         )
 
 
-class EvaluationFlowTests(TestCase):
+class EvaluacionFlowTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.publisher = Organization.objects.create(
@@ -1400,7 +1400,7 @@ class EvaluationFlowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Evaluar propuesta")
+        self.assertContains(response, "Evaluar Propuesta Ciega")
 
     def test_award_decision_view_hides_applicant_identity_before_award(self):
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
@@ -1526,7 +1526,7 @@ class EvaluationFlowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ranking competitivo de propuestas")
+        self.assertContains(response, "Ranking competitivo de Propuestas")
         self.assertContains(response, "Promedio competitivo actual")
         self.assertContains(response, "4,50 / 5")
         self.assertContains(

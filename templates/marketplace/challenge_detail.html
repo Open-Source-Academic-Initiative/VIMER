@@ -40,14 +40,14 @@
 
 {% if user.organization and user.organization.role == 'SUPPLY_SIDE' %}
     {% if requester_application and requester_application.status == 'SUBMITTED' %}
-        <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Ver mi postulación enviada</a>
+        <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Ver mi propuesta enviada</a>
         <p>Tu organización ya envió una propuesta para este desafío.</p>
     {% elif challenge.is_open_for_applications %}
         <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">
             {% if requester_application and requester_application.status == 'DRAFT' %}
                 Continuar borrador
             {% else %}
-                Postularme al desafío
+                Presentar propuesta
             {% endif %}
         </a>
         {% if requester_application and requester_application.status == 'DRAFT' %}
@@ -192,7 +192,7 @@
                                 href="{% url 'evaluation:application-criterion-evaluation-update' challenge.pk app.pk %}"
                                 class="btn btn-primary"
                             >
-                                Evaluar propuesta
+                                Evaluar Propuesta Ciega
                             </a>
                         </p>
                     {% endif %}

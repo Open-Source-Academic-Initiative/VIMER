@@ -38,7 +38,7 @@ Measured on the current local server profile used during the optimization pass:
 - optimized sequential run: `56.357s`
 - optimized parallel run with `--parallel 2`: `32.090s`
 - best measured optimized parallel run with `--parallel 4`: `30.723s`
-- latest full validation after the persisted draft lifecycle implementation with `--parallel 4`: `39.967s`
+- latest full validation after the Phase 6 semantic-alignment closure with `--parallel 4`: `39.382s`
 
 Observed wall-clock timings including database setup/teardown:
 

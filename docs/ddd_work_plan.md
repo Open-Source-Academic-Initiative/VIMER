@@ -365,7 +365,7 @@ Exit criteria:
 - richer audit consumers and decision governance in `evaluation`
 - preserve the current internal split of `marketplace` and keep new behavior inside the right ownership slice
 - maintain and refine the persisted draft lifecycle for `Application`
-- continue semantic convergence in UI copy and business-oriented tests without forcing technical model renames yet
+- preserve the semantic convergence already applied in marketplace and evaluation UI copy and business-oriented tests without forcing technical model renames yet
 
 ## Definition of Done per Domain Feature
 

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Evaluar Propuesta - VIMER{% endblock %}
+{% block title %}Evaluar Propuesta Ciega - VIMER{% endblock %}
 {% block content %}
-<h2>Evaluar Propuesta</h2>
+<h2>Evaluar Propuesta Ciega</h2>
 <h3>{{ application_blind_reference }}</h3>
 <p><strong>Desafío:</strong> {{ challenge.title }}</p>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
@@ -26,5 +26,5 @@
     <button type="submit" class="btn btn-primary">Guardar evaluación</button>
 </form>
 
-<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al desafío</a></p>
+<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al Desafío</a></p>
 {% endblock %}

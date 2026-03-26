@@ -13,7 +13,7 @@
     </ul>
 {% endif %}
 {% if complete_application_evaluation_summaries %}
-    <h4>Ranking competitivo de propuestas</h4>
+    <h4>Ranking competitivo de Propuestas</h4>
     <p>La identidad del postulante permanece oculta hasta que se registre la adjudicación.</p>
     <ul>
         {% for application in complete_application_evaluation_summaries %}
@@ -73,7 +73,7 @@
 {% endif %}
 {% if pending_application_evaluation_summaries %}
     <h4>Propuestas no elegibles aún</h4>
-    <p>Estas propuestas siguen visibles, pero no compiten en el ranking hasta completar cobertura de criterios.</p>
+    <p>Estas Propuestas siguen visibles, pero no compiten en el ranking hasta completar cobertura de criterios.</p>
     <ul>
         {% for application in pending_application_evaluation_summaries %}
             <li>
@@ -151,5 +151,5 @@
         Registrar adjudicación
     </button>
 </form>
-<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al desafío</a></p>
+<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al Desafío</a></p>
 {% endblock %}
