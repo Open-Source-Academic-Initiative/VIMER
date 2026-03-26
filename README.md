@@ -364,7 +364,3 @@ The previous full-suite baseline before the optimization pass was `396.022s`. Th
 - Define a persistence and deployment strategy beyond SQLite.
 - Evaluate Django 6.0 template partials or the Tasks framework only if a concrete product flow justifies adopting them.
 - Deepen evaluation audit and governance now that the approved scoring and adjudication policy is implemented.
-
-## Documentation notes
-
-This file is the versioned, authoritative project reference. Supporting state summaries such as `status_de_desarrollo.md` and `resumen_ejecutivo.md` are also versioned in the repository and should stay synchronized with it, while `django_skill.md` and `django-report.md` are Django 6.0 reference notes rather than VIMER functional documentation.
