@@ -148,15 +148,15 @@ Objective:
 
 Status:
 
-- `Partial`
+- `Implemented internally`, `Partial physically`
 
 Actions:
 
-- Split the internals of `apps/marketplace/` into two clear slices:
+- Keep the physical Django app while preserving separated internal ownership:
   - challenge-oriented concerns
   - application-oriented concerns
-- Keep the physical Django app if needed, but separate modules and ownership.
-- Separate commands, services, forms, and tests by subdomain.
+- Keep commands, services, forms, views, and tests assigned to one subdomain by default.
+- Add new marketplace behavior only through the subdomain slice that owns it.
 
 Suggested internal direction:
 
@@ -181,6 +181,8 @@ Exit criteria:
 
 - Publication and submission logic no longer live in a single generic bucket.
 - Teams can evolve challenge and proposal behavior independently.
+- Status note:
+  - the internal split is already in place through separated domain/application modules plus challenge/application forms, views, and test classes
 
 ### 4. Evolve `Challenge` into a real aggregate
 
@@ -338,7 +340,7 @@ Exit criteria:
 
 1. Keep versioned domain artifacts synchronized
 2. Deepen `Evaluation` with richer audit and governance
-3. Continue the conceptual split of `marketplace`
+3. Preserve the internal split discipline of `marketplace`
 4. Decide whether `Application` needs a persisted draft lifecycle
 5. Continue semantic convergence
 6. Harden operations alongside domain work
@@ -362,7 +364,7 @@ Exit criteria:
 ### Next iteration focus
 
 - richer audit consumers and decision governance in `evaluation`
-- clearer internal split of `marketplace` between challenge and application concerns
+- preserve the current internal split of `marketplace` and keep new behavior inside the right ownership slice
 - decision on persisted draft lifecycle for `Application`
 
 ## Definition of Done per Domain Feature
@@ -385,7 +387,7 @@ Scope:
 
 - deepen event consumers and audit projections around evaluation activity
 - add more traceable invariant-to-test coverage
-- continue separating challenge-facing and application-facing concerns inside `apps/marketplace/`
+- keep challenge-facing and application-facing concerns separated inside `apps/marketplace/`
 
 Recommended file targets for the next slice:
 
@@ -410,7 +412,7 @@ The safest and highest-leverage path now is:
 
 - keep the versioned domain corpus authoritative
 - deepen `Evaluation` before widening the surface area
-- continue the conceptual split of `marketplace` without a risky physical rewrite
+- preserve the current conceptual split of `marketplace` without a risky physical rewrite
 - rename technical legacy concepts only when the model is already stable
 
 This keeps the current baseline useful while moving VIMER from "working MVP with explicit domain architecture" toward "working MVP with tighter semantic, tactical, and operational discipline".

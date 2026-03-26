@@ -216,7 +216,7 @@ Consumes from:
 Short term:
 
 - Keep `apps/marketplace/` as the physical Django app.
-- Split internals by domain concern:
+- Preserve the internal split by domain concern:
   - challenge-focused modules
   - application-focused modules
 
@@ -266,7 +266,7 @@ Long term:
 
 ## Refactor Priority
 
-1. Split `marketplace` conceptually into `Challenge` and `Application`.
+1. Preserve `marketplace` internal ownership boundaries between `Challenge` and `Application`.
 2. Deepen `Notifications` and audit consumers around evaluation events.
 3. Deepen evaluation governance and audit now that the approved equal-weight scoring and tie-aware adjudication policy is implemented.
 4. Revisit technical names later, once behavior stabilizes.

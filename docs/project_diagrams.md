@@ -158,7 +158,7 @@ flowchart LR
 
 ## Notes
 
-- `Marketplace` remains the physical Django app for both challenge and proposal concerns, even though the conceptual split is already clearer in the domain documents.
+- `Marketplace` remains the physical Django app for both challenge and proposal concerns, but its internals are now separated explicitly across domain modules, application services, forms, views, and tests.
 - `Evaluation` is the most event-driven context today: it emits the milestones consumed by challenge timeline projections and in-app notifications.
 - The current scoring model supports multiple evaluators per criterion, with one current persisted assessment per `(proposal, criterion, evaluator)`.
 - Blind evaluation is enforced in publisher-facing evaluation and adjudication flows until the challenge is awarded.

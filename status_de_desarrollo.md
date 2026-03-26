@@ -42,6 +42,7 @@ El estado general puede resumirse asi:
 - La adjudicacion se bloquea mientras existan propuestas activas con criterios pendientes de evaluacion.
 - Los empates tecnicos ya quedan visibles con posicion compacta compartida y resolucion humana por adjudicador.
 - La adjudicacion excepcional fuera del mejor lugar disponible ya esta implementada y requiere confirmacion, motivo estructurado y justificacion obligatoria.
+- `apps/marketplace/` ya no depende de buckets genericos para challenge y application: la separacion tactica interna ya existe tambien en forms, views, consumo de urls y pruebas.
 - La suite ya no depende por defecto del `.env` del workspace para correr pruebas.
 - La estrategia de serving en contenedores ya no depende de `runserver`; ahora usa `gunicorn`.
 - El proceso de evaluacion ya no depende solo de pertenecer a la organizacion publicadora: ahora existe un equipo formal con evaluadores designados, un adjudicador designado y observadores.
@@ -290,7 +291,7 @@ Descripcion:
   - `Notifications`
   - `Administracion de plataforma`
 - A nivel conceptual, `Marketplace` ya se lee internamente como dos subdominios: `Challenge` y `Application`.
-- Se identifico que `Marketplace` es demasiado amplio como bounded context unico y debe dividirse, al menos, en `Challenge` y `Application`.
+- Esa separacion ya fue traducida de forma tactica al codigo mediante servicios, reglas, forms, views y pruebas diferenciadas por concern.
 - Se formalizo el core domain como el ciclo `Desafio -> Propuesta -> Evaluacion/Adjudicacion`.
 - Se definieron agregados raiz concretos:
   - `Desafio`
@@ -478,6 +479,7 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 - La evaluacion ciega ya existe en query models, vistas y templates publisher-facing, y la identidad del postulante solo se revela al adjudicar.
 - Los roles formales de evaluacion ya existen en el software, y el modelo multi-evaluador por criterio tambien ya fue traducido al codigo ejecutable.
 - La politica aprobada de scoring igualitario, ranking con empates visibles y adjudicacion excepcional gobernada ya fue traducida al codigo ejecutable.
+- El split tactico de `marketplace` ya existe internamente en servicios, reglas, forms, views y pruebas, aunque no como separacion fisica de apps Django.
 - `CriterioDeEvaluacion` ya existe en forma implementada como criterio estructurado por desafio, pero aun no esta plenamente alineado con el lenguaje canonico del modelo.
 - `Challenge` y `Application` siguen siendo nombres tecnicos heredados en persistencia y modulos Django.
 - La ontologia existe como artefacto documental, pero todavia no se refleja plenamente en nombres, APIs, vistas, validaciones e interfaces del codigo.
@@ -543,7 +545,7 @@ Interpretacion de esa estimacion:
    - `INV-08`
    - `INV-10`
    - `INV-11`
-3. Dividir conceptualmente `marketplace` en `Challenge` y `Application`, aunque el refactor fisico completo se programe despues.
+3. Mantener la separacion tactica ya lograda en `marketplace` y evitar que nuevos cambios vuelvan a un bucket generico.
 4. Profundizar la evaluacion sobre la base actual de responsabilidades explicitas:
    - `EvaluadorDesignado`
    - `AdjudicadorDesignado`
@@ -583,6 +585,10 @@ Entregables:
 - `ValidadorDeRolSolicitante` como servicio de dominio nombrado;
 - pruebas por invariantes criticas;
 - revision de terminos y nombres en codigo y documentacion.
+
+Observacion de estado:
+
+- Una parte importante de esta iteracion ya fue absorbida por el codigo actual: la separacion tactica interna de `marketplace` entre challenge y application ya existe en servicios, reglas, forms, views y pruebas.
 
 ### Iteracion C: cierre de Application y apertura de Evaluation
 

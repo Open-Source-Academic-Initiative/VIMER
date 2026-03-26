@@ -110,7 +110,7 @@ These are not market roles. They are operational roles inside the evaluation pro
 
 ### Challenge
 
-- Status: `Implemented conceptually`, `Partial physically`
+- Status: `Implemented conceptually`, `Implemented internally`, `Partial physically`
 - Owns:
   - challenge publication
   - challenge lifecycle
@@ -120,10 +120,14 @@ These are not market roles. They are operational roles inside the evaluation pro
 - Technical mapping today:
   - `apps/marketplace/models.py::Challenge`
   - `apps/marketplace/models.py::ChallengeEvaluationCriterion`
+  - `apps/marketplace/application/challenges.py`
+  - `apps/marketplace/domain/challenges.py`
+  - `apps/marketplace/challenge_forms.py`
+  - `apps/marketplace/challenge_views.py`
 
 ### Application
 
-- Status: `Implemented conceptually`, `Partial physically`
+- Status: `Implemented conceptually`, `Implemented internally`, `Partial physically`
 - Owns:
   - proposal submission
   - submission completeness
@@ -131,6 +135,10 @@ These are not market roles. They are operational roles inside the evaluation pro
   - submitted-proposal immutability
 - Technical mapping today:
   - `apps/marketplace/models.py::Application`
+  - `apps/marketplace/application/applications.py`
+  - `apps/marketplace/domain/applications.py`
+  - `apps/marketplace/application_forms.py`
+  - `apps/marketplace/application_views.py`
 
 ### Evaluation
 
@@ -485,7 +493,7 @@ These concepts are part of the ontology even when they are not first-class persi
 - Current limitation:
   - `Challenge` and `Application` remain physically colocated inside `apps/marketplace/`
 - Consequence:
-  - conceptual boundaries are clearer than code boundaries
+  - physical app boundaries still lag behind the internal tactical split already achieved in code
 
 ## Canonical Review Rule
 

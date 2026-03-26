@@ -22,6 +22,8 @@ from apps.evaluation.application.services import (
     evaluate_application_by_criteria,
 )
 from apps.evaluation.models import ChallengeEvaluationRoleAssignment
+from apps.marketplace.application.applications import submit_challenge_application
+from apps.marketplace.application.challenges import publish_challenge
 from apps.marketplace.application.commands import (
     PublishChallengeCommand,
     SubmitApplicationCommand,
@@ -30,10 +32,6 @@ from apps.marketplace.application.exceptions import (
     ChallengeApplicationValidationError,
     ChallengePublicationValidationError,
     DuplicateChallengeApplicationError,
-)
-from apps.marketplace.application.services import (
-    publish_challenge,
-    submit_challenge_application,
 )
 from apps.marketplace.models import Application, Challenge
 
@@ -53,9 +51,10 @@ class MediaRootIsolatedTestCase(TestCase):
         super().tearDownClass()
 
 
-class MarketplaceFlowTests(MediaRootIsolatedTestCase):
+class MarketplaceSharedFixtureMixin:
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.demand_organization = Organization.objects.create(
             tax_id="900000101",
             business_name="Solicitante de prueba",
@@ -102,22 +101,42 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
             application_deadline=timezone.localdate() + timedelta(days=7),
         )
 
-    def make_application_payload(self):
-        return {
-            "problem_understanding": "Entendemos el reto y su contexto operativo.",
-            "proposed_solution": "Proponemos una solución tecnológica modular.",
-            "capabilities_evidence": "Tenemos experiencia, equipo y casos previos relevantes.",
-            "execution_plan": "Ejecutaremos en fases con hitos y seguimiento.",
-        }
-
     def setUp(self):
-        self.demand_organization = Organization.objects.get(pk=self.demand_organization.pk)
-        self.supply_organization = Organization.objects.get(pk=self.supply_organization.pk)
+        super().setUp()
+        self.demand_organization = Organization.objects.get(
+            pk=self.demand_organization.pk
+        )
+        self.supply_organization = Organization.objects.get(
+            pk=self.supply_organization.pk
+        )
         User = get_user_model()
         self.demand_user = User.objects.get(pk=self.demand_user.pk)
         self.supply_user = User.objects.get(pk=self.supply_user.pk)
         self.challenge = Challenge.objects.get(pk=self.challenge.pk)
 
+    def make_application_payload(self):
+        return {
+            "problem_understanding": "Entendemos el reto y su contexto operativo.",
+            "proposed_solution": "Proponemos una solución tecnológica modular.",
+            "capabilities_evidence": (
+                "Tenemos experiencia, equipo y casos previos relevantes."
+            ),
+            "execution_plan": "Ejecutaremos en fases con hitos y seguimiento.",
+        }
+
+    def create_submitted_application(self):
+        return Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            proposal_text="Initial proposal",
+            problem_understanding="Entendimiento inicial",
+            proposed_solution="Solución inicial",
+            capabilities_evidence="Capacidades iniciales",
+            execution_plan="Plan inicial",
+        )
+
+
+class ChallengeFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
     def test_challenge_create_page_loads_for_demand_side_user(self):
         self.client.force_login(self.demand_user)
 
@@ -169,41 +188,6 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, draft_challenge.title)
 
-    def test_challenge_apply_page_includes_challenge_context(self):
-        self.client.force_login(self.supply_user)
-
-        response = self.client.get(
-            reverse("marketplace:challenge-apply", args=[self.challenge.pk])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["challenge"], self.challenge)
-
-    def test_challenge_apply_page_forbidden_for_demand_side_user(self):
-        self.client.force_login(self.demand_user)
-
-        response = self.client.get(
-            reverse("marketplace:challenge-apply", args=[self.challenge.pk])
-        )
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_challenge_detail_hides_apply_action_when_challenge_is_closed(self):
-        self.challenge.status = Challenge.Status.CLOSED
-        self.challenge.save()
-        self.client.force_login(self.supply_user)
-
-        response = self.client.get(
-            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Aplicar al Desafío")
-        self.assertContains(
-            response,
-            "Este desafío no está abierto para recibir propuestas.",
-        )
-
     def test_challenge_detail_hides_draft_challenge_from_non_publisher(self):
         self.challenge.status = Challenge.Status.DRAFT
         self.challenge.save(update_fields=["status"])
@@ -227,61 +211,134 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.challenge.title)
 
-    def test_challenge_apply_duplicate_submission_shows_duplicate_message(self):
-        Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.supply_organization,
-            proposal_text="Initial proposal",
-            problem_understanding="Entendimiento inicial",
-            proposed_solution="Solución inicial",
-            capabilities_evidence="Capacidades iniciales",
-            execution_plan="Plan inicial",
+    def test_challenge_detail_shows_evaluation_criteria(self):
+        self.challenge.evaluation_criteria = (
+            "Experiencia sectorial\n"
+            "Viabilidad técnica\n"
+            "Plan de ejecución"
         )
-        self.client.force_login(self.supply_user)
-
-        response = self.client.post(
-            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
-            self.make_application_payload(),
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertFormError(
-            response.context["form"],
-            None,
-            "Tu organización ya envió una propuesta para este desafío.",
-        )
-
-    def test_challenge_apply_closed_challenge_shows_not_open_message(self):
-        self.challenge.status = Challenge.Status.CLOSED
         self.challenge.save()
         self.client.force_login(self.supply_user)
 
-        response = self.client.post(
-            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
-            self.make_application_payload(),
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFormError(
-            response.context["form"],
-            None,
-            "Este desafío no está abierto para recibir propuestas.",
+        self.assertContains(response, "Criterios de evaluación")
+        self.assertContains(response, "Experiencia sectorial")
+        self.assertContains(response, "Viabilidad técnica")
+        self.assertContains(response, "Plan de ejecución")
+
+    def test_challenge_detail_shows_application_average_score_for_publisher(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        application = self.create_submitted_application()
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.demand_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
         )
+        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=application,
+            actor=self.demand_user,
+            command=EvaluateApplicationCommand(
+                application_id=application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[0].pk,
+                        score=4,
+                        comment="Buen encaje técnico.",
+                    ),
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[1].pk,
+                        score=5,
+                        comment="Experiencia sólida.",
+                    ),
+                ),
+            ),
+        )
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Promedio actual")
+        self.assertContains(response, "4,50 / 5")
+        self.assertContains(response, "Detalle por criterio")
+        self.assertContains(response, "Posición competitiva actual")
+
+    def test_challenge_detail_hides_applicant_identity_for_publisher_before_award(self):
+        self.create_submitted_application()
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Propuesta 01")
+        self.assertNotContains(response, self.supply_organization.business_name)
+
+    def test_challenge_detail_hides_evaluation_read_models_from_non_publisher(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        application = self.create_submitted_application()
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.demand_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=application,
+            actor=self.demand_user,
+            command=EvaluateApplicationCommand(
+                application_id=application.pk,
+                assessments=tuple(
+                    CriterionAssessmentInput(
+                        criterion_id=criterion.pk,
+                        score=4,
+                        comment=f"Evaluación para {criterion.label}.",
+                    )
+                    for criterion in self.challenge.evaluation_criteria_items.order_by(
+                        "position"
+                    )
+                ),
+            ),
+        )
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Promedio actual")
+        self.assertNotContains(response, "Posición competitiva actual")
+        self.assertNotContains(response, "Detalle por criterio")
+        self.assertEqual(response.context["challenge_applications"], [])
+        self.assertEqual(list(response.context["timeline_entries"]), [])
+        self.assertIsNone(response.context["award_decision"])
 
     def test_challenge_detail_shows_applicant_logo_for_publisher_after_award(self):
         self.challenge.evaluation_criteria = "Capacidad técnica"
         self.challenge.save(update_fields=["evaluation_criteria"])
         self.challenge.evaluation_criteria_items.all().delete()
         self.challenge.sync_evaluation_criteria_items()
-        application = Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.supply_organization,
-            proposal_text="Initial proposal",
-            problem_understanding="Entendimiento inicial",
-            proposed_solution="Solución inicial",
-            capabilities_evidence="Capacidades iniciales",
-            execution_plan="Plan inicial",
-        )
+        application = self.create_submitted_application()
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save(update_fields=["status"])
         ChallengeEvaluationRoleAssignment.objects.create(
@@ -327,12 +384,29 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.supply_organization.logo.url)
 
-    def test_challenge_detail_shows_evaluation_criteria(self):
-        self.challenge.evaluation_criteria = (
-            "Experiencia sectorial\n"
-            "Viabilidad técnica\n"
-            "Plan de ejecución"
+
+class ApplicationFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+    def test_challenge_apply_page_includes_challenge_context(self):
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk])
         )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["challenge"], self.challenge)
+
+    def test_challenge_apply_page_forbidden_for_demand_side_user(self):
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_challenge_detail_hides_apply_action_when_challenge_is_closed(self):
+        self.challenge.status = Challenge.Status.CLOSED
         self.challenge.save()
         self.client.force_login(self.supply_user)
 
@@ -341,162 +415,43 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Criterios de evaluación")
-        self.assertContains(response, "Experiencia sectorial")
-        self.assertContains(response, "Viabilidad técnica")
-        self.assertContains(response, "Plan de ejecución")
-
-    def test_challenge_detail_shows_application_average_score_for_publisher(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
-        application = Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.supply_organization,
-            proposal_text="Initial proposal",
-            problem_understanding="Entendimiento inicial",
-            proposed_solution="Solución inicial",
-            capabilities_evidence="Capacidades iniciales",
-            execution_plan="Plan inicial",
-        )
-        self.challenge.status = Challenge.Status.UNDER_EVALUATION
-        self.challenge.save(update_fields=["status"])
-        ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.demand_user,
-            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
-        )
-        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
-        evaluate_application_by_criteria(
-            challenge=self.challenge,
-            application=application,
-            actor=self.demand_user,
-            command=EvaluateApplicationCommand(
-                application_id=application.pk,
-                assessments=(
-                    CriterionAssessmentInput(
-                        criterion_id=criteria[0].pk,
-                        score=4,
-                        comment="Buen encaje técnico.",
-                    ),
-                    CriterionAssessmentInput(
-                        criterion_id=criteria[1].pk,
-                        score=5,
-                        comment="Experiencia sólida.",
-                    ),
-                ),
-            ),
-        )
-        self.client.force_login(self.demand_user)
-
-        response = self.client.get(
-            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        self.assertNotContains(response, "Aplicar al Desafío")
+        self.assertContains(
+            response,
+            "Este desafío no está abierto para recibir propuestas.",
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Promedio actual")
-        self.assertContains(response, "4,50 / 5")
-        self.assertContains(response, "Detalle por criterio")
-        self.assertContains(response, "Posición competitiva actual")
-
-    def test_challenge_detail_hides_applicant_identity_for_publisher_before_award(self):
-        Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.supply_organization,
-            proposal_text="Initial proposal",
-            problem_understanding="Entendimiento inicial",
-            proposed_solution="Solución inicial",
-            capabilities_evidence="Capacidades iniciales",
-            execution_plan="Plan inicial",
-        )
-        self.client.force_login(self.demand_user)
-
-        response = self.client.get(
-            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Propuesta 01")
-        self.assertNotContains(response, self.supply_organization.business_name)
-
-    def test_challenge_detail_hides_evaluation_read_models_from_non_publisher(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
-        application = Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.supply_organization,
-            proposal_text="Initial proposal",
-            problem_understanding="Entendimiento inicial",
-            proposed_solution="Solución inicial",
-            capabilities_evidence="Capacidades iniciales",
-            execution_plan="Plan inicial",
-        )
-        self.challenge.status = Challenge.Status.UNDER_EVALUATION
-        self.challenge.save(update_fields=["status"])
-        ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.demand_user,
-            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
-        )
-        evaluate_application_by_criteria(
-            challenge=self.challenge,
-            application=application,
-            actor=self.demand_user,
-            command=EvaluateApplicationCommand(
-                application_id=application.pk,
-                assessments=tuple(
-                    CriterionAssessmentInput(
-                        criterion_id=criterion.pk,
-                        score=4,
-                        comment=f"Evaluación para {criterion.label}.",
-                    )
-                    for criterion in self.challenge.evaluation_criteria_items.order_by("position")
-                ),
-            ),
-        )
+    def test_challenge_apply_duplicate_submission_shows_duplicate_message(self):
+        self.create_submitted_application()
         self.client.force_login(self.supply_user)
 
-        response = self.client.get(
-            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        response = self.client.post(
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+            self.make_application_payload(),
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Promedio actual")
-        self.assertNotContains(response, "Posición comparativa actual")
-        self.assertNotContains(response, "Detalle por criterio")
-        self.assertEqual(response.context["challenge_applications"], [])
-        self.assertEqual(list(response.context["timeline_entries"]), [])
-        self.assertIsNone(response.context["award_decision"])
+        self.assertFormError(
+            response.context["form"],
+            None,
+            "Tu organización ya envió una propuesta para este desafío.",
+        )
 
-    def test_challenge_create_persists_evaluation_criteria(self):
-        self.client.force_login(self.demand_user)
+    def test_challenge_apply_closed_challenge_shows_not_open_message(self):
+        self.challenge.status = Challenge.Status.CLOSED
+        self.challenge.save()
+        self.client.force_login(self.supply_user)
 
         response = self.client.post(
-            reverse("marketplace:challenge-create"),
-            {
-                "title": "Nuevo desafío con criterios",
-                "description": "Descripción con criterios explícitos.",
-                "evaluation_criteria": (
-                    "Alineación técnica\n"
-                    "Capacidad de ejecución\n"
-                    "Costo total"
-                ),
-                "application_deadline": timezone.localdate() + timedelta(days=14),
-            },
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+            self.make_application_payload(),
         )
 
-        self.assertRedirects(response, reverse("marketplace:challenge-list"))
-        created_challenge = Challenge.objects.get(title="Nuevo desafío con criterios")
-        self.assertEqual(
-            created_challenge.evaluation_criteria,
-            "Alineación técnica\nCapacidad de ejecución\nCosto total",
-        )
-        self.assertEqual(
-            list(created_challenge.evaluation_criteria_items.values_list("label", flat=True)),
-            ["Alineación técnica", "Capacidad de ejecución", "Costo total"],
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            None,
+            "Este desafío no está abierto para recibir propuestas.",
         )
 
     def test_challenge_apply_requires_all_proposal_components(self):
@@ -512,64 +467,8 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["form"].errors.get("execution_plan"))
 
-    def test_challenge_syncs_structured_criteria_when_text_changes(self):
-        self.challenge.evaluation_criteria = "Criterio A\nCriterio B"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.assertEqual(
-            list(
-                self.challenge.evaluation_criteria_items.order_by("position").values_list(
-                    "label",
-                    flat=True,
-                )
-            ),
-            ["Criterio A", "Criterio B"],
-        )
 
-        self.challenge.evaluation_criteria = "Criterio A actualizado\nCriterio C"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-
-        self.assertEqual(
-            list(
-                self.challenge.evaluation_criteria_items.order_by("position").values_list(
-                    "label",
-                    flat=True,
-                )
-            ),
-            ["Criterio A actualizado", "Criterio C"],
-        )
-
-
-class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.demand_organization = Organization.objects.create(
-            tax_id="903000001",
-            business_name="Organización solicitante",
-            chamber_of_commerce_record="CC-301",
-            role="DEMAND_SIDE",
-            contact_email="solicitante-app@example.com",
-            contact_phone="1111111",
-        )
-        cls.supply_organization = Organization.objects.create(
-            tax_id="903000002",
-            business_name="Proveedor tecnológico",
-            chamber_of_commerce_record="CC-302",
-            role="SUPPLY_SIDE",
-            contact_email="proveedor-app@example.com",
-            contact_phone="2222222",
-        )
-        cls.challenge = Challenge.objects.create(
-            publisher=cls.demand_organization,
-            title="Challenge",
-            description="Description",
-            application_deadline=timezone.localdate() + timedelta(days=7),
-        )
-
-    def setUp(self):
-        self.demand_organization = Organization.objects.get(pk=self.demand_organization.pk)
-        self.supply_organization = Organization.objects.get(pk=self.supply_organization.pk)
-        self.challenge = Challenge.objects.get(pk=self.challenge.pk)
-
+class ChallengeServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
     def test_publish_challenge_sets_published_status_and_deadline(self):
         future_deadline = timezone.localdate() + timedelta(days=10)
 
@@ -627,6 +526,67 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
             captured.exception.messages,
         )
 
+    def test_challenge_create_persists_evaluation_criteria(self):
+        self.client.force_login(self.demand_user)
+
+        response = self.client.post(
+            reverse("marketplace:challenge-create"),
+            {
+                "title": "Nuevo desafío con criterios",
+                "description": "Descripción con criterios explícitos.",
+                "evaluation_criteria": (
+                    "Alineación técnica\n"
+                    "Capacidad de ejecución\n"
+                    "Costo total"
+                ),
+                "application_deadline": timezone.localdate() + timedelta(days=14),
+            },
+        )
+
+        self.assertRedirects(response, reverse("marketplace:challenge-list"))
+        created_challenge = Challenge.objects.get(title="Nuevo desafío con criterios")
+        self.assertEqual(
+            created_challenge.evaluation_criteria,
+            "Alineación técnica\nCapacidad de ejecución\nCosto total",
+        )
+        self.assertEqual(
+            list(
+                created_challenge.evaluation_criteria_items.values_list(
+                    "label",
+                    flat=True,
+                )
+            ),
+            ["Alineación técnica", "Capacidad de ejecución", "Costo total"],
+        )
+
+    def test_challenge_syncs_structured_criteria_when_text_changes(self):
+        self.challenge.evaluation_criteria = "Criterio A\nCriterio B"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.assertEqual(
+            list(
+                self.challenge.evaluation_criteria_items.order_by("position").values_list(
+                    "label",
+                    flat=True,
+                )
+            ),
+            ["Criterio A", "Criterio B"],
+        )
+
+        self.challenge.evaluation_criteria = "Criterio A actualizado\nCriterio C"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+
+        self.assertEqual(
+            list(
+                self.challenge.evaluation_criteria_items.order_by("position").values_list(
+                    "label",
+                    flat=True,
+                )
+            ),
+            ["Criterio A actualizado", "Criterio C"],
+        )
+
+
+class ApplicationServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
     def test_submit_application_rejects_duplicates(self):
         command = SubmitApplicationCommand(
             problem_understanding="Entendimiento inicial",
@@ -691,7 +651,9 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
 
     def test_submit_application_rejects_expired_challenge(self):
         with patch("apps.marketplace.models.timezone.localdate") as mocked_localdate:
-            mocked_localdate.return_value = self.challenge.application_deadline + timedelta(days=1)
+            mocked_localdate.return_value = (
+                self.challenge.application_deadline + timedelta(days=1)
+            )
 
             with self.assertRaises(ChallengeApplicationValidationError) as captured:
                 submit_challenge_application(

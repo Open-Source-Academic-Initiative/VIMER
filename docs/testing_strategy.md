@@ -71,6 +71,7 @@ When adding or refactoring tests:
 - keep mutations inside each test or refresh shared ORM instances in `setUp()`
 - avoid expensive repeated media-generation or object-graph creation when it can be shared safely
 - keep invariant coverage traceable across service tests and flow tests
+- when a physical Django app holds more than one concern, keep the tests split by subdomain ownership instead of rebuilding one generic suite bucket
 
 ## Files most impacted by the optimization
 

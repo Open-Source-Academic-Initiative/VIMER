@@ -53,6 +53,11 @@ Durante esta iteracion local se implemento o consolido lo siguiente:
   - ADRs base en `docs/adr/`
 - Reglas de dominio explicitas en `apps/marketplace/domain/` para publication y application invariants.
 - Servicios de aplicacion explicitos en `identity`, `marketplace`, `evaluation` y `notifications`.
+- Separacion tactica interna de `marketplace` entre challenge y application tambien en:
+  - formularios
+  - vistas
+  - consumo de urls desde entrypoints separados
+  - cobertura automatizada por subdominio
 - Evolucion de `Challenge` con:
   - `status`
   - `application_deadline`
@@ -94,6 +99,7 @@ Durante esta iteracion local se implemento o consolido lo siguiente:
   - `Makefile` con comandos de validacion rapida y reproducible
   - `gunicorn` como servidor en `Dockerfile` y `docker-compose.yml`
 - Sincronizacion de documentacion principal con el estado real del codigo.
+- Cierre completo de la separacion tactica minima de `marketplace` sin romper el app fisico.
 
 ## Estado funcional actual
 
@@ -106,6 +112,7 @@ Hoy el sistema ya cubre de forma coherente estos flujos:
 - postulacion de propuestas por organizaciones `Proveedor tecnologico`
 - validacion de duplicados por desafio/aplicante
 - visualizacion de logos/avatares en marketplace
+- separacion interna clara entre concern de publicacion de desafios y concern de postulacion de propuestas
 - ciclo de vida de desafios con apertura, evaluacion y adjudicacion
 - definicion y visualizacion de criterios de evaluacion
 - evaluacion de propuestas criterio por criterio
@@ -164,6 +171,10 @@ La iteracion actual incluye, entre otros:
 
 - `docs/` con ontologia canonica v4, plan DDD, glosario, context map, invariantes, ADRs y plantilla
 - `apps/marketplace/domain/`
+- `apps/marketplace/challenge_forms.py`
+- `apps/marketplace/application_forms.py`
+- `apps/marketplace/challenge_views.py`
+- `apps/marketplace/application_views.py`
 - `apps/evaluation/`
 - `apps/notifications/`
 - migraciones nuevas de `marketplace`, `evaluation` y `notifications`
@@ -183,6 +194,7 @@ Aunque el salto de calidad fue importante, todavia hay limites claros:
 - ya existe un modelo de multiples evaluadores por criterio, con una evaluacion vigente por `(propuesta, criterio, evaluador)`
 - todos los criterios tienen hoy el mismo valor; no existe ponderacion y esa es una decision activa de producto
 - la adjudicacion ya es funcional y trazable, pero sigue siendo minima en gobierno avanzado de evaluacion
+- `apps/marketplace/` sigue siendo un app fisico compartido, aunque su separacion tactica interna ya no depende de buckets genericos
 - no se recalculo una metrica global de coverage actualizada
 - el paralelismo optimo depende del host; en esta maquina `--parallel 4` fue levemente mejor que `--parallel 2`
 
@@ -196,6 +208,7 @@ VIMER ya tiene:
 - invariantes mas visibles
 - bounded contexts mas explicitados
 - flujo central del marketplace cerrado de punta a punta
+- separacion tactica interna suficiente para evolucionar challenge y application con ownership mas claro
 - eventos de dominio utiles en el ciclo de evaluacion
 - read models simples pero valiosos para la toma de decision
 - una politica de scoring y adjudicacion ya implementada y trazable de punta a punta
@@ -220,4 +233,4 @@ El siguiente bloque natural de implementacion deberia ir por uno de estos camino
    - seguridad
    - configuracion productiva
 
-La recomendacion actual es continuar primero por `Evaluation`, y el siguiente faltante funcional real ya no es el ranking, la trazabilidad basica, los roles formales, la evaluacion ciega ni la politica de scoring. El siguiente faltante real pasa a ser mejor gobierno de decisiones, auditoria mas rica y la definicion de si algun dia el producto necesitara ponderacion distinta entre criterios.
+La recomendacion actual es continuar primero por `Evaluation`, y el siguiente faltante funcional real ya no es la separacion tactica minima de `marketplace`, el ranking, la trazabilidad basica, los roles formales, la evaluacion ciega ni la politica de scoring. El siguiente faltante real pasa a ser mejor gobierno de decisiones, auditoria mas rica y la definicion de si algun dia el producto necesitara ponderacion distinta entre criterios.

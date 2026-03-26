@@ -11,6 +11,7 @@ Current status:
 - A public landing page is available at `/`.
 - The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, and application submission.
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
+- `apps/marketplace/` now keeps `Challenge` and `Application` in the same physical Django app, but with separate internal modules for services, domain rules, forms, views, and tests.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
 - The automated test suite currently passes with 99 tests.
@@ -87,6 +88,24 @@ apps/identity/application/     Registration command, exceptions, and service
 apps/marketplace/application/  Challenge publication and application services
 apps/evaluation/application/   Evaluation-team, scoring, and adjudication services
 apps/notifications/application/ Notification read-state service
+```
+
+`apps/marketplace/` remains a single physical Django app, but its internals now follow the challenge/application split explicitly:
+
+```text
+apps/marketplace/
+  application/
+    challenges.py
+    applications.py
+  domain/
+    challenges.py
+    applications.py
+  challenge_forms.py
+  application_forms.py
+  challenge_views.py
+  application_views.py
+  forms.py   # compatibility facade
+  views.py   # compatibility facade
 ```
 
 Main models:
@@ -175,6 +194,7 @@ Strengths:
 - Challenges now store explicit evaluation criteria and expose them in publication/detail flows.
 - Challenges now materialize structured evaluation-criteria entries, including migration backfill for existing text-based criteria.
 - Applications now store structured proposal components and enforce immutability after submission.
+- Marketplace challenge and proposal concerns are now separated internally across services, domain rules, forms, views, and tests.
 - Evaluation now lives in its own Django app and closes the loop through criterion assessment plus adjudication.
 - Evaluation views now provide an explicit proposal ranking plus multi-evaluator assessment detail to support adjudication decisions.
 - Award decisions now keep an evaluation snapshot so adjudication remains auditable after later UI changes.
@@ -207,6 +227,7 @@ Priority issues identified during the audit were fixed:
 - Added an admin safeguard so a superuser cannot delete its own account.
 - Added optional signup logo upload with strict PNG/JPG validation and procedural PNG avatar generation as fallback.
 - Introduced explicit marketplace domain rule modules to name and centralize the current publication/application invariants.
+- Completed the internal tactical split of `apps/marketplace/` so challenge and proposal concerns no longer share one generic forms/views/tests bucket.
 - Added challenge lifecycle semantics with explicit status and optional application deadline.
 - Added explicit evaluation criteria on challenges and required them before a challenge can enter evaluation.
 - Added structured evaluation-criteria entries for challenges and backfilled them from existing text criteria.
@@ -227,6 +248,7 @@ Priority issues identified during the audit were fixed:
 - Added an explicit evaluation context with challenge transition to evaluation, adjudication, mandatory comment, and one winning proposal per challenge.
 - Added an internal notifications context with event-driven inbox entries, unread counts, and mark-all-read behavior.
 - Expanded automated coverage to 99 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, equal-weight criterion scoring, incomplete-proposal adjudication blocking, compact tie handling, exceptional adjudication governance, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, multiple-evaluator aggregation/update semantics, draft-visibility regressions, model-level logo validation, and structured-criteria reconciliation.
+- Marketplace subdomain coverage is now organized explicitly into challenge flow tests, application flow tests, challenge service tests, and application service tests.
 
 ## Main routes
 
