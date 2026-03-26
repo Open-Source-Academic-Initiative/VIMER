@@ -38,13 +38,13 @@
     {% endif %}
 </div>
 
-{% if user.organization.role == 'SUPPLY_SIDE' and challenge.is_open_for_applications %}
+{% if user.organization and user.organization.role == 'SUPPLY_SIDE' and challenge.is_open_for_applications %}
     <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Aplicar al Desafío</a>
-{% elif user.organization.role == 'SUPPLY_SIDE' %}
+{% elif user.organization and user.organization.role == 'SUPPLY_SIDE' %}
     <p>Este desafío no está abierto para recibir propuestas.</p>
 {% endif %}
 
-    {% if user.organization == challenge.publisher %}
+    {% if user.organization and user.organization == challenge.publisher %}
     <h3>Equipo de evaluación</h3>
     <div class="card">
         <p>

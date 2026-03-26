@@ -2,7 +2,7 @@
 {% block title %}Desafíos de I+D+i - VIMER{% endblock %}
 {% block content %}
 <h2>Desafíos de Investigación y Desarrollo</h2>
-{% if user.organization.role == 'DEMAND_SIDE' %}
+{% if user.organization and user.organization.role == 'DEMAND_SIDE' %}
     <p><a href="{% url 'marketplace:challenge-create' %}" class="btn btn-primary">Publicar Nuevo Desafío</a></p>
 {% endif %}
 

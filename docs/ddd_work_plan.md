@@ -324,6 +324,7 @@ Objective:
 Actions:
 
 - Isolate test configuration from local `.env` side effects.
+- Optimize heavy suites with shared immutable fixtures and a documented fast execution path.
 - Expand negative test coverage for permissions, state transitions, and validation failures.
 - Add deployment-oriented documentation and a real production serving strategy.
 - Revisit `manage.py check --deploy` findings under a proper non-debug environment.
@@ -331,6 +332,7 @@ Actions:
 Exit criteria:
 
 - Domain evolution does not increase operational fragility.
+- Validation remains fast enough to run continuously during local iteration.
 
 ## Recommended Execution Order
 

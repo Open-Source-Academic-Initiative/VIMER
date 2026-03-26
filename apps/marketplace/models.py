@@ -5,6 +5,19 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from apps.corporate.models import Organization
 
+
+class ChallengeQuerySet(models.QuerySet):
+    def visible_to_organization(self, organization: Organization | None):
+        public_statuses = Challenge.publicly_visible_statuses()
+        if organization is None:
+            return self.filter(status__in=public_statuses)
+
+        return self.filter(
+            models.Q(status__in=public_statuses)
+            | models.Q(publisher=organization)
+        ).distinct()
+
+
 class Challenge(models.Model):
     """
     R&D&I challenge published by a solicitante organization.
@@ -16,6 +29,8 @@ class Challenge(models.Model):
         UNDER_EVALUATION = "UNDER_EVALUATION", _("En evaluación")
         AWARDED = "AWARDED", _("Adjudicado")
         ARCHIVED = "ARCHIVED", _("Archivado")
+
+    objects = ChallengeQuerySet.as_manager()
 
     publisher = models.ForeignKey(
         Organization,
@@ -80,49 +95,97 @@ class Challenge(models.Model):
         return True
 
     def has_evaluation_criteria(self) -> bool:
-        return bool((self.evaluation_criteria or "").strip())
+        return bool(self._parse_evaluation_criteria_text())
 
     def evaluation_criteria_list(self) -> list[str]:
-        structured_items = list(
+        parsed_items = self._parse_evaluation_criteria_text()
+        if parsed_items:
+            return parsed_items
+
+        return list(
             self.evaluation_criteria_items.order_by("position").values_list(
                 "label",
                 flat=True,
             )
         )
-        if structured_items:
-            return structured_items
 
+    def sync_evaluation_criteria_items(self) -> None:
+        if self.pk is None:
+            return
+
+        desired_items = self._parse_evaluation_criteria_text()
+        existing_items = {
+            item.position: item
+            for item in self.evaluation_criteria_items.all()
+        }
+
+        if not desired_items:
+            self.evaluation_criteria_items.all().delete()
+            return
+
+        items_to_create = []
+        items_to_update = []
+
+        for position, label in enumerate(desired_items, start=1):
+            existing_item = existing_items.get(position)
+            if existing_item is None:
+                items_to_create.append(
+                    ChallengeEvaluationCriterion(
+                        challenge=self,
+                        label=label,
+                        position=position,
+                    )
+                )
+                continue
+
+            if existing_item.label != label:
+                existing_item.label = label
+                items_to_update.append(existing_item)
+
+        stale_positions = set(existing_items) - set(range(1, len(desired_items) + 1))
+        if stale_positions:
+            self.evaluation_criteria_items.filter(position__in=stale_positions).delete()
+
+        if items_to_update:
+            ChallengeEvaluationCriterion.objects.bulk_update(items_to_update, ["label"])
+
+        if items_to_create:
+            ChallengeEvaluationCriterion.objects.bulk_create(items_to_create)
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        original_evaluation_criteria = ""
+        if not is_new:
+            original_evaluation_criteria = (
+                Challenge.objects.filter(pk=self.pk)
+                .values_list("evaluation_criteria", flat=True)
+                .first()
+                or ""
+            )
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+        if is_new or (self.evaluation_criteria or "") != original_evaluation_criteria:
+            self.sync_evaluation_criteria_items()
+
+    def __str__(self):
+        return self.title
+
+    @classmethod
+    def publicly_visible_statuses(cls) -> tuple[str, ...]:
+        return (
+            cls.Status.PUBLISHED,
+            cls.Status.CLOSED,
+            cls.Status.UNDER_EVALUATION,
+            cls.Status.AWARDED,
+        )
+
+    def _parse_evaluation_criteria_text(self) -> list[str]:
         return [
             line.lstrip("-*0123456789. ").strip()
             for line in (self.evaluation_criteria or "").splitlines()
             if line.strip()
         ]
-
-    def sync_evaluation_criteria_items(self) -> None:
-        if self.evaluation_criteria_items.exists():
-            return
-
-        criteria_items = self.evaluation_criteria_list()
-        if not criteria_items:
-            return
-
-        self.evaluation_criteria_items.bulk_create(
-            [
-                ChallengeEvaluationCriterion(
-                    challenge=self,
-                    label=criterion,
-                    position=index,
-                )
-                for index, criterion in enumerate(criteria_items, start=1)
-            ]
-        )
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.title
 
 
 class ChallengeEvaluationCriterion(models.Model):

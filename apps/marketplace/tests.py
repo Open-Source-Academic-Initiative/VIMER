@@ -54,6 +54,54 @@ class MediaRootIsolatedTestCase(TestCase):
 
 
 class MarketplaceFlowTests(MediaRootIsolatedTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.demand_organization = Organization.objects.create(
+            tax_id="900000101",
+            business_name="Solicitante de prueba",
+            chamber_of_commerce_record="CC-101",
+            role="DEMAND_SIDE",
+            contact_email="solicitante@example.com",
+            contact_phone="1111111",
+        )
+        cls.supply_organization = Organization.objects.create(
+            tax_id="900000202",
+            business_name="Proveedor tecnológico de prueba",
+            chamber_of_commerce_record="CC-202",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor@example.com",
+            contact_phone="2222222",
+        )
+        cls.demand_organization.logo = generate_default_logo(
+            business_name=cls.demand_organization.business_name,
+            tax_id=cls.demand_organization.tax_id,
+        )
+        cls.demand_organization.save(update_fields=["logo"])
+        cls.supply_organization.logo = generate_default_logo(
+            business_name=cls.supply_organization.business_name,
+            tax_id=cls.supply_organization.tax_id,
+        )
+        cls.supply_organization.save(update_fields=["logo"])
+        User = get_user_model()
+        cls.demand_user = User.objects.create_user(
+            username="demand_user",
+            email="demand_user@example.com",
+            password="ClaveSegura123",
+            organization=cls.demand_organization,
+        )
+        cls.supply_user = User.objects.create_user(
+            username="supply_user",
+            email="supply_user@example.com",
+            password="ClaveSegura123",
+            organization=cls.supply_organization,
+        )
+        cls.challenge = Challenge.objects.create(
+            publisher=cls.demand_organization,
+            title="Existing challenge",
+            description="Challenge description",
+            application_deadline=timezone.localdate() + timedelta(days=7),
+        )
+
     def make_application_payload(self):
         return {
             "problem_understanding": "Entendemos el reto y su contexto operativo.",
@@ -63,50 +111,12 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         }
 
     def setUp(self):
-        self.demand_organization = Organization.objects.create(
-            tax_id="900000101",
-            business_name="Solicitante de prueba",
-            chamber_of_commerce_record="CC-101",
-            role="DEMAND_SIDE",
-            contact_email="solicitante@example.com",
-            contact_phone="1111111",
-        )
-        self.supply_organization = Organization.objects.create(
-            tax_id="900000202",
-            business_name="Proveedor tecnológico de prueba",
-            chamber_of_commerce_record="CC-202",
-            role="SUPPLY_SIDE",
-            contact_email="proveedor@example.com",
-            contact_phone="2222222",
-        )
-        self.demand_organization.logo = generate_default_logo(
-            business_name=self.demand_organization.business_name,
-            tax_id=self.demand_organization.tax_id,
-        )
-        self.demand_organization.save(update_fields=["logo"])
-        self.supply_organization.logo = generate_default_logo(
-            business_name=self.supply_organization.business_name,
-            tax_id=self.supply_organization.tax_id,
-        )
-        self.supply_organization.save(update_fields=["logo"])
-        self.demand_user = get_user_model().objects.create_user(
-            username="demand_user",
-            email="demand_user@example.com",
-            password="ClaveSegura123",
-            organization=self.demand_organization,
-        )
-        self.supply_user = get_user_model().objects.create_user(
-            username="supply_user",
-            email="supply_user@example.com",
-            password="ClaveSegura123",
-            organization=self.supply_organization,
-        )
-        self.challenge = Challenge.objects.create(
-            publisher=self.demand_organization,
-            title="Existing challenge",
-            description="Challenge description",
-            application_deadline=timezone.localdate() + timedelta(days=7),
-        )
+        self.demand_organization = Organization.objects.get(pk=self.demand_organization.pk)
+        self.supply_organization = Organization.objects.get(pk=self.supply_organization.pk)
+        User = get_user_model()
+        self.demand_user = User.objects.get(pk=self.demand_user.pk)
+        self.supply_user = User.objects.get(pk=self.supply_user.pk)
+        self.challenge = Challenge.objects.get(pk=self.challenge.pk)
 
     def test_challenge_create_page_loads_for_demand_side_user(self):
         self.client.force_login(self.demand_user)
@@ -130,6 +140,34 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.demand_organization.logo.url)
+
+    def test_challenge_list_hides_draft_challenges_from_non_publishers(self):
+        draft_challenge = Challenge.objects.create(
+            publisher=self.demand_organization,
+            title="Borrador interno",
+            description="No debe verse fuera de la organización publicadora.",
+            status=Challenge.Status.DRAFT,
+        )
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(reverse("marketplace:challenge-list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, draft_challenge.title)
+
+    def test_challenge_list_shows_publisher_own_draft_challenges(self):
+        draft_challenge = Challenge.objects.create(
+            publisher=self.demand_organization,
+            title="Borrador visible para publisher",
+            description="Debe verse para su organización publicadora.",
+            status=Challenge.Status.DRAFT,
+        )
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(reverse("marketplace:challenge-list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, draft_challenge.title)
 
     def test_challenge_apply_page_includes_challenge_context(self):
         self.client.force_login(self.supply_user)
@@ -165,6 +203,29 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
             response,
             "Este desafío no está abierto para recibir propuestas.",
         )
+
+    def test_challenge_detail_hides_draft_challenge_from_non_publisher(self):
+        self.challenge.status = Challenge.Status.DRAFT
+        self.challenge.save(update_fields=["status"])
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_challenge_detail_shows_draft_challenge_to_publisher(self):
+        self.challenge.status = Challenge.Status.DRAFT
+        self.challenge.save(update_fields=["status"])
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-detail", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.challenge.title)
 
     def test_challenge_apply_duplicate_submission_shows_duplicate_message(self):
         Application.objects.create(
@@ -273,9 +334,6 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
             "Plan de ejecución"
         )
         self.challenge.save()
-        self.challenge.evaluation_criteria_items.create(label="Experiencia sectorial", position=1)
-        self.challenge.evaluation_criteria_items.create(label="Viabilidad técnica", position=2)
-        self.challenge.evaluation_criteria_items.create(label="Plan de ejecución", position=3)
         self.client.force_login(self.supply_user)
 
         response = self.client.get(
@@ -455,10 +513,37 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["form"].errors.get("execution_plan"))
 
+    def test_challenge_syncs_structured_criteria_when_text_changes(self):
+        self.challenge.evaluation_criteria = "Criterio A\nCriterio B"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.assertEqual(
+            list(
+                self.challenge.evaluation_criteria_items.order_by("position").values_list(
+                    "label",
+                    flat=True,
+                )
+            ),
+            ["Criterio A", "Criterio B"],
+        )
+
+        self.challenge.evaluation_criteria = "Criterio A actualizado\nCriterio C"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+
+        self.assertEqual(
+            list(
+                self.challenge.evaluation_criteria_items.order_by("position").values_list(
+                    "label",
+                    flat=True,
+                )
+            ),
+            ["Criterio A actualizado", "Criterio C"],
+        )
+
 
 class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
-    def setUp(self):
-        self.demand_organization = Organization.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.demand_organization = Organization.objects.create(
             tax_id="903000001",
             business_name="Organización solicitante",
             chamber_of_commerce_record="CC-301",
@@ -466,7 +551,7 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
             contact_email="solicitante-app@example.com",
             contact_phone="1111111",
         )
-        self.supply_organization = Organization.objects.create(
+        cls.supply_organization = Organization.objects.create(
             tax_id="903000002",
             business_name="Proveedor tecnológico",
             chamber_of_commerce_record="CC-302",
@@ -474,12 +559,17 @@ class MarketplaceApplicationServiceTests(MediaRootIsolatedTestCase):
             contact_email="proveedor-app@example.com",
             contact_phone="2222222",
         )
-        self.challenge = Challenge.objects.create(
-            publisher=self.demand_organization,
+        cls.challenge = Challenge.objects.create(
+            publisher=cls.demand_organization,
             title="Challenge",
             description="Description",
             application_deadline=timezone.localdate() + timedelta(days=7),
         )
+
+    def setUp(self):
+        self.demand_organization = Organization.objects.get(pk=self.demand_organization.pk)
+        self.supply_organization = Organization.objects.get(pk=self.supply_organization.pk)
+        self.challenge = Challenge.objects.get(pk=self.challenge.pk)
 
     def test_publish_challenge_sets_published_status_and_deadline(self):
         future_deadline = timezone.localdate() + timedelta(days=10)

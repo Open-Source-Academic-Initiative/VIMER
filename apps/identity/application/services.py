@@ -44,42 +44,41 @@ def register_organization_user(command: RegisterOrganizationUserCommand) -> User
     )
 
     try:
-        if logo_upload:
-            validate_logo_image(logo_upload)
-            organization.logo = logo_upload
-        else:
-            organization.logo = generate_default_logo(
-                business_name=business_name,
-                tax_id=tax_id,
+        with transaction.atomic():
+            if logo_upload:
+                validate_logo_image(logo_upload)
+                organization.logo = logo_upload
+            else:
+                organization.logo = generate_default_logo(
+                    business_name=business_name,
+                    tax_id=tax_id,
+                )
+
+            organization.full_clean()
+            organization.save()
+
+            user = User(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                organization=organization,
             )
-
-        organization.full_clean()
-        organization.save()
-
-        user = User(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            organization=organization,
-        )
-        user.set_password(command.password)
-        user.full_clean(validate_unique=False)
-        user.save()
+            user.set_password(command.password)
+            user.full_clean(validate_unique=False)
+            user.save()
     except ValidationError as exc:
         raise RegistrationValidationError(
             messages=getattr(exc, "messages", None),
             message_dict=getattr(exc, "message_dict", None),
         ) from exc
     except IntegrityError as exc:
-        error_message = str(exc)
-
-        if "identity_user.username" in error_message:
-            raise DuplicateUsernameError from exc
-        if "identity_user.email" in error_message:
-            raise DuplicateEmailError from exc
-        if "corporate_organization.tax_id" in error_message:
+        if Organization.objects.filter(tax_id=tax_id).exists():
             raise DuplicateTaxIdError from exc
+        if User.objects.filter(username=username).exists():
+            raise DuplicateUsernameError from exc
+        if User.objects.filter(email__iexact=email).exists():
+            raise DuplicateEmailError from exc
         raise RegistrationValidationError(
             messages=["No fue posible completar el registro. Revisa la información e inténtalo nuevamente."],
         ) from exc

@@ -5,6 +5,13 @@ from .models import Application, Challenge, ChallengeEvaluationCriterion
 class ChallengeEvaluationCriterionInline(admin.TabularInline):
     model = ChallengeEvaluationCriterion
     extra = 0
+    can_delete = False
+    fields = ("position", "label")
+    readonly_fields = ("position", "label")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(Challenge)
 class ChallengeAdmin(admin.ModelAdmin):

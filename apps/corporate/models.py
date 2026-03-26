@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.corporate.avatar_utils import validate_logo_image
+
 class Organization(models.Model):
     class MarketRole(models.TextChoices):
         DEMAND_SIDE = "DEMAND_SIDE", _("Solicitante")
@@ -11,7 +13,12 @@ class Organization(models.Model):
     chamber_of_commerce_record = models.CharField(_("Registro Cámara de Comercio"), max_length=100)
     role = models.CharField(max_length=20, choices=MarketRole.choices)
     
-    logo = models.ImageField(upload_to="corporate/logos/", null=True, blank=True)
+    logo = models.ImageField(
+        upload_to="corporate/logos/",
+        null=True,
+        blank=True,
+        validators=[validate_logo_image],
+    )
     description = models.TextField(_("Descripción"), blank=True)
     economic_activity = models.TextField(_("Actividad Económica"), blank=True)
     contact_email = models.EmailField(_("Email"))

@@ -23,20 +23,95 @@ from apps.notifications.models import Notification
 
 
 class NotificationEventIntegrationTests(TestCase):
-    def assign_default_evaluation_roles(self):
+    @classmethod
+    def setUpTestData(cls):
+        cls.publisher = Organization.objects.create(
+            tax_id="930000001",
+            business_name="Solicitante Notifica",
+            chamber_of_commerce_record="CC-NOTIF-1",
+            role="DEMAND_SIDE",
+            contact_email="solicitante-notifica@example.com",
+            contact_phone="3005550001",
+        )
+        cls.provider = Organization.objects.create(
+            tax_id="930000002",
+            business_name="Proveedor Notifica",
+            chamber_of_commerce_record="CC-NOTIF-2",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-notifica@example.com",
+            contact_phone="3005550002",
+        )
+        cls.other_provider = Organization.objects.create(
+            tax_id="930000003",
+            business_name="Proveedor Alterno",
+            chamber_of_commerce_record="CC-NOTIF-3",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-alterno@example.com",
+            contact_phone="3005550003",
+        )
+        User = get_user_model()
+        cls.publisher_user = User.objects.create_user(
+            username="publisher_notifications",
+            email="publisher-notifications@example.com",
+            password="ClaveSegura123",
+            organization=cls.publisher,
+        )
+        cls.publisher_observer_user = User.objects.create_user(
+            username="publisher_observer_notifications",
+            email="publisher-observer-notifications@example.com",
+            password="ClaveSegura123",
+            organization=cls.publisher,
+        )
+        cls.provider_user = User.objects.create_user(
+            username="provider_notifications",
+            email="provider-notifications@example.com",
+            password="ClaveSegura123",
+            organization=cls.provider,
+        )
+        cls.other_provider_user = User.objects.create_user(
+            username="other_provider_notifications",
+            email="other-provider-notifications@example.com",
+            password="ClaveSegura123",
+            organization=cls.other_provider,
+        )
+        cls.challenge = Challenge.objects.create(
+            publisher=cls.publisher,
+            title="Challenge notifications",
+            description="Description",
+            evaluation_criteria="Experiencia, viabilidad técnica y plan de entrega.",
+            application_deadline=timezone.localdate() + timedelta(days=7),
+        )
+        cls.application = Application.objects.create(
+            challenge=cls.challenge,
+            applicant=cls.provider,
+            proposal_text="Resumen",
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
+        cls.other_application = Application.objects.create(
+            challenge=cls.challenge,
+            applicant=cls.other_provider,
+            proposal_text="Resumen alterno",
+            problem_understanding="Otro entendimiento",
+            proposed_solution="Otra solución",
+            capabilities_evidence="Otras capacidades",
+            execution_plan="Otro plan",
+        )
         ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_user,
+            challenge=cls.challenge,
+            user=cls.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
         )
         ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_user,
+            challenge=cls.challenge,
+            user=cls.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
         )
         ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_observer_user,
+            challenge=cls.challenge,
+            user=cls.publisher_observer_user,
             role=ChallengeEvaluationRoleAssignment.Role.OBSERVER,
         )
 
@@ -55,81 +130,19 @@ class NotificationEventIntegrationTests(TestCase):
         )
 
     def setUp(self):
-        self.publisher = Organization.objects.create(
-            tax_id="930000001",
-            business_name="Solicitante Notifica",
-            chamber_of_commerce_record="CC-NOTIF-1",
-            role="DEMAND_SIDE",
-            contact_email="solicitante-notifica@example.com",
-            contact_phone="3005550001",
-        )
-        self.provider = Organization.objects.create(
-            tax_id="930000002",
-            business_name="Proveedor Notifica",
-            chamber_of_commerce_record="CC-NOTIF-2",
-            role="SUPPLY_SIDE",
-            contact_email="proveedor-notifica@example.com",
-            contact_phone="3005550002",
-        )
-        self.other_provider = Organization.objects.create(
-            tax_id="930000003",
-            business_name="Proveedor Alterno",
-            chamber_of_commerce_record="CC-NOTIF-3",
-            role="SUPPLY_SIDE",
-            contact_email="proveedor-alterno@example.com",
-            contact_phone="3005550003",
-        )
+        self.publisher = Organization.objects.get(pk=self.publisher.pk)
+        self.provider = Organization.objects.get(pk=self.provider.pk)
+        self.other_provider = Organization.objects.get(pk=self.other_provider.pk)
         User = get_user_model()
-        self.publisher_user = User.objects.create_user(
-            username="publisher_notifications",
-            email="publisher-notifications@example.com",
-            password="ClaveSegura123",
-            organization=self.publisher,
+        self.publisher_user = User.objects.get(pk=self.publisher_user.pk)
+        self.publisher_observer_user = User.objects.get(
+            pk=self.publisher_observer_user.pk
         )
-        self.publisher_observer_user = User.objects.create_user(
-            username="publisher_observer_notifications",
-            email="publisher-observer-notifications@example.com",
-            password="ClaveSegura123",
-            organization=self.publisher,
-        )
-        self.provider_user = User.objects.create_user(
-            username="provider_notifications",
-            email="provider-notifications@example.com",
-            password="ClaveSegura123",
-            organization=self.provider,
-        )
-        self.other_provider_user = User.objects.create_user(
-            username="other_provider_notifications",
-            email="other-provider-notifications@example.com",
-            password="ClaveSegura123",
-            organization=self.other_provider,
-        )
-        self.challenge = Challenge.objects.create(
-            publisher=self.publisher,
-            title="Challenge notifications",
-            description="Description",
-            evaluation_criteria="Experiencia, viabilidad técnica y plan de entrega.",
-            application_deadline=timezone.localdate() + timedelta(days=7),
-        )
-        self.application = Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.provider,
-            proposal_text="Resumen",
-            problem_understanding="Entendimiento",
-            proposed_solution="Solución",
-            capabilities_evidence="Capacidades",
-            execution_plan="Plan",
-        )
-        self.other_application = Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.other_provider,
-            proposal_text="Resumen alterno",
-            problem_understanding="Otro entendimiento",
-            proposed_solution="Otra solución",
-            capabilities_evidence="Otras capacidades",
-            execution_plan="Otro plan",
-        )
-        self.assign_default_evaluation_roles()
+        self.provider_user = User.objects.get(pk=self.provider_user.pk)
+        self.other_provider_user = User.objects.get(pk=self.other_provider_user.pk)
+        self.challenge = Challenge.objects.get(pk=self.challenge.pk)
+        self.application = Application.objects.get(pk=self.application.pk)
+        self.other_application = Application.objects.get(pk=self.other_application.pk)
 
     def test_start_evaluation_creates_notifications_for_applicant_members(self):
         with self.captureOnCommitCallbacks(execute=True):
@@ -263,7 +276,8 @@ class NotificationEventIntegrationTests(TestCase):
 
 
 class NotificationFlowTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         organization = Organization.objects.create(
             tax_id="940000001",
             business_name="Organizacion Flow Notif",
@@ -273,19 +287,23 @@ class NotificationFlowTests(TestCase):
             contact_phone="3006660001",
         )
         User = get_user_model()
-        self.user = User.objects.create_user(
+        cls.user = User.objects.create_user(
             username="flow_notifications",
             email="flow-notifications@example.com",
             password="ClaveSegura123",
             organization=organization,
         )
-        Notification.objects.create(
-            recipient=self.user,
+        cls.notification = Notification.objects.create(
+            recipient=cls.user,
             kind=Notification.Kind.EVALUATION_STARTED,
             title="Nueva notificación",
             body="El desafío pasó a evaluación.",
             link="/marketplace/challenge/1/",
         )
+
+    def setUp(self):
+        self.user = get_user_model().objects.get(pk=self.user.pk)
+        self.notification = Notification.objects.get(pk=self.notification.pk)
 
     def test_notifications_list_view_shows_unread_notifications(self):
         self.client.force_login(self.user)

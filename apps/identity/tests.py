@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from django.contrib.admin import helpers
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -151,6 +152,25 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
         self.assertFalse(
             get_user_model().objects.filter(username="invalid_logo_user").exists()
         )
+
+    def test_organization_logo_validator_also_applies_at_model_level(self):
+        organization = Organization(
+            tax_id="900123459",
+            business_name="Model Validation Org",
+            chamber_of_commerce_record="CC-126",
+            role="SUPPLY_SIDE",
+            contact_email="model-validation@example.com",
+            contact_phone="3001234570",
+            logo=self.make_test_image(
+                image_format="GIF",
+                filename="invalid-model-logo.gif",
+            ),
+        )
+
+        with self.assertRaises(ValidationError) as captured:
+            organization.full_clean()
+
+        self.assertIn("Solo se permiten imagenes PNG o JPG.", captured.exception.message_dict["logo"])
 
     def test_signup_rejects_duplicate_tax_id_as_form_error(self):
         self.client.post(
@@ -488,17 +508,23 @@ class RegistrationApplicationServiceTests(MediaRootIsolatedTestCase):
 
 
 class SuperuserAdminSafeguardsTests(TestCase):
-    def setUp(self):
-        self.admin_user = get_user_model().objects.create_superuser(
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = get_user_model().objects.create_superuser(
             username="platform_admin",
             email="platform-admin@example.com",
             password="ClaveSegura123",
         )
-        self.other_user = get_user_model().objects.create_user(
+        cls.other_user = get_user_model().objects.create_user(
             username="managed_user",
             email="managed-user@example.com",
             password="ClaveSegura123",
         )
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin_user = User.objects.get(pk=self.admin_user.pk)
+        self.other_user = User.objects.get(pk=self.other_user.pk)
 
     def test_superuser_cannot_delete_itself_from_admin_delete_view(self):
         self.client.force_login(self.admin_user)

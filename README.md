@@ -13,7 +13,7 @@ Current status:
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 87 tests.
+- The automated test suite currently passes with 93 tests.
 - Django Admin now prevents a platform superuser from deleting its own account.
 - Organizations can upload a custom logo during signup, limited to PNG/JPG; otherwise a procedural default avatar is generated automatically.
 - Organization logos/avatars are visible in marketplace publications and proposal listings.
@@ -36,6 +36,8 @@ Current status:
 - Criterion-by-criterion proposal evaluation now emits its own domain event, feeding timeline and applicant notifications.
 - Proposal-evaluation activity now also notifies the evaluation team and enriches publisher-facing audit views.
 - The local test suite now ignores the workspace `.env` by default, reducing environment-specific failures.
+- The heaviest test modules now reuse immutable fixtures through `setUpTestData()`, reducing suite runtime sharply without weakening isolation.
+- A repository-level `Makefile` now exposes `make test-fast` and `make verify-fast` for the optimized validation path.
 - Containerized serving now uses `gunicorn` instead of Django's development server.
 - Challenges now support a formal evaluation team with designated evaluators, one designated adjudicator, and optional observers.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
@@ -58,6 +60,7 @@ Versioned domain references:
 - `docs/domain/context_map.md`: bounded-context view
 - `docs/domain/invariants.md`: traceable rule inventory
 - `docs/project_diagrams.md`: current functional-flow and architecture diagrams
+- `docs/testing_strategy.md`: current automated-validation and test-optimization guidance
 
 ## Architecture
 
@@ -151,7 +154,7 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 87 tests.
+- `python manage.py test` currently passes with 93 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
@@ -169,6 +172,7 @@ Strengths:
 - Evaluation event consumers now also react to proposal scoring with timeline projections, applicant notifications, and evaluation-team notifications.
 - Evaluation permissions now follow formal designated roles instead of any publisher member being able to mutate the process.
 - The test runner is now isolated from local `.env` overrides unless explicitly requested.
+- Test setup for the heaviest suites now reuses shared immutable fixtures through `setUpTestData()`, substantially reducing database setup overhead.
 - Notifications now live in their own Django app and consume evaluation domain events.
 
 Current limitations:
@@ -207,11 +211,12 @@ Priority issues identified during the audit were fixed:
 - Isolated test settings from the local `.env` by default through `READ_DOT_ENV_FILE`.
 - Switched containerized serving from `runserver` to `gunicorn`.
 - Added formal evaluation-role assignments with designated evaluators, a designated adjudicator, observer roles, UI management, and permission enforcement.
+- Optimized the heaviest test modules to reuse immutable fixtures via `setUpTestData()` and documented a standard fast-validation path through `make test-fast`.
 - Prevented applications against challenges that are closed or no longer open for submission.
 - Formalized proposal submission with structured required components and immutable submitted applications.
 - Added an explicit evaluation context with challenge transition to evaluation, adjudication, mandatory comment, and one winning proposal per challenge.
 - Added an internal notifications context with event-driven inbox entries, unread counts, and mark-all-read behavior.
-- Expanded automated coverage to 87 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, and multiple-evaluator aggregation/update semantics.
+- Expanded automated coverage to 93 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, multiple-evaluator aggregation/update semantics, draft-visibility regressions, model-level logo validation, and structured-criteria reconciliation.
 
 ## Main routes
 
@@ -290,6 +295,22 @@ python manage.py check
 python manage.py check --deploy
 python manage.py test
 ```
+
+Optimized local validation path:
+
+```bash
+make test-fast
+make verify-fast
+make test-fast TEST_PARALLEL=2
+```
+
+Current measured suite timings after the fixture optimization:
+
+- `python manage.py test`: `56.357s` test runtime (`58.91s` wall clock)
+- `python manage.py test --parallel 2`: `32.090s` test runtime (`34.68s` wall clock)
+- `python manage.py test --parallel 4`: `30.723s` test runtime (`33.63s` wall clock)
+
+The previous full-suite baseline before the optimization pass was `396.022s`.
 
 ## Priority backlog
 

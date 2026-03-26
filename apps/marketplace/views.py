@@ -38,10 +38,24 @@ class ChallengeListView(LoginRequiredMixin, ListView):
     template_name = 'marketplace/challenge_list.html'
     context_object_name = 'challenges'
 
+    def get_queryset(self):
+        organization = getattr(self.request.user, "organization", None)
+        return (
+            Challenge.objects.visible_to_organization(organization)
+            .select_related("publisher")
+        )
+
 class ChallengeDetailView(LoginRequiredMixin, DetailView):
     model = Challenge
     template_name = 'marketplace/challenge_detail.html'
     context_object_name = 'challenge'
+
+    def get_queryset(self):
+        organization = getattr(self.request.user, "organization", None)
+        return (
+            Challenge.objects.visible_to_organization(organization)
+            .select_related("publisher")
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

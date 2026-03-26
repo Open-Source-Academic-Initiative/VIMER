@@ -46,15 +46,75 @@ from apps.marketplace.models import Application, Challenge
 
 
 class EvaluationServiceTests(TestCase):
-    def assign_default_evaluation_roles(self):
+    @classmethod
+    def setUpTestData(cls):
+        cls.publisher = Organization.objects.create(
+            tax_id="910000001",
+            business_name="Solicitante Evaluador",
+            chamber_of_commerce_record="CC-EVAL-1",
+            role="DEMAND_SIDE",
+            contact_email="solicitante-eval@example.com",
+            contact_phone="3001110000",
+        )
+        cls.provider = Organization.objects.create(
+            tax_id="910000002",
+            business_name="Proveedor Evaluado",
+            chamber_of_commerce_record="CC-EVAL-2",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-eval@example.com",
+            contact_phone="3002220000",
+        )
+        cls.other_publisher = Organization.objects.create(
+            tax_id="910000003",
+            business_name="Otro Solicitante",
+            chamber_of_commerce_record="CC-EVAL-3",
+            role="DEMAND_SIDE",
+            contact_email="otro-solicitante@example.com",
+            contact_phone="3003330000",
+        )
+        User = get_user_model()
+        cls.publisher_user = User.objects.create_user(
+            username="publisher_eval",
+            email="publisher-eval@example.com",
+            password="ClaveSegura123",
+            organization=cls.publisher,
+        )
+        cls.publisher_colleague_user = User.objects.create_user(
+            username="publisher_colleague_eval",
+            email="publisher-colleague-eval@example.com",
+            password="ClaveSegura123",
+            organization=cls.publisher,
+        )
+        cls.other_publisher_user = User.objects.create_user(
+            username="other_publisher_eval",
+            email="other-publisher-eval@example.com",
+            password="ClaveSegura123",
+            organization=cls.other_publisher,
+        )
+        cls.challenge = Challenge.objects.create(
+            publisher=cls.publisher,
+            title="Challenge under evaluation",
+            description="Description",
+            evaluation_criteria="Experiencia, viabilidad técnica y plan de ejecución.",
+            application_deadline=timezone.localdate() + timedelta(days=7),
+        )
+        cls.application = Application.objects.create(
+            challenge=cls.challenge,
+            applicant=cls.provider,
+            proposal_text="Resumen",
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
         ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_user,
+            challenge=cls.challenge,
+            user=cls.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
         )
         ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_user,
+            challenge=cls.challenge,
+            user=cls.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
         )
 
@@ -88,66 +148,17 @@ class EvaluationServiceTests(TestCase):
         )
 
     def setUp(self):
-        self.publisher = Organization.objects.create(
-            tax_id="910000001",
-            business_name="Solicitante Evaluador",
-            chamber_of_commerce_record="CC-EVAL-1",
-            role="DEMAND_SIDE",
-            contact_email="solicitante-eval@example.com",
-            contact_phone="3001110000",
-        )
-        self.provider = Organization.objects.create(
-            tax_id="910000002",
-            business_name="Proveedor Evaluado",
-            chamber_of_commerce_record="CC-EVAL-2",
-            role="SUPPLY_SIDE",
-            contact_email="proveedor-eval@example.com",
-            contact_phone="3002220000",
-        )
-        self.other_publisher = Organization.objects.create(
-            tax_id="910000003",
-            business_name="Otro Solicitante",
-            chamber_of_commerce_record="CC-EVAL-3",
-            role="DEMAND_SIDE",
-            contact_email="otro-solicitante@example.com",
-            contact_phone="3003330000",
-        )
+        self.publisher = Organization.objects.get(pk=self.publisher.pk)
+        self.provider = Organization.objects.get(pk=self.provider.pk)
+        self.other_publisher = Organization.objects.get(pk=self.other_publisher.pk)
         User = get_user_model()
-        self.publisher_user = User.objects.create_user(
-            username="publisher_eval",
-            email="publisher-eval@example.com",
-            password="ClaveSegura123",
-            organization=self.publisher,
+        self.publisher_user = User.objects.get(pk=self.publisher_user.pk)
+        self.publisher_colleague_user = User.objects.get(
+            pk=self.publisher_colleague_user.pk
         )
-        self.publisher_colleague_user = User.objects.create_user(
-            username="publisher_colleague_eval",
-            email="publisher-colleague-eval@example.com",
-            password="ClaveSegura123",
-            organization=self.publisher,
-        )
-        self.other_publisher_user = User.objects.create_user(
-            username="other_publisher_eval",
-            email="other-publisher-eval@example.com",
-            password="ClaveSegura123",
-            organization=self.other_publisher,
-        )
-        self.challenge = Challenge.objects.create(
-            publisher=self.publisher,
-            title="Challenge under evaluation",
-            description="Description",
-            evaluation_criteria="Experiencia, viabilidad técnica y plan de ejecución.",
-            application_deadline=timezone.localdate() + timedelta(days=7),
-        )
-        self.application = Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.provider,
-            proposal_text="Resumen",
-            problem_understanding="Entendimiento",
-            proposed_solution="Solución",
-            capabilities_evidence="Capacidades",
-            execution_plan="Plan",
-        )
-        self.assign_default_evaluation_roles()
+        self.other_publisher_user = User.objects.get(pk=self.other_publisher_user.pk)
+        self.challenge = Challenge.objects.get(pk=self.challenge.pk)
+        self.application = Application.objects.get(pk=self.application.pk)
 
     def test_start_challenge_evaluation_sets_under_evaluation_status(self):
         start_challenge_evaluation(challenge=self.challenge, actor=self.publisher_user)
@@ -254,14 +265,6 @@ class EvaluationServiceTests(TestCase):
     def test_award_decision_view_shows_structured_evaluation_criteria(self):
         self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
         self.challenge.save()
-        self.challenge.evaluation_criteria_items.create(
-            label="Capacidad técnica",
-            position=1,
-        )
-        self.challenge.evaluation_criteria_items.create(
-            label="Experiencia sectorial",
-            position=2,
-        )
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save()
         self.client.force_login(self.publisher_user)
@@ -789,23 +792,68 @@ class EvaluationServiceTests(TestCase):
 
 
 class EvaluationFlowTests(TestCase):
-    def assign_default_evaluation_roles(self):
+    @classmethod
+    def setUpTestData(cls):
+        cls.publisher = Organization.objects.create(
+            tax_id="920000001",
+            business_name="Solicitante Flow",
+            chamber_of_commerce_record="CC-EVAL-F1",
+            role="DEMAND_SIDE",
+            contact_email="solicitante-flow@example.com",
+            contact_phone="3001111111",
+        )
+        cls.provider = Organization.objects.create(
+            tax_id="920000002",
+            business_name="Proveedor Flow",
+            chamber_of_commerce_record="CC-EVAL-F2",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-flow@example.com",
+            contact_phone="3002222222",
+        )
+        User = get_user_model()
+        cls.publisher_user = User.objects.create_user(
+            username="publisher_flow",
+            email="publisher-flow@example.com",
+            password="ClaveSegura123",
+            organization=cls.publisher,
+        )
+        cls.publisher_colleague_user = User.objects.create_user(
+            username="publisher_flow_colleague",
+            email="publisher-flow-colleague@example.com",
+            password="ClaveSegura123",
+            organization=cls.publisher,
+        )
+        cls.provider_user = User.objects.create_user(
+            username="provider_flow",
+            email="provider-flow@example.com",
+            password="ClaveSegura123",
+            organization=cls.provider,
+        )
+        cls.challenge = Challenge.objects.create(
+            publisher=cls.publisher,
+            title="Challenge flow",
+            description="Description",
+            evaluation_criteria="Capacidad técnica y experiencia previa.",
+            application_deadline=timezone.localdate() + timedelta(days=7),
+        )
+        cls.application = Application.objects.create(
+            challenge=cls.challenge,
+            applicant=cls.provider,
+            proposal_text="Resumen",
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
         ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_user,
+            challenge=cls.challenge,
+            user=cls.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
         )
         ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_user,
+            challenge=cls.challenge,
+            user=cls.publisher_user,
             role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
-        )
-
-    def assign_secondary_evaluator_role(self):
-        ChallengeEvaluationRoleAssignment.objects.create(
-            challenge=self.challenge,
-            user=self.publisher_colleague_user,
-            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
         )
 
     def build_complete_evaluation_command(self):
@@ -833,58 +881,16 @@ class EvaluationFlowTests(TestCase):
         return payload
 
     def setUp(self):
-        self.publisher = Organization.objects.create(
-            tax_id="920000001",
-            business_name="Solicitante Flow",
-            chamber_of_commerce_record="CC-EVAL-F1",
-            role="DEMAND_SIDE",
-            contact_email="solicitante-flow@example.com",
-            contact_phone="3001111111",
-        )
-        self.provider = Organization.objects.create(
-            tax_id="920000002",
-            business_name="Proveedor Flow",
-            chamber_of_commerce_record="CC-EVAL-F2",
-            role="SUPPLY_SIDE",
-            contact_email="proveedor-flow@example.com",
-            contact_phone="3002222222",
-        )
+        self.publisher = Organization.objects.get(pk=self.publisher.pk)
+        self.provider = Organization.objects.get(pk=self.provider.pk)
         User = get_user_model()
-        self.publisher_user = User.objects.create_user(
-            username="publisher_flow",
-            email="publisher-flow@example.com",
-            password="ClaveSegura123",
-            organization=self.publisher,
+        self.publisher_user = User.objects.get(pk=self.publisher_user.pk)
+        self.publisher_colleague_user = User.objects.get(
+            pk=self.publisher_colleague_user.pk
         )
-        self.publisher_colleague_user = User.objects.create_user(
-            username="publisher_flow_colleague",
-            email="publisher-flow-colleague@example.com",
-            password="ClaveSegura123",
-            organization=self.publisher,
-        )
-        self.provider_user = User.objects.create_user(
-            username="provider_flow",
-            email="provider-flow@example.com",
-            password="ClaveSegura123",
-            organization=self.provider,
-        )
-        self.challenge = Challenge.objects.create(
-            publisher=self.publisher,
-            title="Challenge flow",
-            description="Description",
-            evaluation_criteria="Capacidad técnica y experiencia previa.",
-            application_deadline=timezone.localdate() + timedelta(days=7),
-        )
-        self.application = Application.objects.create(
-            challenge=self.challenge,
-            applicant=self.provider,
-            proposal_text="Resumen",
-            problem_understanding="Entendimiento",
-            proposed_solution="Solución",
-            capabilities_evidence="Capacidades",
-            execution_plan="Plan",
-        )
-        self.assign_default_evaluation_roles()
+        self.provider_user = User.objects.get(pk=self.provider_user.pk)
+        self.challenge = Challenge.objects.get(pk=self.challenge.pk)
+        self.application = Application.objects.get(pk=self.application.pk)
 
     def test_challenge_detail_shows_start_evaluation_action_for_publisher(self):
         self.client.force_login(self.publisher_user)
