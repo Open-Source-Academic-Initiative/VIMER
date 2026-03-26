@@ -32,13 +32,13 @@ This project's tests are primarily database- and ORM-bound. In this profile:
 
 ## Benchmarks
 
-Measured on the current local server profile used during the optimization pass:
+Reference measurements captured on the local server profile used during the optimization work:
 
 - historical full-suite baseline before the fixture refactor: `396.022s`
 - optimized sequential run: `56.357s`
-- optimized parallel run with `--parallel 2`: `32.090s`
-- best measured optimized parallel run with `--parallel 4`: `30.723s`
-- latest full validation after the Phase 6 semantic-alignment closure with `--parallel 4`: `39.382s`
+- earlier optimized parallel run with `--parallel 2`: `32.090s`
+- earlier best measured optimized parallel run with `--parallel 4`: `30.723s`
+- latest full validation after the current documentation audit with `--parallel 4`: `38.974s`
 
 Observed wall-clock timings including database setup/teardown:
 
@@ -46,7 +46,7 @@ Observed wall-clock timings including database setup/teardown:
 - `manage.py test --parallel 2`: `34.68s`
 - `manage.py test --parallel 4`: `33.63s`
 
-On this host, `--parallel 4` remains the fastest measured option, although the gain over `--parallel 2` is small and normal suite evolution can move the exact runtime slightly. If the hardware profile changes, rerun the benchmark before changing the default.
+These numbers confirm that Django's multiprocess runner is materially better than the sequential path on this host, but they no longer prove that `--parallel 4` is always faster than `--parallel 2` for the current suite shape. Keep `TEST_PARALLEL=4` as the repository default for now, and rerun the benchmark whenever suite composition or hardware profile changes enough to matter.
 
 ## Standard commands
 

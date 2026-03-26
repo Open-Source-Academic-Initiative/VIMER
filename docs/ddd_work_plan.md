@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document turns the DDD and ontological direction described in the local analysis notes into an executable work plan for the current codebase.
+This document turns the DDD and ontological direction captured in the versioned project corpus into an executable work plan for the current codebase.
 
 The goal is not to rebuild VIMER from scratch. The goal is to evolve the current baseline in controlled iterations so the software reflects the domain model with increasing fidelity.
 
@@ -329,6 +329,8 @@ Actions:
 - Expand negative test coverage for permissions, state transitions, and validation failures.
 - Add deployment-oriented documentation and a real production serving strategy.
 - Revisit `manage.py check --deploy` findings under a proper non-debug environment.
+- Tighten the current Django 6.0 CSP policy away from inline allowances as templates move toward static assets or nonce-based delivery.
+- Evaluate Django 6.0 template partials or the Tasks framework only when a concrete product flow benefits from them.
 
 Exit criteria:
 
@@ -366,6 +368,7 @@ Exit criteria:
 - preserve the current internal split of `marketplace` and keep new behavior inside the right ownership slice
 - maintain and refine the persisted draft lifecycle for `Application`
 - preserve the semantic convergence already applied in marketplace and evaluation UI copy and business-oriented tests without forcing technical model renames yet
+- tighten the current Django 6.0 CSP posture without breaking the existing HTML flows
 - keep README, executive notes, and local status tracking synchronized with that semantic convergence on each iteration
 
 ## Definition of Done per Domain Feature

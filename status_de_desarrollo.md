@@ -45,6 +45,8 @@ El estado general puede resumirse asi:
 - `apps/marketplace/` ya no depende de buckets genericos para challenge y application: la separacion tactica interna ya existe tambien en forms, views, consumo de urls y pruebas.
 - El cierre previsto de Fase 6 ya quedo ejecutado en el alcance actual: marketplace y evaluation usan mejor el lenguaje ubicuo en UI visible, pruebas de negocio y documentos principales.
 - La suite ya no depende por defecto del `.env` del workspace para correr pruebas.
+- El proyecto ya adopta varias capacidades concretas de Django 6.0 en el codigo real: `STORAGES`, CSP nativa mediante `ContentSecurityPolicyMiddleware` y `SECURE_CSP`, `ASGI_APPLICATION`, `manage.py check --deploy` y serving con `gunicorn`.
+- La alineacion con Django 6.0 sigue siendo parcial en seguridad avanzada: la CSP todavia permite inline script/style por compatibilidad con templates existentes, y las capacidades nuevas de template partials y Tasks framework no se usan aun porque el producto todavia no las necesita.
 - La estrategia de serving en contenedores ya no depende de `runserver`; ahora usa `gunicorn`.
 - El proceso de evaluacion ya no depende solo de pertenecer a la organizacion publicadora: ahora existe un equipo formal con evaluadores designados, un adjudicador designado y observadores.
 - El proyecto ya no depende solo de DDD implicito en el codigo: ahora existe un corpus versionado con context map, lenguaje ubicuo, inventario de invariantes y una ontologia canonica v4 con entidades, actores, roles, permisos, estados, eventos e invariantes.
@@ -253,6 +255,7 @@ Situacion actual:
 
 - Existe un `README.md` bastante completo y sincronizado con el estado actual de la iteracion local.
 - Los documentos locales de apoyo tambien fueron actualizados para reflejar el conteo real de pruebas y el alcance actual del superusuario.
+- `status_de_desarrollo.md` y `resumen_ejecutivo.md` ya forman parte del repositorio versionado y no deben tratarse como notas ignoradas del workspace.
 - Durante esta sesion se construyeron y consolidaron artefactos de modelado de dominio mas fuertes:
   - `docs/domain/ontology_v4.md` como ontologia canonica;
   - `docs/domain/glossary.md` como lenguaje ubicuo preferido;
@@ -262,7 +265,7 @@ Situacion actual:
 Brechas:
 
 - Aun falta institucionalizar una disciplina de actualizacion documental por iteracion, para que README, ADRs, glosario, ontologia, reportes y decisiones de modelado evolucionen de forma coordinada.
-- Como varios de estos documentos locales estan ignorados por git, pueden volver a desincronizarse si no se mantienen conscientemente junto al codigo.
+- Aunque estos documentos ya estan versionados, pueden volver a desincronizarse si no se mantienen conscientemente junto al codigo y las migraciones.
 
 ## 5. Metodologias y buenas practicas aplicadas hasta el momento
 
@@ -501,7 +504,7 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 
 ### 7.1 Riesgo documental
 
-- El `README.md` versionado esta alineado con el estado actual, pero los documentos locales ignorados por git pueden desincronizarse con mas facilidad.
+- El `README.md` versionado esta alineado con el estado actual, y `status_de_desarrollo.md` junto con `resumen_ejecutivo.md` ya estan versionados tambien.
 - Ahora el riesgo es mayor porque ya existe un corpus de dominio mas sofisticado: `README.md`, `docs/domain/*`, `status_de_desarrollo.md` y `resumen_ejecutivo.md` deben mantenerse coherentes entre si.
 - Conviene mantener una rutina de sincronizacion documental por iteracion para evitar decisiones basadas en informacion vieja.
 
@@ -509,6 +512,8 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 
 - El entorno local sigue dependiendo de `.env` para desarrollo y despliegue local.
 - Las pruebas ya no dependen por defecto del `.env` del workspace, pero el comportamiento de deploy sigue condicionado por la configuracion efectiva del entorno.
+- Aunque Django 6.0 ya ofrece CSP nativa y el proyecto la usa, la politica actual conserva `unsafe-inline` para script/style; eso debe endurecerse antes de considerar un perfil productivo serio.
+- Django 6.0 tambien ofrece template partials y Tasks framework, pero hoy no hay un caso de producto que justifique adoptarlos y hacerlo antes de tiempo agregaria complejidad sin retorno claro.
 
 ### 7.3 Riesgo de cobertura
 

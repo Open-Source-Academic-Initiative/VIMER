@@ -38,6 +38,8 @@ La fotografia correcta hoy es esta:
 - La suite ya no depende por defecto del `.env` local para correr pruebas.
 - La suite de pruebas mas pesada ya fue optimizada para reutilizar fixtures inmutables con `setUpTestData()`.
 - El repositorio ahora expone una via estandar de validacion rapida con `make test-fast` y `make verify-fast`.
+- El proyecto ya adopta capacidades concretas de Django 6.0 en el runtime real: `STORAGES`, `ContentSecurityPolicyMiddleware`, `SECURE_CSP`, `ASGI_APPLICATION`, `check --deploy` y serving con `gunicorn`.
+- La alineacion con Django 6.0 no es total todavia: la CSP sigue permitiendo inline script/style por compatibilidad con templates actuales, y ni template partials ni el Tasks framework se usan aun en VIMER.
 - El proceso de evaluacion ya no depende de permisos implicitos por pertenecer a la organizacion publicadora: ahora existe un equipo formal con evaluadores designados, un adjudicador designado y observadores.
 - El proyecto sigue sin estar listo para produccion.
 
@@ -145,9 +147,9 @@ Hoy el sistema ya cubre de forma coherente estos flujos:
 - suite actual validada: 109 tests
 - benchmark actual de pruebas:
   - secuencial: `56.357s`
-  - paralelo `--parallel 2`: `32.090s`
-  - paralelo `--parallel 4`: `39.382s` en la validacion final mas reciente
-- mejor benchmark historico paralelo medido en esta maquina: `30.723s`
+  - benchmark historico `--parallel 2`: `32.090s`
+  - mejor benchmark historico `--parallel 4`: `30.723s`
+  - validacion completa mas reciente `--parallel 4`: `38.974s`
 - baseline historica previa a la optimizacion de fixtures: `396.022s`
 - comando rapido recomendado para validacion local: `make test-fast`
 - comando rapido recomendado para checklist completo: `make verify-fast`
@@ -207,7 +209,7 @@ Aunque el salto de calidad fue importante, todavia hay limites claros:
 - la adjudicacion ya es funcional y trazable, pero sigue siendo minima en gobierno avanzado de evaluacion
 - `apps/marketplace/` sigue siendo un app fisico compartido, aunque su separacion tactica interna ya no depende de buckets genericos
 - no se recalculo una metrica global de coverage actualizada
-- el paralelismo optimo depende del host; en esta maquina `--parallel 4` fue levemente mejor que `--parallel 2`
+- el paralelismo optimo depende del host y de la forma actual de la suite; hoy sigue habiendo evidencia de que `--parallel` mejora claramente sobre el modo secuencial, pero conviene rebenchmarkear antes de afirmar que `4` siempre gana a `2`
 
 ## Conclusiones
 
@@ -226,7 +228,7 @@ VIMER ya tiene:
 
 El proyecto todavia no esta listo para produccion, pero ya esta claramente por encima de una baseline CRUD: ahora tiene una base arquitectonica y semantica mucho mas apta para seguir iterando con disciplina.
 
-Tambien quedo en una posicion operativa mucho mejor para iterar: la suite automatizada paso de una referencia historica de `396.022s` a una validacion final reciente de `39.382s` en corrida paralela completa, manteniendo como mejor benchmark medido `30.723s`, sin reducir cobertura funcional ni bajar el nivel de validacion.
+Tambien quedo en una posicion operativa mucho mejor para iterar: la suite automatizada paso de una referencia historica de `396.022s` a una validacion final reciente de `38.974s` en corrida paralela completa, manteniendo como mejor benchmark medido `30.723s`, sin reducir cobertura funcional ni bajar el nivel de validacion.
 
 ## Siguiente paso recomendado
 

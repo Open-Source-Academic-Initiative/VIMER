@@ -44,6 +44,9 @@ Current status:
 - The heaviest test modules now reuse immutable fixtures through `setUpTestData()`, reducing suite runtime sharply without weakening isolation.
 - A repository-level `Makefile` now exposes `make test-fast` and `make verify-fast` for the optimized validation path.
 - The approved equal-weight scoring, tie-aware ranking, and exceptional-adjudication policy is now implemented end to end.
+- The project already adopts key Django 6.0 platform capabilities, including `STORAGES`, first-party CSP middleware through `ContentSecurityPolicyMiddleware`, and `SECURE_CSP` security policy settings.
+- The current CSP still allows inline script/style sources for compatibility with existing templates, so tightening that policy toward nonce/static-only delivery remains an explicit hardening task.
+- Django 6.0 template partials and the Tasks framework are available in the platform reference set, but they are not currently used in VIMER because no concrete product flow requires them yet.
 - Containerized serving now uses `gunicorn` instead of Django's development server.
 - Challenges now support a formal evaluation team with designated evaluators, one designated adjudicator, and optional observers.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
@@ -311,7 +314,7 @@ Relevant environment variables:
 
 Environment behavior:
 - Development: `DEBUG=True`, SQLite by default, secure cookies disabled, and local `ALLOWED_HOSTS` entries automatically included.
-- Production: requires `SECRET_KEY`, supports an external `DATABASE_URL`, and enables HSTS, secure cookies, and HTTPS redirects by default unless explicitly overridden by environment configuration.
+- Production: requires `SECRET_KEY`, supports an external `DATABASE_URL`, uses Django 6.0 `STORAGES`, and enables HSTS, secure cookies, HTTPS redirects, content-type nosniff, and CSP by default unless explicitly overridden by environment configuration.
 - Tests: ignore the local `.env` by default and use a test-oriented debug profile unless you intentionally override it with `TEST_DEBUG` or `READ_DOT_ENV_FILE=True`.
 
 ## Docker
@@ -340,25 +343,28 @@ make verify-fast
 make test-fast TEST_PARALLEL=2
 ```
 
-Current measured suite timings after the fixture optimization:
+Reference suite timings captured after the fixture optimization:
 
 - `python manage.py test`: `56.357s` test runtime (`58.91s` wall clock)
-- `python manage.py test --parallel 2`: `32.090s` test runtime (`34.68s` wall clock)
-- `python manage.py test --parallel 4`: `39.382s` test runtime on the latest full validation after the Phase 6 semantic-alignment closure
+- Earlier benchmark with `python manage.py test --parallel 2`: `32.090s` test runtime (`34.68s` wall clock)
+- Earlier best measured benchmark with `python manage.py test --parallel 4`: `30.723s`
+- Latest recorded full validation with `python manage.py test --parallel 4`: `38.974s`
 
-The previous full-suite baseline before the optimization pass was `396.022s`.
+The previous full-suite baseline before the optimization pass was `396.022s`. The repository still defaults to `TEST_PARALLEL=4`, but the exact winner between `--parallel 2` and `--parallel 4` can move as the suite evolves, so rerun the benchmark if runtime is an important decision point on a given host.
 
 ## Priority backlog
 
 - Keep this README synchronized with the current implementation and local branch reality.
 - Harden production configuration (`DEBUG=False`, secure cookies, HSTS, SSL redirect).
+- Tighten the current CSP away from inline allowances as template assets move to static files or nonce-based delivery.
 - Complete the production deployment stack around `gunicorn` and external infrastructure.
 - Add more tests for permissions, validations, and business-rule failures.
 - Evaluate additional database constraints to reinforce remaining domain invariants.
 - Improve form and template UX.
 - Define a persistence and deployment strategy beyond SQLite.
+- Evaluate Django 6.0 template partials or the Tasks framework only if a concrete product flow justifies adopting them.
 - Deepen evaluation audit and governance now that the approved scoring and adjudication policy is implemented.
 
 ## Documentation notes
 
-This file is the versioned, authoritative project reference. Local state snapshots such as `status_de_desarrollo.md` and `resumen_ejecutivo.md` may exist as ignored workspace notes, while `django_skill.md` and `django-report.md` are Django 6.0 reference notes rather than VIMER functional documentation.
+This file is the versioned, authoritative project reference. Supporting state summaries such as `status_de_desarrollo.md` and `resumen_ejecutivo.md` are also versioned in the repository and should stay synchronized with it, while `django_skill.md` and `django-report.md` are Django 6.0 reference notes rather than VIMER functional documentation.
