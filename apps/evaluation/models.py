@@ -71,6 +71,30 @@ class ChallengeEvaluationRoleAssignment(models.Model):
 
 
 class AwardDecision(models.Model):
+    class SelectionMode(models.TextChoices):
+        BEST_RANKED = "BEST_RANKED", _("Alineada con el mejor lugar disponible")
+        TIE_BREAK = "TIE_BREAK", _("Desempate humano en el mejor lugar")
+        EXCEPTIONAL = "EXCEPTIONAL", _("Adjudicación excepcional")
+
+    class ExceptionalReason(models.TextChoices):
+        STRATEGIC_EXTERNAL_DECISION = (
+            "DECISION_ESTRATEGICA_EXTERNA",
+            _("Decisión estratégica externa"),
+        )
+        BUDGETARY_OR_CONTRACTUAL_RESTRICTION = (
+            "RESTRICCION_PRESUPUESTAL_O_CONTRACTUAL",
+            _("Restricción presupuestal o contractual"),
+        )
+        RISK_OUTSIDE_EVALUATION = (
+            "RIESGO_NO_REFLEJADO_EN_EVALUACION",
+            _("Riesgo no reflejado en la evaluación"),
+        )
+        INSTITUTIONAL_REQUIREMENT = (
+            "CUMPLIMIENTO_O_REQUISITO_INSTITUCIONAL",
+            _("Cumplimiento o requisito institucional"),
+        )
+        OTHER = "OTRO", _("Otro")
+
     challenge = models.OneToOneField(
         Challenge,
         on_delete=models.CASCADE,
@@ -117,6 +141,38 @@ class AwardDecision(models.Model):
         null=True,
         blank=True,
     )
+    selection_mode = models.CharField(
+        _("Modo de adjudicación"),
+        max_length=16,
+        choices=SelectionMode.choices,
+        default=SelectionMode.BEST_RANKED,
+    )
+    exceptional_reason = models.CharField(
+        _("Motivo estructurado de adjudicación excepcional"),
+        max_length=48,
+        choices=ExceptionalReason.choices,
+        blank=True,
+    )
+    best_available_position = models.PositiveIntegerField(
+        _("Mejor posición disponible registrada al adjudicar"),
+        null=True,
+        blank=True,
+    )
+    tied_best_application_count = models.PositiveIntegerField(
+        _("Cantidad de propuestas empatadas en la mejor posición"),
+        null=True,
+        blank=True,
+    )
+    best_available_applications_snapshot = models.JSONField(
+        _("Snapshot de propuestas en la mejor posición disponible"),
+        default=list,
+        blank=True,
+    )
+    higher_ranked_applications_snapshot = models.JSONField(
+        _("Snapshot de propuestas con mejor posición que la adjudicada"),
+        default=list,
+        blank=True,
+    )
     decided_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -140,6 +196,14 @@ class AwardDecision(models.Model):
 
         if not (self.comment or "").strip():
             errors["comment"] = _("Debes registrar un comentario de adjudicación.")
+
+        if (
+            self.selection_mode == self.SelectionMode.EXCEPTIONAL
+            and not self.exceptional_reason
+        ):
+            errors["exceptional_reason"] = _(
+                "Debes registrar un motivo estructurado para una adjudicación excepcional."
+            )
 
         if errors:
             raise ValidationError(errors)

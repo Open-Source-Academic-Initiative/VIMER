@@ -266,7 +266,7 @@ These concepts are part of the ontology even when they are not first-class persi
 
 ### Resumen de evaluacion de propuesta
 
-- Status: `Implemented`, with approved next-step policy pending
+- Status: `Implemented`
 - Technical mapping:
   - `apps/evaluation/application/queries.py::ApplicationEvaluationSummary`
 - Semantics:
@@ -280,23 +280,14 @@ These concepts are part of the ontology even when they are not first-class persi
   - per-criterion evaluation count and average
   - per-evaluator audit detail
 - Current implementation note:
-  - aggregate totals are still computed across all registered current assessments
-- Approved next policy:
-  - proposal-level scoring must use the average of criterion averages so that each criterion keeps equal value
+  - proposal-level scoring uses the average of criterion averages so that each criterion keeps equal value
 
 ### Ranking comparativo de propuestas
 
-- Status: `Partial`
+- Status: `Implemented`
 - Technical mapping:
   - built in `apps/evaluation/application/queries.py`
 - Current implementation semantics:
-  - orders proposals for publisher-facing comparison
-  - prioritizes complete evaluations
-  - then stronger average score
-  - then total score
-  - then registered assessment count
-  - then primary key as deterministic tie-breaker
-- Approved next policy:
   - complete proposals participate in the competitive ranking
   - incomplete proposals remain visible but outside the competitive ranking as not yet eligible
   - all criteria keep equal value
@@ -354,7 +345,7 @@ These concepts are part of the ontology even when they are not first-class persi
 
 ### Politica vigente de scoring y adjudicacion
 
-- Status: `Planned`
+- Status: `Implemented`
 - Canonical reference:
   - `docs/domain/evaluation_scoring_and_award_policy.md`
 - Approved product decision:
@@ -440,6 +431,12 @@ These concepts are part of the ontology even when they are not first-class persi
 - Submitted proposal immutability
 - Evaluation criteria required before evaluation starts
 - Award eligibility requires criterion coverage
+- Equal-weight criterion scoring
+- Proposal-level comparison uses criterion averages instead of raw evaluator volume
+- Challenge award requires complete active-proposal coverage
+- Incomplete proposals remain outside the competitive ranking
+- Real ties remain explicit and require human resolution
+- Exceptional awards require structured reason plus justification
 - Evaluation team required before evaluation starts
 - Evaluation roles restricted to publisher-organization members
 - Only designated evaluators may score
@@ -471,8 +468,7 @@ These concepts are part of the ontology even when they are not first-class persi
 - Semantics:
   - different designated evaluators may each register their own current assessment for the same criterion
   - the same evaluator updates its current assessment instead of producing a second active row
-  - the current implementation computes proposal aggregates across all registered current assessments
-  - the approved next policy keeps multiple evaluators but reduces each criterion to its own average before proposal-level comparison
+  - the current implementation reduces each criterion to its own average before proposal-level comparison
   - adjudication eligibility depends on criterion coverage, not on every evaluator scoring every criterion
 
 ### Weighted criteria

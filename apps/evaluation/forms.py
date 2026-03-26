@@ -13,9 +13,13 @@ from apps.evaluation.application.commands import (
 )
 from apps.evaluation.application.queries import (
     build_challenge_application_evaluation_summaries,
+    build_pending_award_messages,
 )
-from apps.evaluation.models import ApplicationCriterionEvaluation
-from apps.evaluation.models import ChallengeEvaluationRoleAssignment
+from apps.evaluation.models import (
+    ApplicationCriterionEvaluation,
+    AwardDecision,
+    ChallengeEvaluationRoleAssignment,
+)
 from apps.marketplace.models import Application, Challenge
 
 
@@ -85,6 +89,15 @@ class ChallengeEvaluationRoleAssignmentForm(forms.Form):
 
 
 class AwardDecisionForm(forms.Form):
+    exceptional_reason = forms.ChoiceField(
+        choices=(("", "---------"), *AwardDecision.ExceptionalReason.choices),
+        required=False,
+        label="Motivo estructurado de adjudicación excepcional",
+    )
+    confirm_exceptional_selection = forms.BooleanField(
+        required=False,
+        label="Confirmo que deseo adjudicar fuera del mejor lugar disponible",
+    )
     comment = forms.CharField(
         widget=forms.Textarea,
         label="Comentario de adjudicación",
@@ -97,12 +110,37 @@ class AwardDecisionForm(forms.Form):
             challenge,
             reveal_applicant_identity=False,
         )
+        self.complete_evaluation_summaries = tuple(
+            application
+            for application in self.evaluation_summaries
+            if application.evaluation_summary.is_complete
+        )
+        self.pending_evaluation_summaries = tuple(
+            application
+            for application in self.evaluation_summaries
+            if not application.evaluation_summary.is_complete
+        )
+        self.best_available_summaries = tuple(
+            application
+            for application in self.complete_evaluation_summaries
+            if application.evaluation_summary.ranking_position == 1
+        )
+        self.pending_award_messages = build_pending_award_messages(
+            self.evaluation_summaries
+        )
+        self.is_award_blocked = bool(self.pending_award_messages)
         blind_reference_map = build_challenge_application_blind_reference_map(challenge)
         self.eligible_application_ids = [
             application.pk
-            for application in self.evaluation_summaries
-            if application.evaluation_summary.is_complete
+            for application in self.complete_evaluation_summaries
         ]
+        self.best_available_application_ids = {
+            application.pk for application in self.best_available_summaries
+        }
+        self.summary_by_application_id = {
+            application.pk: application.evaluation_summary
+            for application in self.evaluation_summaries
+        }
         eligible_queryset = challenge.applications.none()
         if self.eligible_application_ids:
             eligible_queryset = (
@@ -125,15 +163,75 @@ class AwardDecisionForm(forms.Form):
             label="Propuesta ganadora",
             blind_reference_map=blind_reference_map,
         )
-        self.order_fields(["winning_application", "comment"])
-        self.fields["winning_application"].help_text = (
-            "Solo aparecen propuestas con todos los criterios evaluados, listadas según el ranking actual y usando referencias ciegas hasta adjudicar."
+        self.order_fields(
+            [
+                "winning_application",
+                "exceptional_reason",
+                "confirm_exceptional_selection",
+                "comment",
+            ]
         )
+        self.fields["winning_application"].help_text = (
+            "Solo aparecen propuestas con cobertura completa. La adjudicación seguirá usando referencias ciegas hasta que se registre la decisión."
+        )
+        self.fields["exceptional_reason"].help_text = (
+            "Solo es obligatorio si decides adjudicar una propuesta fuera del mejor lugar disponible."
+        )
+        self.fields["confirm_exceptional_selection"].help_text = (
+            "Debes marcarlo para confirmar una adjudicación excepcional fuera del mejor lugar disponible."
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        winning_application = cleaned_data.get("winning_application")
+
+        if self.pending_award_messages:
+            for message in self.pending_award_messages:
+                self.add_error(None, message)
+            return cleaned_data
+
+        if not self.complete_evaluation_summaries:
+            self.add_error(
+                None,
+                "No hay propuestas con cobertura completa disponibles para adjudicar.",
+            )
+            return cleaned_data
+
+        if winning_application is None:
+            return cleaned_data
+
+        if winning_application.pk not in self.best_available_application_ids:
+            self.add_error(
+                None,
+                "Estás intentando adjudicar una propuesta fuera del mejor lugar disponible.",
+            )
+            if not cleaned_data.get("confirm_exceptional_selection"):
+                self.add_error(
+                    "confirm_exceptional_selection",
+                    (
+                        "Debes confirmar explícitamente que deseas adjudicar fuera "
+                        "del mejor lugar disponible."
+                    ),
+                )
+            if not cleaned_data.get("exceptional_reason"):
+                self.add_error(
+                    "exceptional_reason",
+                    (
+                        "Debes registrar un motivo estructurado para adjudicar "
+                        "fuera del mejor lugar disponible."
+                    ),
+                )
+
+        return cleaned_data
 
     def to_command(self) -> AwardDecisionCommand:
         return AwardDecisionCommand(
             winning_application_id=self.cleaned_data["winning_application"].pk,
             comment=self.cleaned_data["comment"],
+            exceptional_reason=self.cleaned_data["exceptional_reason"],
+            confirm_exceptional_selection=self.cleaned_data[
+                "confirm_exceptional_selection"
+            ],
         )
 
 

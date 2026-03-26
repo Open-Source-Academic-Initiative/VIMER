@@ -479,12 +479,13 @@ Rule:
 
 Status:
 
-- `Planned`
+- `Implemented`
 
-Approved target enforcement:
+Current enforcement:
 
 - approved product policy in `evaluation_scoring_and_award_policy.md`
-- scoring and ranking logic should average criteria equally once implemented
+- evaluation read models and ranking logic average criteria equally
+- evaluation service and flow tests
 
 ### INV-30
 
@@ -494,11 +495,13 @@ Rule:
 
 Status:
 
-- `Planned`
+- `Implemented`
 
-Approved target enforcement:
+Current enforcement:
 
-- evaluation read models and adjudication logic should aggregate by criterion average first
+- evaluation read models aggregate by criterion average first
+- adjudication service reuses the same scoring semantics
+- evaluation service tests
 
 ### INV-31
 
@@ -508,12 +511,13 @@ Rule:
 
 Status:
 
-- `Planned`
+- `Implemented`
 
-Approved target enforcement:
+Current enforcement:
 
-- adjudication service should block while active proposals remain incomplete
-- adjudication UI should expose pending blind proposal references and missing criterion counts
+- adjudication service blocks while active proposals remain incomplete
+- adjudication UI exposes pending blind proposal references and missing criterion counts
+- evaluation service and flow tests
 
 ### INV-32
 
@@ -523,11 +527,13 @@ Rule:
 
 Status:
 
-- `Planned`
+- `Implemented`
 
-Approved target enforcement:
+Current enforcement:
 
-- evaluation read models and adjudication views should distinguish complete and incomplete proposals
+- evaluation read models distinguish complete and incomplete proposals
+- publisher-facing challenge detail and adjudication views render incomplete proposals separately
+- marketplace and evaluation flow tests
 
 ### INV-33
 
@@ -537,12 +543,13 @@ Rule:
 
 Status:
 
-- `Planned`
+- `Implemented`
 
-Approved target enforcement:
+Current enforcement:
 
-- evaluation ranking should preserve tied positions
-- adjudication snapshot should preserve tie context
+- evaluation ranking preserves tied compact positions
+- adjudication snapshot preserves tie context
+- evaluation service tests
 
 ### INV-34
 
@@ -552,20 +559,21 @@ Rule:
 
 Status:
 
-- `Planned`
+- `Implemented`
 
-Approved target enforcement:
+Current enforcement:
 
-- adjudication flow should warn, require confirmation, and record reason plus justification
-- better-ranked proposals should remain visible for audit
+- adjudication flow warns, requires confirmation, and records reason plus justification
+- better-ranked proposals remain visible in the award snapshot for audit
+- evaluation service and flow tests
 
 ## Near-Term Enforcement Priorities
 
 The next invariants to implement in code should be:
 
 1. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
-2. implement the approved equal-weight scoring and tie-aware adjudication policy
-3. define whether proposal drafts deserve a first-class persisted lifecycle
+2. define whether proposal drafts deserve a first-class persisted lifecycle
+3. deepen evaluation audit and governance beyond the current adjudication controls
 
 ## Traceability Expectation
 

@@ -50,6 +50,12 @@ def record_challenge_awarded(sender, *, event, **kwargs):
     dispatch_uid="evaluation.record_application_evaluation_recorded",
 )
 def record_application_evaluation_recorded(sender, *, event, **kwargs):
+    ranking_fragment = ""
+    if event.ranking_position is not None:
+        ranking_fragment = f" Posición competitiva actual: #{event.ranking_position}."
+    else:
+        ranking_fragment = " La propuesta sigue fuera del ranking competitivo."
+
     ChallengeTimelineEntry.objects.create(
         challenge_id=event.challenge_id,
         event_type=ChallengeTimelineEntry.EventType.APPLICATION_EVALUATED,
@@ -59,6 +65,7 @@ def record_application_evaluation_recorded(sender, *, event, **kwargs):
             f"Cobertura actual: {event.evaluated_count}/{event.criteria_total} criterios. "
             f"Evaluaciones acumuladas: {event.assessment_count}. "
             f"Promedio actual: {event.average_score:.2f}/5."
+            f"{ranking_fragment}"
         ),
         occurred_at=event.occurred_at,
     )

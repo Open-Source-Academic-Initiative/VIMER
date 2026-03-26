@@ -147,6 +147,25 @@ class EvaluationServiceTests(TestCase):
             command=self.build_complete_evaluation_command(),
         )
 
+    def create_application(self, *, tax_id: str, business_name: str) -> Application:
+        applicant = Organization.objects.create(
+            tax_id=tax_id,
+            business_name=business_name,
+            chamber_of_commerce_record=f"CC-{tax_id}",
+            role="SUPPLY_SIDE",
+            contact_email=f"{tax_id}@example.com",
+            contact_phone="3004444444",
+        )
+        return Application.objects.create(
+            challenge=self.challenge,
+            applicant=applicant,
+            proposal_text=f"Resumen {business_name}",
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
+
     def setUp(self):
         self.publisher = Organization.objects.get(pk=self.publisher.pk)
         self.provider = Organization.objects.get(pk=self.provider.pk)
@@ -376,7 +395,7 @@ class EvaluationServiceTests(TestCase):
         self.assertEqual(entry.actor, self.publisher_user)
         self.assertEqual(
             entry.description,
-            "Se registró actividad de evaluación sobre Propuesta 01. Cobertura actual: 1/1 criterios. Evaluaciones acumuladas: 1. Promedio actual: 4.00/5.",
+            "Se registró actividad de evaluación sobre Propuesta 01. Cobertura actual: 1/1 criterios. Evaluaciones acumuladas: 1. Promedio actual: 4.00/5. Posición competitiva actual: #1.",
         )
 
     def test_adjudicate_challenge_creates_decision_and_awards_challenge(self):
@@ -790,6 +809,310 @@ class EvaluationServiceTests(TestCase):
         self.assertEqual(summaries[1].evaluation_summary.ranking_position, 2)
         self.assertEqual(summaries[1].evaluation_summary.eligible_ranking_position, 2)
 
+    def test_build_challenge_application_evaluation_summaries_averages_by_criterion_before_ranking(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        self.assign_secondary_evaluator_role()
+        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
+
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=EvaluateApplicationCommand(
+                application_id=self.application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[0].pk,
+                        score=5,
+                        comment="Muy fuerte en capacidad técnica.",
+                    ),
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[1].pk,
+                        score=1,
+                        comment="Muy débil en experiencia.",
+                    ),
+                ),
+            ),
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_colleague_user,
+            command=EvaluateApplicationCommand(
+                application_id=self.application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[0].pk,
+                        score=5,
+                        comment="Coincide en la fortaleza técnica.",
+                    ),
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[1].pk,
+                        score=1,
+                        comment="Coincide en la debilidad sectorial.",
+                    ),
+                ),
+            ),
+        )
+
+        summary = build_challenge_application_evaluation_summaries(self.challenge)[0].evaluation_summary
+
+        self.assertEqual(summary.assessment_count, 4)
+        self.assertEqual(summary.total_score, 12)
+        self.assertEqual(summary.average_score, 3.0)
+        self.assertEqual(summary.criterion_results[0].average_score, 5.0)
+        self.assertEqual(summary.criterion_results[1].average_score, 1.0)
+
+    def test_build_challenge_application_evaluation_summaries_marks_ties_with_compact_positions(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        second_application = self.create_application(
+            tax_id="910000098",
+            business_name="Proveedor Empatado",
+        )
+        third_application = self.create_application(
+            tax_id="910000097",
+            business_name="Proveedor Tercero",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
+
+        for application, scores in (
+            (self.application, (5, 3)),
+            (second_application, (4, 4)),
+            (third_application, (3, 3)),
+        ):
+            evaluate_application_by_criteria(
+                challenge=self.challenge,
+                application=application,
+                actor=self.publisher_user,
+                command=EvaluateApplicationCommand(
+                    application_id=application.pk,
+                    assessments=tuple(
+                        CriterionAssessmentInput(
+                            criterion_id=criterion.pk,
+                            score=score,
+                            comment=f"Evaluación para {criterion.label}.",
+                        )
+                        for criterion, score in zip(criteria, scores, strict=True)
+                    ),
+                ),
+            )
+
+        summaries = build_challenge_application_evaluation_summaries(self.challenge)
+
+        self.assertEqual(
+            [application.evaluation_summary.ranking_position for application in summaries],
+            [1, 1, 2],
+        )
+        self.assertTrue(summaries[0].evaluation_summary.is_tied)
+        self.assertTrue(summaries[1].evaluation_summary.is_tied)
+        self.assertEqual(summaries[0].evaluation_summary.tied_application_count, 2)
+        self.assertEqual(summaries[2].evaluation_summary.tied_application_count, 1)
+
+    def test_adjudicate_challenge_requires_all_active_proposals_complete(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        second_application = self.create_application(
+            tax_id="910000096",
+            business_name="Proveedor Pendiente",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=EvaluateApplicationCommand(
+                application_id=self.application.pk,
+                assessments=tuple(
+                    CriterionAssessmentInput(
+                        criterion_id=criterion.pk,
+                        score=4,
+                        comment=f"Evaluación para {criterion.label}.",
+                    )
+                    for criterion in criteria
+                ),
+            ),
+        )
+
+        with self.assertRaises(ChallengeEvaluationValidationError) as captured:
+            adjudicate_challenge(
+                challenge=self.challenge,
+                actor=self.publisher_user,
+                command=AwardDecisionCommand(
+                    winning_application_id=self.application.pk,
+                    comment="Intento prematuro de adjudicación.",
+                ),
+            )
+
+        self.assertIn(
+            "No puedes adjudicar el desafío mientras existan propuestas activas con criterios pendientes de evaluación.",
+            captured.exception.messages,
+        )
+        self.assertIn(
+            "Pendientes: Propuesta 02 (2 criterios pendientes).",
+            captured.exception.messages,
+        )
+
+    def test_adjudicate_challenge_requires_reason_and_confirmation_for_exceptional_selection(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        second_application = self.create_application(
+            tax_id="910000095",
+            business_name="Proveedor Mejor Posicionado Para Excepción",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
+
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=second_application,
+            actor=self.publisher_user,
+            command=EvaluateApplicationCommand(
+                application_id=second_application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[0].pk,
+                        score=5,
+                        comment="Muy fuerte.",
+                    ),
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[1].pk,
+                        score=5,
+                        comment="Muy fuerte.",
+                    ),
+                ),
+            ),
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=EvaluateApplicationCommand(
+                application_id=self.application.pk,
+                assessments=(
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[0].pk,
+                        score=4,
+                        comment="Buena.",
+                    ),
+                    CriterionAssessmentInput(
+                        criterion_id=criteria[1].pk,
+                        score=4,
+                        comment="Buena.",
+                    ),
+                ),
+            ),
+        )
+
+        with self.assertRaises(ChallengeEvaluationValidationError) as captured:
+            adjudicate_challenge(
+                challenge=self.challenge,
+                actor=self.publisher_user,
+                command=AwardDecisionCommand(
+                    winning_application_id=self.application.pk,
+                    comment="Quiero elegir una distinta.",
+                ),
+            )
+
+        self.assertIn(
+            "Debes confirmar explícitamente que deseas adjudicar fuera del mejor lugar disponible.",
+            captured.exception.messages,
+        )
+        self.assertIn(
+            "Debes registrar un motivo estructurado para adjudicar fuera del mejor lugar disponible.",
+            captured.exception.messages,
+        )
+
+    def test_adjudicate_challenge_records_exceptional_snapshot_and_reason(self):
+        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.evaluation_criteria_items.all().delete()
+        self.challenge.sync_evaluation_criteria_items()
+        second_application = self.create_application(
+            tax_id="910000094",
+            business_name="Proveedor Mejor Posicionado Auditado",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save(update_fields=["status"])
+        criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))
+
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=second_application,
+            actor=self.publisher_user,
+            command=EvaluateApplicationCommand(
+                application_id=second_application.pk,
+                assessments=tuple(
+                    CriterionAssessmentInput(
+                        criterion_id=criterion.pk,
+                        score=5,
+                        comment=f"Excelente en {criterion.label}.",
+                    )
+                    for criterion in criteria
+                ),
+            ),
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=EvaluateApplicationCommand(
+                application_id=self.application.pk,
+                assessments=tuple(
+                    CriterionAssessmentInput(
+                        criterion_id=criterion.pk,
+                        score=4,
+                        comment=f"Fuerte en {criterion.label}.",
+                    )
+                    for criterion in criteria
+                ),
+            ),
+        )
+
+        decision = adjudicate_challenge(
+            challenge=self.challenge,
+            actor=self.publisher_user,
+            command=AwardDecisionCommand(
+                winning_application_id=self.application.pk,
+                comment="Decisión estratégica excepcional.",
+                exceptional_reason=AwardDecision.ExceptionalReason.STRATEGIC_EXTERNAL_DECISION,
+                confirm_exceptional_selection=True,
+            ),
+        )
+
+        self.assertEqual(decision.selection_mode, AwardDecision.SelectionMode.EXCEPTIONAL)
+        self.assertEqual(
+            decision.exceptional_reason,
+            AwardDecision.ExceptionalReason.STRATEGIC_EXTERNAL_DECISION,
+        )
+        self.assertEqual(decision.best_available_position, 1)
+        self.assertEqual(len(decision.best_available_applications_snapshot), 1)
+        self.assertEqual(
+            decision.best_available_applications_snapshot[0]["blind_reference"],
+            "Propuesta 02",
+        )
+        self.assertEqual(len(decision.higher_ranked_applications_snapshot), 1)
+        self.assertEqual(
+            decision.higher_ranked_applications_snapshot[0]["blind_reference"],
+            "Propuesta 02",
+        )
+
 
 class EvaluationFlowTests(TestCase):
     @classmethod
@@ -1153,14 +1476,53 @@ class EvaluationFlowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ranking comparativo de propuestas")
-        self.assertContains(response, "Promedio actual de evaluación")
+        self.assertContains(response, "Ranking competitivo de propuestas")
+        self.assertContains(response, "Promedio competitivo actual")
         self.assertContains(response, "4,50 / 5")
-        self.assertContains(response, "Ranking elegible para adjudicación")
         self.assertContains(
             response,
-            "Solo aparecen propuestas con todos los criterios evaluados, listadas según el ranking actual y usando referencias ciegas hasta adjudicar.",
+            "Solo aparecen propuestas con cobertura completa. La adjudicación seguirá usando referencias ciegas hasta que se registre la decisión.",
         )
+
+    def test_award_decision_view_blocks_submission_while_other_proposals_are_incomplete(self):
+        other_provider = Organization.objects.create(
+            tax_id="920000099",
+            business_name="Proveedor Flow Pendiente",
+            chamber_of_commerce_record="CC-EVAL-F99",
+            role="SUPPLY_SIDE",
+            contact_email="proveedor-flow-pendiente@example.com",
+            contact_phone="3009999999",
+        )
+        Application.objects.create(
+            challenge=self.challenge,
+            applicant=other_provider,
+            proposal_text="Resumen alterno",
+            problem_understanding="Otro entendimiento",
+            proposed_solution="Otra solución",
+            capabilities_evidence="Otras capacidades",
+            execution_plan="Otro plan",
+        )
+        self.challenge.status = Challenge.Status.UNDER_EVALUATION
+        self.challenge.save()
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.application,
+            actor=self.publisher_user,
+            command=self.build_complete_evaluation_command(),
+        )
+        self.client.force_login(self.publisher_user)
+
+        response = self.client.get(
+            reverse("evaluation:award-decision-create", args=[self.challenge.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Adjudicación bloqueada")
+        self.assertContains(
+            response,
+            "No puedes adjudicar el desafío mientras existan propuestas activas con criterios pendientes de evaluación.",
+        )
+        self.assertContains(response, "Pendientes: Propuesta 02 (1 criterio pendiente).")
 
     def test_challenge_detail_shows_award_decision_evaluation_snapshot(self):
         self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
@@ -1207,6 +1569,7 @@ class EvaluationFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Posición comparativa registrada al adjudicar")
         self.assertContains(response, "Posición elegible registrada al adjudicar")
+        self.assertContains(response, "Modo de adjudicación")
         self.assertContains(response, "Promedio registrado al adjudicar")
         self.assertContains(response, "4,50 / 5")
         self.assertContains(response, "Criterios evaluados al adjudicar")

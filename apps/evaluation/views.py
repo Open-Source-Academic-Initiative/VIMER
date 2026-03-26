@@ -9,6 +9,7 @@ from django.views.generic import FormView
 from apps.evaluation.application.exceptions import ChallengeEvaluationValidationError
 from apps.evaluation.application.queries import (
     build_challenge_application_evaluation_summaries,
+    build_pending_award_messages,
 )
 from apps.evaluation.application.services import (
     assign_challenge_evaluation_roles,
@@ -127,13 +128,44 @@ class AwardDecisionCreateView(ChallengeEvaluationRoleRequiredMixin, FormView):
         form = context.get("form")
         if form is not None and hasattr(form, "evaluation_summaries"):
             context["application_evaluation_summaries"] = form.evaluation_summaries
+            context["complete_application_evaluation_summaries"] = (
+                form.complete_evaluation_summaries
+            )
+            context["pending_application_evaluation_summaries"] = (
+                form.pending_evaluation_summaries
+            )
+            context["best_available_application_summaries"] = (
+                form.best_available_summaries
+            )
+            context["award_blocking_messages"] = form.pending_award_messages
+            context["is_award_blocked"] = form.is_award_blocked
         else:
-            context["application_evaluation_summaries"] = (
+            application_evaluation_summaries = (
                 build_challenge_application_evaluation_summaries(
                     self.get_challenge(),
                     reveal_applicant_identity=False,
                 )
             )
+            context["application_evaluation_summaries"] = application_evaluation_summaries
+            context["complete_application_evaluation_summaries"] = tuple(
+                application
+                for application in application_evaluation_summaries
+                if application.evaluation_summary.is_complete
+            )
+            context["pending_application_evaluation_summaries"] = tuple(
+                application
+                for application in application_evaluation_summaries
+                if not application.evaluation_summary.is_complete
+            )
+            context["best_available_application_summaries"] = tuple(
+                application
+                for application in application_evaluation_summaries
+                if application.evaluation_summary.ranking_position == 1
+            )
+            context["award_blocking_messages"] = build_pending_award_messages(
+                application_evaluation_summaries
+            )
+            context["is_award_blocked"] = bool(context["award_blocking_messages"])
         return context
 
     def get_success_url(self):

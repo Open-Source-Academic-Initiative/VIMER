@@ -12,19 +12,21 @@
         {% endfor %}
     </ul>
 {% endif %}
-{% if application_evaluation_summaries %}
-    <h4>Ranking comparativo de propuestas</h4>
+{% if complete_application_evaluation_summaries %}
+    <h4>Ranking competitivo de propuestas</h4>
     <p>La identidad del postulante permanece oculta hasta que se registre la adjudicación.</p>
     <ul>
-        {% for application in application_evaluation_summaries %}
+        {% for application in complete_application_evaluation_summaries %}
             <li>
-                <strong>#{{ application.evaluation_summary.ranking_position }} {{ application.evaluation_summary.blind_reference }}</strong>
-                <br>
-                <strong>Ranking elegible para adjudicación:</strong>
-                {% if application.evaluation_summary.eligible_ranking_position %}
-                    #{{ application.evaluation_summary.eligible_ranking_position }}
-                {% else %}
-                    Pendiente de evaluación completa
+                <strong>
+                    #{{ application.evaluation_summary.ranking_position }} {{ application.evaluation_summary.blind_reference }}
+                </strong>
+                {% if application.evaluation_summary.is_tied %}
+                    <br>
+                    <em>
+                        Empatada en esta posición con {{ application.evaluation_summary.tied_application_count }}
+                        propuestas.
+                    </em>
                 {% endif %}
                 <br>
                 <strong>Avance:</strong>
@@ -35,19 +37,12 @@
                 {{ application.evaluation_summary.assessment_count }}
                 <br>
                 {% if application.evaluation_summary.average_score is not None %}
-                    <strong>Promedio actual de evaluación:</strong>
+                    <strong>Promedio competitivo actual:</strong>
                     {{ application.evaluation_summary.average_score|floatformat:2 }} / 5
                     | <strong>Puntaje acumulado:</strong>
                     {{ application.evaluation_summary.total_score }}
                 {% else %}
                     Aún no registra evaluaciones por criterio.
-                {% endif %}
-                <br>
-                <strong>Elegible para adjudicación:</strong>
-                {% if application.evaluation_summary.is_complete %}
-                    Sí
-                {% else %}
-                    No
                 {% endif %}
                 {% if application.evaluation_summary.criterion_results %}
                     <ul>
@@ -76,10 +71,85 @@
         {% endfor %}
     </ul>
 {% endif %}
+{% if pending_application_evaluation_summaries %}
+    <h4>Propuestas no elegibles aún</h4>
+    <p>Estas propuestas siguen visibles, pero no compiten en el ranking hasta completar cobertura de criterios.</p>
+    <ul>
+        {% for application in pending_application_evaluation_summaries %}
+            <li>
+                <strong>{{ application.evaluation_summary.blind_reference }}</strong>
+                <br>
+                <strong>Avance:</strong>
+                {{ application.evaluation_summary.evaluated_count }}/{{ application.evaluation_summary.criteria_total }}
+                criterios evaluados
+                <br>
+                <strong>Criterios pendientes:</strong>
+                {{ application.evaluation_summary.missing_criteria_count }}
+                {% if application.evaluation_summary.missing_criteria_labels %}
+                    ({{ application.evaluation_summary.missing_criteria_labels|join:", " }})
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if best_available_application_summaries %}
+    <h4>Mejor lugar disponible</h4>
+    <ul>
+        {% for application in best_available_application_summaries %}
+            <li>
+                {{ application.evaluation_summary.blind_reference }}
+                con promedio {{ application.evaluation_summary.average_score|floatformat:2 }}/5
+                en la posición #{{ application.evaluation_summary.ranking_position }}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if award_blocking_messages %}
+    <div class="card">
+        <h4>Adjudicación bloqueada</h4>
+        {% for message in award_blocking_messages %}
+            <p>{{ message }}</p>
+        {% endfor %}
+    </div>
+{% endif %}
 <form method="post">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Registrar adjudicación</button>
+    {{ form.non_field_errors }}
+    <p>
+        {{ form.winning_application.label_tag }}
+        {{ form.winning_application }}
+        {{ form.winning_application.errors }}
+        {% if form.winning_application.help_text %}
+            <small>{{ form.winning_application.help_text }}</small>
+        {% endif %}
+    </p>
+    <div class="card">
+        <p><strong>Advertencia:</strong> si eliges una propuesta fuera del mejor lugar disponible, deberás confirmarlo y justificarlo.</p>
+        <p>
+            {{ form.exceptional_reason.label_tag }}
+            {{ form.exceptional_reason }}
+            {{ form.exceptional_reason.errors }}
+            {% if form.exceptional_reason.help_text %}
+                <small>{{ form.exceptional_reason.help_text }}</small>
+            {% endif %}
+        </p>
+        <p>
+            {{ form.confirm_exceptional_selection }}
+            {{ form.confirm_exceptional_selection.label_tag }}
+            {{ form.confirm_exceptional_selection.errors }}
+            {% if form.confirm_exceptional_selection.help_text %}
+                <small>{{ form.confirm_exceptional_selection.help_text }}</small>
+            {% endif %}
+        </p>
+    </div>
+    <p>
+        {{ form.comment.label_tag }}
+        {{ form.comment }}
+        {{ form.comment.errors }}
+    </p>
+    <button type="submit" class="btn btn-primary" {% if is_award_blocked %}disabled{% endif %}>
+        Registrar adjudicación
+    </button>
 </form>
 <p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al desafío</a></p>
 {% endblock %}

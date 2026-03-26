@@ -5,6 +5,8 @@ from dataclasses import dataclass
 class AwardDecisionCommand:
     winning_application_id: int
     comment: str
+    exceptional_reason: str = ""
+    confirm_exceptional_selection: bool = False
 
 
 @dataclass(frozen=True)

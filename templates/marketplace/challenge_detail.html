@@ -82,7 +82,7 @@
             <p>Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación.</p>
         {% endif %}
     </div>
-        <h3>Interesados en este desafío:</h3>
+    <h3>Interesados en este desafío:</h3>
     <ul>
         {% for app in challenge_applications %}
             <li>
@@ -106,26 +106,34 @@
                     <strong>Plan:</strong> {{ app.execution_plan|truncatewords:20 }}
                 </div>
                 {% if challenge.status == 'UNDER_EVALUATION' %}
-                    <p>
-                        <strong>Posición comparativa actual:</strong>
-                        #{{ app.evaluation_summary.ranking_position }}
-                    </p>
+                    {% if app.evaluation_summary.is_complete %}
+                        <p>
+                            <strong>Posición competitiva actual:</strong>
+                            #{{ app.evaluation_summary.ranking_position }}
+                            {% if app.evaluation_summary.is_tied %}
+                                (empatada con {{ app.evaluation_summary.tied_application_count }} propuestas)
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p><strong>Estado competitivo:</strong> No elegible aún</p>
+                    {% endif %}
                     <p>
                         <strong>Evaluación por criterios:</strong>
                         {{ app.evaluation_summary.evaluated_count }}/{{ app.evaluation_summary.criteria_total }}
                         completados
                     </p>
+                    {% if not app.evaluation_summary.is_complete %}
+                        <p>
+                            <strong>Criterios pendientes:</strong>
+                            {{ app.evaluation_summary.missing_criteria_count }}
+                            {% if app.evaluation_summary.missing_criteria_labels %}
+                                ({{ app.evaluation_summary.missing_criteria_labels|join:", " }})
+                            {% endif %}
+                        </p>
+                    {% endif %}
                     <p>
                         <strong>Evaluaciones registradas:</strong>
                         {{ app.evaluation_summary.assessment_count }}
-                    </p>
-                    <p>
-                        <strong>Ranking elegible para adjudicación:</strong>
-                        {% if app.evaluation_summary.eligible_ranking_position %}
-                            #{{ app.evaluation_summary.eligible_ranking_position }}
-                        {% else %}
-                            Pendiente de evaluación completa
-                        {% endif %}
                     </p>
                     {% if app.evaluation_summary.average_score is not None %}
                         <p>
@@ -178,6 +186,21 @@
         {% endfor %}
     </ul>
 
+    {% if best_available_applications and challenge.status == 'UNDER_EVALUATION' %}
+        <div class="card">
+            <p><strong>Mejor lugar disponible:</strong></p>
+            <ul>
+                {% for app in best_available_applications %}
+                    <li>
+                        {{ app.evaluation_summary.blind_reference }}
+                        con promedio {{ app.evaluation_summary.average_score|floatformat:2 }}/5
+                        en la posición #{{ app.evaluation_summary.ranking_position }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
     {% if can_start_evaluation %}
         <form method="post" action="{% url 'evaluation:challenge-evaluation-start' challenge.pk %}">
             {% csrf_token %}
@@ -185,6 +208,13 @@
         </form>
     {% elif can_award_challenge %}
         <p><a href="{% url 'evaluation:award-decision-create' challenge.pk %}" class="btn btn-primary">Adjudicar desafío</a></p>
+    {% elif can_adjudicate_challenge and challenge.status == 'UNDER_EVALUATION' and award_blocking_messages %}
+        <div class="card">
+            <p><strong>La adjudicación está bloqueada por ahora.</strong></p>
+            {% for message in award_blocking_messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
     {% endif %}
 
     {% if award_decision %}
@@ -205,6 +235,13 @@
                     #{{ award_decision.winning_eligible_ranking_position }}
                 </p>
             {% endif %}
+            <p><strong>Modo de adjudicación:</strong> {{ award_decision.get_selection_mode_display }}</p>
+            {% if award_decision.exceptional_reason %}
+                <p>
+                    <strong>Motivo estructurado:</strong>
+                    {{ award_decision.get_exceptional_reason_display }}
+                </p>
+            {% endif %}
             {% if award_decision.winning_average_score is not None %}
                 <p>
                     <strong>Promedio registrado al adjudicar:</strong>
@@ -218,6 +255,30 @@
                     <strong>Criterios evaluados al adjudicar:</strong>
                     {{ award_decision.winning_evaluated_criteria_count }}/{{ award_decision.winning_criteria_total }}
                 </p>
+            {% endif %}
+            {% if award_decision.best_available_applications_snapshot %}
+                <p><strong>Propuestas en la mejor posición disponible al adjudicar:</strong></p>
+                <ul>
+                    {% for snapshot in award_decision.best_available_applications_snapshot %}
+                        <li>
+                            {{ snapshot.blind_reference }}
+                            en posición #{{ snapshot.ranking_position }}
+                            con promedio {{ snapshot.average_score|floatformat:2 }}/5
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            {% if award_decision.higher_ranked_applications_snapshot %}
+                <p><strong>Propuestas con mejor posición que la adjudicada:</strong></p>
+                <ul>
+                    {% for snapshot in award_decision.higher_ranked_applications_snapshot %}
+                        <li>
+                            {{ snapshot.blind_reference }}
+                            en posición #{{ snapshot.ranking_position }}
+                            con promedio {{ snapshot.average_score|floatformat:2 }}/5
+                        </li>
+                    {% endfor %}
+                </ul>
             {% endif %}
         </div>
     {% endif %}

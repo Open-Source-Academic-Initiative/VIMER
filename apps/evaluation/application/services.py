@@ -9,7 +9,9 @@ from apps.evaluation.application.commands import (
 )
 from apps.evaluation.application.exceptions import ChallengeEvaluationValidationError
 from apps.evaluation.application.queries import (
+    build_application_ranking_snapshot,
     build_challenge_application_evaluation_summaries,
+    build_pending_award_messages,
 )
 from apps.evaluation.domain.exceptions import EvaluationDomainRuleViolation
 from apps.evaluation.domain.events import (
@@ -17,7 +19,11 @@ from apps.evaluation.domain.events import (
     ChallengeAwarded,
     ChallengeEvaluationStarted,
 )
+from apps.evaluation.domain.invariants import (
+    INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION,
+)
 from apps.evaluation.domain.rules import (
+    ensure_all_active_applications_have_complete_coverage,
     ensure_application_has_required_criterion_coverage_for_award,
     ensure_actor_belongs_to_publisher_organization,
     ensure_actor_is_designated_adjudicator,
@@ -335,12 +341,30 @@ def adjudicate_challenge(
         pk=command.winning_application_id
     ).select_related("challenge", "applicant").first()
     winning_application_summary = None
+    winning_application_with_summary = None
+    challenge_summaries = []
+    best_available_applications = []
+    higher_ranked_applications = []
+    selection_mode = AwardDecision.SelectionMode.BEST_RANKED
+    exceptional_reason = ""
     _ensure_structured_criteria_items(challenge)
     if winning_application is None:
         messages.append("Debes seleccionar una propuesta válida para adjudicar.")
     elif winning_application.challenge_id != challenge.pk:
         messages.append("La propuesta seleccionada no pertenece a este desafío.")
     else:
+        challenge_summaries = build_challenge_application_evaluation_summaries(challenge)
+        pending_award_messages = build_pending_award_messages(challenge_summaries)
+        _collect_rule_violation(
+            messages=messages,
+            invariant_ids=invariant_ids,
+            callback=lambda: ensure_all_active_applications_have_complete_coverage(
+                has_incomplete_active_applications=bool(pending_award_messages)
+            ),
+        )
+        if pending_award_messages:
+            messages.extend(pending_award_messages[1:])
+
         _collect_rule_violation(
             messages=messages,
             invariant_ids=invariant_ids,
@@ -348,7 +372,6 @@ def adjudicate_challenge(
                 winning_application
             ),
         )
-        challenge_summaries = build_challenge_application_evaluation_summaries(challenge)
         winning_application_with_summary = next(
             (
                 application
@@ -365,6 +388,45 @@ def adjudicate_challenge(
             winning_application_summary = (
                 winning_application_with_summary.evaluation_summary
             )
+            best_available_applications = [
+                application
+                for application in challenge_summaries
+                if application.evaluation_summary.ranking_position == 1
+            ]
+            higher_ranked_applications = [
+                application
+                for application in challenge_summaries
+                if (
+                    application.evaluation_summary.ranking_position is not None
+                    and winning_application_summary.ranking_position is not None
+                    and application.evaluation_summary.ranking_position
+                    < winning_application_summary.ranking_position
+                )
+            ]
+            is_exceptional_award = (
+                winning_application_summary.ranking_position is not None
+                and winning_application_summary.ranking_position > 1
+            )
+            exceptional_reason = (command.exceptional_reason or "").strip()
+            if is_exceptional_award and not command.confirm_exceptional_selection:
+                messages.append(
+                    "Debes confirmar explícitamente que deseas adjudicar fuera del mejor lugar disponible."
+                )
+                invariant_ids.append(
+                    INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION
+                )
+            if is_exceptional_award and not exceptional_reason:
+                messages.append(
+                    "Debes registrar un motivo estructurado para adjudicar fuera del mejor lugar disponible."
+                )
+                invariant_ids.append(
+                    INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION
+                )
+
+            if is_exceptional_award:
+                selection_mode = AwardDecision.SelectionMode.EXCEPTIONAL
+            elif winning_application_summary.is_tied:
+                selection_mode = AwardDecision.SelectionMode.TIE_BREAK
 
     if not (command.comment or "").strip():
         messages.append("Debes registrar un comentario de adjudicación.")
@@ -388,6 +450,18 @@ def adjudicate_challenge(
         winning_eligible_ranking_position=(
             winning_application_summary.eligible_ranking_position
         ),
+        selection_mode=selection_mode,
+        exceptional_reason=exceptional_reason,
+        best_available_position=1 if best_available_applications else None,
+        tied_best_application_count=len(best_available_applications) or None,
+        best_available_applications_snapshot=[
+            build_application_ranking_snapshot(application)
+            for application in best_available_applications
+        ],
+        higher_ranked_applications_snapshot=[
+            build_application_ranking_snapshot(application)
+            for application in higher_ranked_applications
+        ],
         decided_by=actor,
     )
 

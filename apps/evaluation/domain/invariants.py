@@ -9,6 +9,12 @@ INV_25_EVALUATION_MILESTONES_REMAIN_AUDITABLE = "INV-25"
 INV_26_APPLICANT_IDENTITY_REMAINS_BLIND_UNTIL_AWARD = "INV-26"
 INV_27_ONE_CURRENT_ASSESSMENT_PER_EVALUATOR_AND_CRITERION = "INV-27"
 INV_28_AWARD_REQUIRES_CRITERION_COVERAGE = "INV-28"
+INV_29_CRITERIA_REMAIN_EQUALLY_WEIGHTED = "INV-29"
+INV_30_MULTI_EVALUATOR_CRITERIA_COLLAPSE_TO_CRITERION_AVERAGE = "INV-30"
+INV_31_AWARD_REQUIRES_COMPLETE_ACTIVE_PROPOSAL_COVERAGE = "INV-31"
+INV_32_INCOMPLETE_PROPOSALS_REMAIN_OUTSIDE_COMPETITIVE_RANKING = "INV-32"
+INV_33_TIES_REMAIN_EXPLICIT_AND_REQUIRE_HUMAN_RESOLUTION = "INV-33"
+INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION = "INV-34"
 
 INVARIANT_CATALOG = {
     INV_18_CHALLENGE_REQUIRES_EVALUATION_TEAM_BEFORE_EVALUATION: (
@@ -43,5 +49,23 @@ INVARIANT_CATALOG = {
     ),
     INV_28_AWARD_REQUIRES_CRITERION_COVERAGE: (
         "A proposal can only be awarded after every challenge criterion has at least one registered assessment."
+    ),
+    INV_29_CRITERIA_REMAIN_EQUALLY_WEIGHTED: (
+        "All challenge criteria keep equal value in the current product phase."
+    ),
+    INV_30_MULTI_EVALUATOR_CRITERIA_COLLAPSE_TO_CRITERION_AVERAGE: (
+        "Multiple evaluations on the same criterion collapse into that criterion average before proposal-level comparison."
+    ),
+    INV_31_AWARD_REQUIRES_COMPLETE_ACTIVE_PROPOSAL_COVERAGE: (
+        "A challenge can only be awarded when every active proposal has complete criterion coverage."
+    ),
+    INV_32_INCOMPLETE_PROPOSALS_REMAIN_OUTSIDE_COMPETITIVE_RANKING: (
+        "Incomplete proposals remain visible but outside the competitive ranking until they complete criterion coverage."
+    ),
+    INV_33_TIES_REMAIN_EXPLICIT_AND_REQUIRE_HUMAN_RESOLUTION: (
+        "Real ties remain explicit and are resolved by the designated adjudicator through human judgment."
+    ),
+    INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION: (
+        "Awarding outside the best available ranking requires a structured reason and free-text justification."
     ),
 }

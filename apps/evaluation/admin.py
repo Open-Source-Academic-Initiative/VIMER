@@ -13,13 +13,14 @@ class AwardDecisionAdmin(admin.ModelAdmin):
     list_display = (
         "challenge",
         "winning_application",
+        "selection_mode",
         "winning_ranking_position",
         "winning_total_score",
         "winning_assessment_count",
         "decided_by",
         "decided_at",
     )
-    list_filter = ("decided_at",)
+    list_filter = ("selection_mode", "exceptional_reason", "decided_at")
     search_fields = ("challenge__title", "comment", "winning_application__applicant__business_name")
 
 

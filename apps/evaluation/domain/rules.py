@@ -6,6 +6,7 @@ from apps.evaluation.domain.invariants import (
     INV_21_ONLY_DESIGNATED_EVALUATORS_CAN_SCORE_PROPOSALS,
     INV_22_ONLY_DESIGNATED_ADJUDICATOR_CAN_ADJUDICATE,
     INV_28_AWARD_REQUIRES_CRITERION_COVERAGE,
+    INV_31_AWARD_REQUIRES_COMPLETE_ACTIVE_PROPOSAL_COVERAGE,
 )
 from apps.evaluation.models import ChallengeEvaluationRoleAssignment
 from apps.marketplace.models import Application, Challenge
@@ -104,4 +105,15 @@ def ensure_application_has_required_criterion_coverage_for_award(
         raise EvaluationDomainRuleViolation(
             "La propuesta ganadora debe tener todos sus criterios evaluados antes de adjudicar.",
             invariant_id=INV_28_AWARD_REQUIRES_CRITERION_COVERAGE,
+        )
+
+
+def ensure_all_active_applications_have_complete_coverage(
+    *,
+    has_incomplete_active_applications: bool,
+) -> None:
+    if has_incomplete_active_applications:
+        raise EvaluationDomainRuleViolation(
+            "No puedes adjudicar el desafío mientras existan propuestas activas con criterios pendientes de evaluación.",
+            invariant_id=INV_31_AWARD_REQUIRES_COMPLETE_ACTIVE_PROPOSAL_COVERAGE,
         )

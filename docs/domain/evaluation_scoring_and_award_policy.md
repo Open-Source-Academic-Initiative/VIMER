@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved product decision, pending implementation in code.
+Approved product decision, implemented in code.
 
 ## Purpose
 
@@ -97,8 +97,10 @@ It supersedes any assumption that more evaluator activity on the same criterion 
 
 ## Implementation Note
 
-At the time this document was approved:
+Current implementation status:
 
-- the current codebase still aggregates proposal scoring across all registered criterion assessments
-- the current ranking still uses that aggregate behavior
-- the approved equal-weight per-criterion policy has not yet been implemented
+- proposal scoring now averages criterion averages instead of averaging all raw assessments together
+- incomplete proposals remain visible but outside the competitive ranking
+- adjudication is blocked while active proposals remain incomplete
+- ties remain explicit with compact visible positions
+- award snapshots now preserve best-available ranking context, tie context, and exceptional-award metadata when applicable

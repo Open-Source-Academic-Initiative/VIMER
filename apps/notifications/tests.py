@@ -115,10 +115,11 @@ class NotificationEventIntegrationTests(TestCase):
             role=ChallengeEvaluationRoleAssignment.Role.OBSERVER,
         )
 
-    def build_complete_evaluation_command(self):
+    def build_complete_evaluation_command(self, application: Application | None = None):
         self.challenge.sync_evaluation_criteria_items()
+        target_application = application or self.application
         return EvaluateApplicationCommand(
-            application_id=self.application.pk,
+            application_id=target_application.pk,
             assessments=tuple(
                 CriterionAssessmentInput(
                     criterion_id=criterion.pk,
@@ -177,7 +178,13 @@ class NotificationEventIntegrationTests(TestCase):
             challenge=self.challenge,
             application=self.application,
             actor=self.publisher_user,
-            command=self.build_complete_evaluation_command(),
+            command=self.build_complete_evaluation_command(self.application),
+        )
+        evaluate_application_by_criteria(
+            challenge=self.challenge,
+            application=self.other_application,
+            actor=self.publisher_user,
+            command=self.build_complete_evaluation_command(self.other_application),
         )
 
         with self.captureOnCommitCallbacks(execute=True):

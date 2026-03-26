@@ -265,19 +265,17 @@ Objective:
 Status:
 
 - `Implemented` for the core cycle
-- `Next` for equal-weight scoring policy implementation, deeper audit, and governance refinements
+- `Implemented` for equal-weight scoring and tie-aware adjudication
+- `Next` for deeper audit and governance refinements
 
 Minimum domain additions:
 
-- approved equal-weight per-criterion scoring
-- tie-aware adjudication governance
 - richer audit and event consumers
 - deeper governance of evaluation decisions
 
 Actions:
 
 - Preserve `apps/evaluation/` as the explicit evaluation context.
-- Implement the approved equal-weight scoring and tie-aware adjudication policy from `docs/domain/evaluation_scoring_and_award_policy.md`.
 - Revisit criterion weighting only if product semantics later require non-uniform scoring.
 - Deepen audit read models and event consumers around evaluation activity.
 - Revisit whether adjudication needs additional governance controls beyond the current designated-role model.
@@ -339,7 +337,7 @@ Exit criteria:
 ## Recommended Execution Order
 
 1. Keep versioned domain artifacts synchronized
-2. Deepen `Evaluation` with the approved equal-weight scoring policy and richer audit
+2. Deepen `Evaluation` with richer audit and governance
 3. Continue the conceptual split of `marketplace`
 4. Decide whether `Application` needs a persisted draft lifecycle
 5. Continue semantic convergence
@@ -363,7 +361,6 @@ Exit criteria:
 
 ### Next iteration focus
 
-- implement the approved equal-weight scoring and tie-aware adjudication policy
 - richer audit consumers and decision governance in `evaluation`
 - clearer internal split of `marketplace` between challenge and application concerns
 - decision on persisted draft lifecycle for `Application`
@@ -386,16 +383,15 @@ The next slice should focus on the minimum work that increases domain fidelity w
 
 Scope:
 
-- implement the approved equal-weight scoring and tie-aware adjudication policy
 - deepen event consumers and audit projections around evaluation activity
 - add more traceable invariant-to-test coverage
 - continue separating challenge-facing and application-facing concerns inside `apps/marketplace/`
 
 Recommended file targets for the next slice:
 
-- `apps/evaluation/application/queries.py`
-- `apps/evaluation/application/services.py`
-- `apps/evaluation/domain/invariants.py`
+- `apps/evaluation/domain/handlers.py`
+- `apps/notifications/domain/handlers.py`
+- `apps/evaluation/models.py`
 - `apps/evaluation/tests.py`
 - `docs/domain/ontology_v4.md`
 - `docs/domain/invariants.md`

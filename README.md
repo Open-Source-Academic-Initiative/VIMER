@@ -13,7 +13,7 @@ Current status:
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 93 tests.
+- The automated test suite currently passes with 99 tests.
 - Django Admin now prevents a platform superuser from deleting its own account.
 - Organizations can upload a custom logo during signup, limited to PNG/JPG; otherwise a procedural default avatar is generated automatically.
 - Organization logos/avatars are visible in marketplace publications and proposal listings.
@@ -38,7 +38,7 @@ Current status:
 - The local test suite now ignores the workspace `.env` by default, reducing environment-specific failures.
 - The heaviest test modules now reuse immutable fixtures through `setUpTestData()`, reducing suite runtime sharply without weakening isolation.
 - A repository-level `Makefile` now exposes `make test-fast` and `make verify-fast` for the optimized validation path.
-- An equal-weight scoring and tie-aware adjudication policy is now documented as an approved product decision pending implementation.
+- The approved equal-weight scoring, tie-aware ranking, and exceptional-adjudication policy is now implemented end to end.
 - Containerized serving now uses `gunicorn` instead of Django's development server.
 - Challenges now support a formal evaluation team with designated evaluators, one designated adjudicator, and optional observers.
 - The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
@@ -60,7 +60,7 @@ Versioned domain references:
 - `docs/domain/glossary.md`: preferred business language
 - `docs/domain/context_map.md`: bounded-context view
 - `docs/domain/invariants.md`: traceable rule inventory
-- `docs/domain/evaluation_scoring_and_award_policy.md`: approved scoring and adjudication policy pending implementation
+- `docs/domain/evaluation_scoring_and_award_policy.md`: implemented scoring and adjudication policy
 - `docs/project_diagrams.md`: current functional-flow and architecture diagrams
 - `docs/testing_strategy.md`: current automated-validation and test-optimization guidance
 
@@ -116,10 +116,13 @@ Main models:
 - Evaluation team management with designated evaluators, adjudicator, and observers.
 - Criterion-by-criterion proposal evaluation during `UNDER_EVALUATION`.
 - Blind evaluation and adjudication views that hide applicant identity until award.
-- Aggregated evaluation summaries per proposal, including coverage, registered assessment count, average score, and criterion detail.
-- Explicit comparative proposal ranking in publisher-facing evaluation and adjudication views.
+- Aggregated evaluation summaries per proposal, including coverage, registered assessment count, equal-weight average score, and criterion detail.
+- Explicit comparative proposal ranking in publisher-facing evaluation and adjudication views, with incomplete proposals kept outside the competitive ranking.
 - Multiple independent evaluator assessments per criterion, with one current persisted assessment per `(proposal, criterion, evaluator)`.
-- Persisted evaluation snapshot on award decisions, including ranking and score context.
+- Tie-aware ranking with compact visible positions and persisted tie context on award decisions.
+- Adjudication blocking while active proposals remain incomplete, with blind pending references and missing-criterion counts.
+- Exceptional adjudication flow with explicit warning, confirmation, structured reason, and persisted audit snapshot.
+- Persisted evaluation snapshot on award decisions, including ranking, tie, and exceptional-selection context.
 - Evaluation history timeline for challenge publishers.
 - Internal notifications inbox with unread counter and mark-all-read flow.
 - Proposal-evaluation notifications for applicant organizations after scoring is registered.
@@ -136,7 +139,9 @@ Main models:
 - Only `SUPPLY_SIDE` (`Proveedor tecnológico`) organizations can apply to challenges.
 - Challenges only accept applications while they remain published and open for submission.
 - A challenge must define evaluation criteria before it can move into evaluation.
-- A winning proposal becomes eligible for adjudication once each criterion has at least one registered assessment.
+- All criteria keep equal value; there is no criterion weighting in the current product phase.
+- A proposal score is calculated from the average of its criterion averages.
+- A challenge can only be adjudicated once every active proposal has complete criterion coverage.
 - Only the publisher organization can manage and execute evaluation operations for its challenge.
 - Evaluation roles can only be assigned to members of the publisher organization.
 - At least one designated evaluator and one designated adjudicator are required before evaluation can start.
@@ -147,6 +152,8 @@ Main models:
 - A submitted proposal must include all required structured components.
 - A submitted proposal cannot be modified after submission.
 - A challenge can have at most one adjudicated winning proposal.
+- A persistent tie in the best available position is resolved by the designated adjudicator through human judgment and mandatory comment.
+- Adjudicating outside the best available position requires explicit confirmation, structured reason, and free-text justification.
 - A platform superuser cannot delete its own account from Django Admin.
 - Organization logos uploaded at signup are limited to PNG/JPG; when no custom image is provided, a procedural PNG avatar is generated automatically.
 
@@ -156,7 +163,7 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 93 tests.
+- `python manage.py test` currently passes with 99 tests.
 - The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
@@ -182,7 +189,6 @@ Current limitations:
 - Deployment security still depends on correct environment configuration.
 - Test coverage is still limited.
 - SQLite is still the default database.
-- The newly approved equal-weight scoring and adjudication policy is not fully implemented yet.
 - `README.md` should be kept in sync as the local iteration evolves, since some operational details change faster than the core architecture.
 
 ## Fixes applied during this consolidation
@@ -206,10 +212,11 @@ Priority issues identified during the audit were fixed:
 - Added structured evaluation-criteria entries for challenges and backfilled them from existing text criteria.
 - Added criterion-by-criterion proposal assessments and required criterion coverage before adjudicating a winning proposal.
 - Added reusable evaluation summaries so publishers can compare proposals during review and adjudication.
-- Added explicit comparative proposal ranking in evaluation and adjudication views, prioritizing criterion coverage, stronger averages, and richer assessment volume.
-- Added persisted adjudication snapshots with ranking, score, evaluation-completeness, and assessment-count context for the winning proposal.
+- Reworked proposal ranking and adjudication to use equal-weight per-criterion scoring instead of raw assessment volume.
+- Added explicit separation between competitive and not-yet-eligible proposals in publisher-facing evaluation and adjudication views.
+- Added persisted adjudication snapshots with ranking, score, tie, and exceptional-selection context for the winning proposal.
 - Added explicit proposal-evaluation events with timeline persistence and applicant-facing notifications.
-- Evolved proposal assessment from a single-evaluator model to multiple independent evaluators per criterion, with aggregate scoring across all registered assessments.
+- Evolved proposal assessment from a single-evaluator model to multiple independent evaluators per criterion, with proposal-level comparison based on criterion averages.
 - Added evaluation-team notifications and richer publisher-facing audit detail when proposal-scoring activity is recorded.
 - Isolated test settings from the local `.env` by default through `READ_DOT_ENV_FILE`.
 - Switched containerized serving from `runserver` to `gunicorn`.
@@ -219,7 +226,7 @@ Priority issues identified during the audit were fixed:
 - Formalized proposal submission with structured required components and immutable submitted applications.
 - Added an explicit evaluation context with challenge transition to evaluation, adjudication, mandatory comment, and one winning proposal per challenge.
 - Added an internal notifications context with event-driven inbox entries, unread counts, and mark-all-read behavior.
-- Expanded automated coverage to 93 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, multiple-evaluator aggregation/update semantics, draft-visibility regressions, model-level logo validation, and structured-criteria reconciliation.
+- Expanded automated coverage to 99 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, post-submission immutability, evaluation/adjudication flows, equal-weight criterion scoring, incomplete-proposal adjudication blocking, compact tie handling, exceptional adjudication governance, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, multiple-evaluator aggregation/update semantics, draft-visibility regressions, model-level logo validation, and structured-criteria reconciliation.
 
 ## Main routes
 
@@ -311,7 +318,7 @@ Current measured suite timings after the fixture optimization:
 
 - `python manage.py test`: `56.357s` test runtime (`58.91s` wall clock)
 - `python manage.py test --parallel 2`: `32.090s` test runtime (`34.68s` wall clock)
-- `python manage.py test --parallel 4`: `30.723s` test runtime (`33.63s` wall clock)
+- `python manage.py test --parallel 4`: `31.696s` test runtime on the latest full validation
 
 The previous full-suite baseline before the optimization pass was `396.022s`.
 
@@ -324,7 +331,7 @@ The previous full-suite baseline before the optimization pass was `396.022s`.
 - Evaluate additional database constraints to reinforce remaining domain invariants.
 - Improve form and template UX.
 - Define a persistence and deployment strategy beyond SQLite.
-- Implement the approved equal-weight scoring, tie handling, and adjudication-exception policy from `docs/domain/evaluation_scoring_and_award_policy.md`.
+- Deepen evaluation audit and governance now that the approved scoring and adjudication policy is implemented.
 
 ## Documentation notes
 

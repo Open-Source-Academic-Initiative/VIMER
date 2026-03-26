@@ -82,6 +82,15 @@ class ChallengeDetailView(LoginRequiredMixin, DetailView):
         context["can_adjudicate_challenge"] = detail_read_model.can_adjudicate_challenge
         context["can_start_evaluation"] = detail_read_model.can_start_evaluation
         context["can_award_challenge"] = detail_read_model.can_award_challenge
+        context["pending_award_applications"] = list(
+            detail_read_model.pending_award_applications
+        )
+        context["best_available_applications"] = list(
+            detail_read_model.best_available_applications
+        )
+        context["award_blocking_messages"] = list(
+            detail_read_model.award_blocking_messages
+        )
         return context
 
 class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):

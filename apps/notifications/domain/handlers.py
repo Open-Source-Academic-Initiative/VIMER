@@ -133,6 +133,11 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
         "applicant__members",
         "challenge__evaluation_role_assignments__user",
     ).get(pk=event.application_id)
+    applicant_ranking_fragment = (
+        f"posición competitiva actual #{event.ranking_position}."
+        if event.ranking_position is not None
+        else "todavía fuera del ranking competitivo."
+    )
     notifications = [
         Notification(
             recipient=recipient,
@@ -142,8 +147,7 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
                 f"Tu propuesta para '{application.challenge.title}' quedó con "
                 f"{event.evaluated_count}/{event.criteria_total} criterios evaluados, "
                 f"{event.assessment_count} evaluaciones registradas, "
-                f"promedio {event.average_score:.2f}/5 y posición actual "
-                f"#{event.ranking_position}."
+                f"promedio {event.average_score:.2f}/5 y {applicant_ranking_fragment}"
             ),
             link=_build_challenge_link(application.challenge_id),
         )

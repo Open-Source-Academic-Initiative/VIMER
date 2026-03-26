@@ -36,7 +36,8 @@ Measured on the current local server profile used during the optimization pass:
 - historical full-suite baseline before the fixture refactor: `396.022s`
 - optimized sequential run: `56.357s`
 - optimized parallel run with `--parallel 2`: `32.090s`
-- optimized parallel run with `--parallel 4`: `30.723s`
+- best measured optimized parallel run with `--parallel 4`: `30.723s`
+- latest full validation after the scoring/adjudication implementation with `--parallel 4`: `31.696s`
 
 Observed wall-clock timings including database setup/teardown:
 
@@ -44,7 +45,7 @@ Observed wall-clock timings including database setup/teardown:
 - `manage.py test --parallel 2`: `34.68s`
 - `manage.py test --parallel 4`: `33.63s`
 
-On this host, `--parallel 4` was the fastest measured option, although the gain over `--parallel 2` was small. If the hardware profile changes, rerun the benchmark before changing the default.
+On this host, `--parallel 4` remains the fastest measured option, although the gain over `--parallel 2` is small and normal suite evolution can move the exact runtime slightly. If the hardware profile changes, rerun the benchmark before changing the default.
 
 ## Standard commands
 

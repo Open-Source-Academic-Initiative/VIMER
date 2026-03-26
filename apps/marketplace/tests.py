@@ -398,8 +398,7 @@ class MarketplaceFlowTests(MediaRootIsolatedTestCase):
         self.assertContains(response, "Promedio actual")
         self.assertContains(response, "4,50 / 5")
         self.assertContains(response, "Detalle por criterio")
-        self.assertContains(response, "Posición comparativa actual")
-        self.assertContains(response, "Ranking elegible para adjudicación")
+        self.assertContains(response, "Posición competitiva actual")
 
     def test_challenge_detail_hides_applicant_identity_for_publisher_before_award(self):
         Application.objects.create(
