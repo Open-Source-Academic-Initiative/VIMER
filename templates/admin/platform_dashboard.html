@@ -1,0 +1,24 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Dashboard piloto VIMER</h1>
+<table>
+    <tbody>
+        <tr><th>Organizaciones registradas</th><td>{{ organization_count }}</td></tr>
+        <tr><th>Representantes activos</th><td>{{ active_representative_count }}</td></tr>
+        <tr><th>Propuestas enviadas</th><td>{{ submitted_application_count }}</td></tr>
+        <tr><th>Evaluaciones registradas últimos 30 días</th><td>{{ recent_evaluation_count }}</td></tr>
+        <tr><th>Tiempo promedio publicación a adjudicación</th><td>{{ mean_award_duration|default:"Sin datos" }}</td></tr>
+    </tbody>
+</table>
+<h2>Desafíos por estado</h2>
+<table>
+    <thead><tr><th>Estado</th><th>Total</th></tr></thead>
+    <tbody>
+        {% for row in challenge_counts %}
+            <tr><td>{{ row.status }}</td><td>{{ row.count }}</td></tr>
+        {% empty %}
+            <tr><td colspan="2">Sin desafíos.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

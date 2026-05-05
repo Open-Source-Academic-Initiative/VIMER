@@ -6,6 +6,23 @@
     <p><a href="{% url 'marketplace:challenge-create' %}" class="btn btn-primary">Publicar Nuevo Desafío</a></p>
 {% endif %}
 
+<form method="get" class="card">
+    <input type="search" name="q" value="{{ query }}" placeholder="Buscar desafíos">
+    <select name="category">
+        <option value="">Todas las categorías</option>
+        {% for category in categories %}
+            <option value="{{ category.slug }}" {% if selected_category == category.slug %}selected{% endif %}>{{ category.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="status">
+        <option value="">Todos los estados</option>
+        {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">Filtrar</button>
+</form>
+
 {% for challenge in challenges %}
 <div class="card">
     <h3>{{ challenge.title }}</h3>
@@ -21,6 +38,14 @@
     </p>
     <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
     <p>
+        <strong>Categorías:</strong>
+        {% for category in challenge.categories.all %}
+            {{ category.name }}{% if not forloop.last %}, {% endif %}
+        {% empty %}
+            Sin categoría
+        {% endfor %}
+    </p>
+    <p>
         <strong>Fecha límite:</strong>
         {% if challenge.application_deadline %}
             {{ challenge.application_deadline }}
@@ -28,7 +53,7 @@
             Sin fecha límite
         {% endif %}
     </p>
-    <p>{{ challenge.description|truncatewords:30 }}</p>
+    <p>{{ challenge.description|striptags|truncatewords:30 }}</p>
     <a href="{% url 'marketplace:challenge-detail' challenge.pk %}" class="btn btn-primary">Ver Más</a>
 </div>
 {% empty %}

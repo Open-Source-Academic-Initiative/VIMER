@@ -599,13 +599,260 @@ Current enforcement:
 - better-ranked proposals remain visible in the award snapshot for audit
 - evaluation service and flow tests
 
+## Release v1 Planned Invariants
+
+These invariants are defined as part of VIMER's first official release. They carry status `Planned` until the release ships them in code, tests and persistence enforcement. Authoritative scope reference: `docs/release_plan_v1.md`. The numbering jumps from `INV-41` to `INV-50` to leave room for any retroactive additions to the existing inventory.
+
+### INV-50
+
+Rule:
+
+- An organization has exactly one active `Representante titular` at any time.
+
+Status:
+
+- `Planned`
+
+Owning ADR:
+
+- `docs/adr/0005-multi-representative-onboarding.md`
+
+Planned enforcement:
+
+- boolean flag on `identity.User`
+- conditional database unique constraint on `(organization, is_organization_titular=True)`
+- titularity-transfer service ensures atomic flag movement
+
+### INV-51
+
+Rule:
+
+- Only the active `Representante titular` of an organization may approve or reject a `Solicitud de unión` targeting that organization.
+
+Status:
+
+- `Planned`
+
+Owning ADR:
+
+- `docs/adr/0005-multi-representative-onboarding.md`
+
+Planned enforcement:
+
+- application-service authorization check
+- view-level access control
+
+### INV-52
+
+Rule:
+
+- A `Solicitud de unión` in `PENDING` state expires after a configurable window without resolution and transitions to `EXPIRED`.
+
+Status:
+
+- `Planned`
+
+Planned enforcement:
+
+- `OrganizationJoinRequest.expires_at` field
+- management command schedulable through cron
+- domain event `RepresentativeJoinExpired` emitted on transition
+
+### INV-53
+
+Rule:
+
+- A representative cannot operate marketplace or evaluation flows while their account is in `PENDING_APPROVAL` state.
+
+Status:
+
+- `Planned`
+
+Planned enforcement:
+
+- middleware or view decorator that intercepts non-public flows
+- application-service preconditions on key write paths
+
+### INV-54
+
+Rule:
+
+- Titularity can only be transferred to an active representative of the same organization.
+
+Status:
+
+- `Planned`
+
+Planned enforcement:
+
+- application-service validation in the transfer use case
+- model-level check on the transfer operation
+
+### INV-55
+
+Rule:
+
+- A representative whose verified email has not been confirmed cannot operate any non-public flow.
+
+Status:
+
+- `Planned`
+
+Owning ADR:
+
+- `docs/adr/0008-pilot-launch-posture.md`
+
+Planned enforcement:
+
+- email-verification token model
+- middleware or view decorator that gates non-public flows on verification status
+
+### INV-56
+
+Rule:
+
+- An attachment uploaded to a `Desafío` or to an `Application` must declare a MIME type from the allowlist (`application/pdf`, `image/jpeg`, `image/png`) and must not exceed the configured size cap.
+
+Status:
+
+- `Planned`
+
+Owning ADR:
+
+- `docs/adr/0006-attachments-and-markdown-content.md`
+
+Planned enforcement:
+
+- form validators
+- model `clean()` method
+- application-service pre-save check
+
+### INV-57
+
+Rule:
+
+- Attachments uploaded to a `Propuesta` are only accessible to its applicant organization, to the designated evaluation team of the parent challenge, and to the publisher organization after `AWARDED`.
+
+Status:
+
+- `Planned`
+
+Planned enforcement:
+
+- permission-aware download view
+- query-set scoping in evaluation read models
+
+### INV-58
+
+Rule:
+
+- Filenames presented to evaluators in publisher-facing or evaluation-facing flows must not reveal the applicant identity until adjudication.
+
+Status:
+
+- `Planned`
+
+Planned enforcement:
+
+- normalized filename rendering through blind-reference utilities
+- evaluation read models drop or replace original filenames in the blind window
+
+### INV-59
+
+Rule:
+
+- Markdown rendered from user-supplied content must be sanitized server-side, rejecting scripts, iframes, inline styles and embedded images-by-markdown.
+
+Status:
+
+- `Planned`
+
+Planned enforcement:
+
+- centralized rendering helper using `markdown` + `bleach`
+- single allowlist constant; templates do not call `mark_safe` on user content directly
+
+### INV-60
+
+Rule:
+
+- A published `Desafío` must reference at least one `Categoría de desafío` from the active catalog.
+
+Status:
+
+- `Planned`
+
+Owning ADR:
+
+- `docs/adr/0007-closed-challenge-taxonomy.md`
+
+Planned enforcement:
+
+- form validation in the publication flow
+- application-service pre-publish check
+
+### INV-61
+
+Rule:
+
+- A `Categoría de desafío` referenced by at least one challenge cannot be hard-deleted; it can only be deactivated.
+
+Status:
+
+- `Planned`
+
+Planned enforcement:
+
+- soft-delete pattern through `is_active`
+- admin form custom validation
+
+### INV-62
+
+Rule:
+
+- Signup cannot complete without explicit acceptance of the current versions of T&C and Política de Tratamiento de Datos.
+
+Status:
+
+- `Planned`
+
+Owning ADR:
+
+- `docs/adr/0008-pilot-launch-posture.md`
+
+Planned enforcement:
+
+- form-level required checkbox
+- registration application service records the accepted version identifier
+- model-level constraint linking the user to a non-null acceptance record
+
+### INV-63
+
+Rule:
+
+- Public signup must succeed only if the Cloudflare Turnstile challenge is verified server-side as valid.
+
+Status:
+
+- `Planned`
+
+Owning ADR:
+
+- `docs/adr/0008-pilot-launch-posture.md`
+
+Planned enforcement:
+
+- registration application service performs the server-side verification
+- form fails validation when the token is missing or invalid
+
 ## Near-Term Enforcement Priorities
 
 The next invariants to implement in code should be:
 
-1. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
-2. preserve the implemented draft/submitted proposal lifecycle without leaking drafts into evaluation
-3. deepen evaluation audit and governance beyond the current adjudication controls
+1. close the v1 release scope: implement `INV-50` through `INV-63` in code, tests and persistence as governed by `docs/release_plan_v1.md`
+2. keep `ontology_v4.md`, `glossary.md`, `context_map.md`, and `invariants.md` synchronized per iteration
+3. preserve the implemented draft/submitted proposal lifecycle without leaking drafts into evaluation
+4. defer deeper evaluation audit and governance beyond the v1 release; revisit when the pilot operator declares the move to `DEPLOYMENT_PROFILE=production`
 
 ## Traceability Expectation
 

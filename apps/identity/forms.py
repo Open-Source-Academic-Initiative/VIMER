@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from apps.corporate.avatar_utils import validate_logo_image
@@ -17,6 +18,18 @@ class RegistrationForm(forms.Form):
         required=False,
         label="Logo de la organización (PNG o JPG)",
     )
+    accept_terms = forms.BooleanField(
+        label="Acepto los Términos y Condiciones",
+        required=True,
+    )
+    accept_privacy_policy = forms.BooleanField(
+        label="Acepto la Política de Tratamiento de Datos Personales",
+        required=True,
+    )
+    turnstile_token = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput,
+    )
     
     # User fields
     password = forms.CharField(widget=forms.PasswordInput, label="Contraseña")
@@ -29,8 +42,6 @@ class RegistrationForm(forms.Form):
 
     def clean_tax_id(self):
         tax_id = self.cleaned_data["tax_id"].strip()
-        if Organization.objects.filter(tax_id=tax_id).exists():
-            raise forms.ValidationError("Ya existe una organización registrada con este NIT.")
         return tax_id
 
     def clean_username(self):
@@ -75,6 +86,14 @@ class RegistrationForm(forms.Form):
             except ValidationError as exc:
                 self.add_error("password", exc)
 
+        turnstile_response = (
+            cleaned_data.get("turnstile_token")
+            or self.data.get("cf-turnstile-response", "")
+        )
+        cleaned_data["turnstile_token"] = turnstile_response
+        if settings.TURNSTILE_SITE_KEY and not turnstile_response:
+            self.add_error(None, "Debes completar la verificación anti-spam.")
+
         return cleaned_data
 
     def to_command(self) -> RegisterOrganizationUserCommand:
@@ -90,4 +109,7 @@ class RegistrationForm(forms.Form):
             role=self.cleaned_data["role"],
             contact_phone=self.cleaned_data["contact_phone"],
             logo_upload=self.cleaned_data.get("logo"),
+            accepted_terms=self.cleaned_data["accept_terms"],
+            accepted_privacy_policy=self.cleaned_data["accept_privacy_policy"],
+            turnstile_token=self.cleaned_data.get("turnstile_token", ""),
         )

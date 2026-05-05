@@ -498,6 +498,92 @@ These concepts are part of the ontology even when they are not first-class persi
 - Consequence:
   - physical app boundaries still lag behind the internal tactical split already achieved in code
 
+## Release v1 Extensions
+
+The following concepts are planned for VIMER's first official release. The authoritative scope for v1 is `docs/release_plan_v1.md`, supported by `docs/adr/0004-dual-mode-deployment.md` through `docs/adr/0009-accepted-release-risks.md`. Each concept here carries status `Planned` until it ships in code.
+
+### Representante titular
+
+- Type: organization governance role inside `Identity` and `Corporate`
+- Meaning: representative that holds governance authority over an organization on the platform
+- Status: `Planned`
+- Technical mapping (planned): boolean flag on `identity.User` backed by a database constraint that allows at most one active titular per organization
+- Semantics:
+  - the first registered representative of an organization is automatically the titular
+  - approves or rejects pending join requests for its organization
+  - can transfer titularity to another active representative
+  - is not an evaluation-governance role and is not a market role
+
+### Solicitud de unión a organización
+
+- Status: `Planned`
+- Technical mapping (planned): aggregate `identity.OrganizationJoinRequest`
+- Semantics:
+  - created when a self-registering representative provides a tax identifier already associated with an existing organization
+  - lifecycle states: `PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`
+  - expires automatically after a configurable window (default 14 days)
+  - approval and rejection are reserved to the current titular of the target organization
+
+### Categoría de desafío
+
+- Status: `Planned`
+- Technical mapping (planned): aggregate `marketplace.Category`
+- Semantics:
+  - owned and curated by `Administración de plataforma`
+  - vocabulary is closed: only platform administrators may create, edit, reorder or disable
+  - a published `Desafío` must reference at least one category
+  - used to filter the marketplace listing and to support analytics
+
+### Adjunto de desafío
+
+- Status: `Planned`
+- Technical mapping (planned): aggregate `marketplace.ChallengeAttachment`
+- Semantics:
+  - attached to a `Desafío`
+  - visible to all authenticated representatives once the challenge is published
+  - MIME-allowlisted (PDF/JPG/PNG), size capped per file, filenames normalized server-side, URLs use opaque identifiers
+
+### Adjunto de propuesta
+
+- Status: `Planned`
+- Technical mapping (planned): aggregate `marketplace.ApplicationAttachment`
+- Semantics:
+  - attached to an `Application`
+  - access restricted to: applicant organization, designated evaluators of the same challenge, designated adjudicator, observers, and publisher organization after `AWARDED`
+  - blind-evaluation rules extend to attachment metadata: filenames presented to evaluators must not leak applicant identity until adjudication
+  - same MIME allowlist, same size cap, same opaque URL strategy as `Adjunto de desafío`
+
+### Aceptación de documentos legales
+
+- Status: `Planned`
+- Technical mapping (planned): record on `identity.User` linking to a versioned T&C and Política de Tratamiento de Datos
+- Semantics:
+  - mandatory at signup; representation cannot register without explicit acceptance
+  - persists the version identifier of each accepted document so future revisions can require re-acceptance
+  - aligned with Habeas Data Ley 1581 de 2012 and Decreto 1377 de 2013 minimum legal posture
+
+### Markdown sanitizado en contenido largo
+
+- Status: `Planned`
+- Semantics:
+  - long-form fields on `Desafío` and on the four mandatory `Propuesta` components accept markdown
+  - markdown is rendered server-side and sanitized through a conservative allowlist that excludes scripts, iframes, inline styles and images-by-markdown
+  - raw HTML in markdown source is escaped, not rendered
+
+### Release v1 — Planned Domain Events
+
+- `RepresentativeJoinRequested`
+- `RepresentativeJoinApproved`
+- `RepresentativeJoinRejected`
+- `RepresentativeJoinExpired`
+- `OrganizationOwnershipTransferred`
+- `LegalDocumentsAccepted`
+
+Consumers (planned):
+
+- `apps/notifications/`: in-app inbox plus email channel for the requesting representative and for the titular
+- audit projection inside `Identity` for titularity transfer and join-request lifecycle
+
 ## Canonical Review Rule
 
 A change should be questioned if it introduces code, documentation, or UI behavior that conflicts with any of the following without an explicit ADR or ontology update:

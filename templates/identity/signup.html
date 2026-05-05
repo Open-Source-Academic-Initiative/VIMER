@@ -5,6 +5,15 @@
 <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
+    {% if turnstile_site_key %}
+        <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+    {% endif %}
+    <p>
+        Al registrarte aceptas los
+        <a href="{% url 'legal-terms' %}" target="_blank" rel="noopener">Términos y Condiciones</a>
+        y la
+        <a href="{% url 'legal-privacy-policy' %}" target="_blank" rel="noopener">Política de Tratamiento de Datos</a>.
+    </p>
     <button type="submit" class="btn btn-primary">Registrarse</button>
 </form>
 <p>¿Ya tienes cuenta? <a href="{% url 'login' %}">Inicia sesión</a></p>

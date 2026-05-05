@@ -4,6 +4,7 @@ from apps.marketplace.application.commands import (
     SaveApplicationDraftCommand,
     SubmitApplicationCommand,
 )
+from apps.marketplace.challenge_forms import MultipleFileField
 
 
 class ApplicationSubmissionForm(forms.Form):
@@ -26,6 +27,10 @@ class ApplicationSubmissionForm(forms.Form):
         widget=forms.Textarea,
         label="Plan de ejecución",
         required=False,
+    )
+    attachments = MultipleFileField(
+        required=False,
+        label="Adjuntos de la propuesta (PDF, JPG o PNG)",
     )
 
     def __init__(self, *args, submission_intent: str = "submit", **kwargs):
@@ -56,6 +61,7 @@ class ApplicationSubmissionForm(forms.Form):
             proposed_solution=self.cleaned_data["proposed_solution"],
             capabilities_evidence=self.cleaned_data["capabilities_evidence"],
             execution_plan=self.cleaned_data["execution_plan"],
+            attachments=tuple(self.cleaned_data.get("attachments") or ()),
         )
 
     def to_command(self) -> SubmitApplicationCommand:
@@ -64,4 +70,5 @@ class ApplicationSubmissionForm(forms.Form):
             proposed_solution=self.cleaned_data["proposed_solution"],
             capabilities_evidence=self.cleaned_data["capabilities_evidence"],
             execution_plan=self.cleaned_data["execution_plan"],
+            attachments=tuple(self.cleaned_data.get("attachments") or ()),
         )

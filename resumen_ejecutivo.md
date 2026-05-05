@@ -1,11 +1,13 @@
 # Resumen Ejecutivo - VIMER
 
-Fecha: 2026-03-26
-Rama de trabajo: `baseline-iteration`
+Fecha: 2026-05-05
+Rama de trabajo: `main`
 
 ## Estado general
 
 VIMER ya no esta solo en una baseline funcional de Django. En la iteracion actual se consolido una base de dominio mucho mas explicita, se reforzo el flujo principal del marketplace y se abrio un cierre minimo pero real del ciclo `Desafio -> Propuesta -> Evaluacion -> Adjudicacion`.
+
+Actualizacion 2026-05-05: el proyecto dio un segundo salto relevante. Ademas de la base DDD y del ciclo central ya consolidado, ahora existe una hoja de ruta de release v1 para piloto cerrado y una primera implementacion de capacidades operativas necesarias para ese piloto: onboarding multi-representante, aceptacion legal versionada, verificacion de email, Turnstile configurable, categorias, busqueda/filtros, adjuntos, markdown sanitizado, dashboard administrativo minimo y perfiles de despliegue `pilot`/`production`.
 
 La fotografia correcta hoy es esta:
 
@@ -41,7 +43,27 @@ La fotografia correcta hoy es esta:
 - El proyecto ya adopta capacidades concretas de Django 6.0 en el runtime real: `STORAGES`, `ContentSecurityPolicyMiddleware`, `SECURE_CSP`, `ASGI_APPLICATION`, `check --deploy` y serving con `gunicorn`.
 - La alineacion con Django 6.0 no es total todavia: la CSP sigue permitiendo inline script/style por compatibilidad con templates actuales, y ni template partials ni el Tasks framework se usan aun en VIMER.
 - El proceso de evaluacion ya no depende de permisos implicitos por pertenecer a la organizacion publicadora: ahora existe un equipo formal con evaluadores designados, un adjudicador designado y observadores.
-- El proyecto sigue sin estar listo para produccion.
+- `Identity` ya soporta multiples representantes por organizacion, representante titular, solicitudes de union, aprobacion/rechazo por titular, expiracion de solicitudes, transferencia de titularidad, verificacion de correo y aceptacion versionada de terminos/politica.
+- `Marketplace` ya soporta taxonomia cerrada de categorias, busqueda y filtros, adjuntos PDF/JPG/PNG en desafios y propuestas, y markdown sanitizado en contenido largo.
+- La operacion ya distingue perfiles `pilot` y `production` mediante `DEPLOYMENT_PROFILE`; el perfil production pasa `manage.py check --deploy` cuando se proveen variables requeridas.
+- Ya existe un dashboard minimo de administracion de plataforma en `/admin/dashboard/`.
+- El proyecto sigue sin estar listo para produccion general, pero ya tiene una postura concreta para piloto cerrado.
+
+## Cambios y acciones de esta sesion
+
+En la sesion 2026-05-05 se ejecuto la consolidacion del release v1:
+
+- Se creo `docs/release_plan_v1.md` como plan rector del piloto cerrado.
+- Se agregaron ADRs 0004-0009: despliegue dual, onboarding multi-representante, adjuntos/markdown, taxonomia cerrada, postura de piloto y riesgos aceptados.
+- Se implemento onboarding multi-representante con `OrganizationJoinRequest`, representante titular, aprobacion/rechazo, expiracion por comando y transferencia de titularidad.
+- Se incorporaron verificacion de email, recuperacion de contrasena, aceptacion legal versionada y Turnstile configurable en signup.
+- Se incorporaron categorias de desafio, busqueda y filtros en marketplace.
+- Se implementaron adjuntos y markdown sanitizado para `Desafio` y `Propuesta`.
+- Se agrego dashboard administrativo minimo y paginas publicas legales/FAQ.
+- Se agregaron perfiles de despliegue y compose files separados para piloto y produccion.
+- Se sincronizaron `README.md`, `docs/ddd_work_plan.md`, `docs/domain/*` y los documentos de seguimiento.
+- Se valido el slice focal `apps.identity.tests apps.marketplace.tests apps.notifications.tests`: 62 tests OK.
+- Se valido `DEPLOYMENT_PROFILE=production ... manage.py check --deploy`: sin issues.
 
 ## Cambios principales implementados
 
@@ -110,18 +132,58 @@ Durante esta iteracion local se implemento o consolido lo siguiente:
 - Sincronizacion de documentacion principal con el estado real del codigo.
 - Cierre completo de la separacion tactica minima de `marketplace` sin romper el app fisico.
 - Cierre completo del slice actual de convergencia semantica entre marketplace, evaluation y la documentacion principal.
+- Plan rector v1 y ADRs de release:
+  - `docs/release_plan_v1.md`
+  - `docs/adr/0004-dual-mode-deployment.md`
+  - `docs/adr/0005-multi-representative-onboarding.md`
+  - `docs/adr/0006-attachments-and-markdown-content.md`
+  - `docs/adr/0007-closed-challenge-taxonomy.md`
+  - `docs/adr/0008-pilot-launch-posture.md`
+  - `docs/adr/0009-accepted-release-risks.md`
+- Onboarding multi-representante y gobierno organizacional inicial:
+  - representante titular por organizacion
+  - solicitudes de union con estados `PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`
+  - aprobacion/rechazo por titular
+  - expiracion mediante comando de management
+  - transferencia de titularidad
+- Hardening minimo de signup:
+  - aceptacion versionada de terminos y politica de datos
+  - verificacion de email por token
+  - recuperacion de contrasena
+  - Turnstile configurable
+- Enriquecimiento de contenido y discovery:
+  - categorias cerradas de desafio
+  - seed de categorias
+  - busqueda textual
+  - filtros por categoria y estado
+  - markdown sanitizado con `markdown` y `bleach`
+  - adjuntos para desafio y propuesta con MIME allowlist e identificadores opacos
+- Operacion de piloto:
+  - `DEPLOYMENT_PROFILE`
+  - `docker-compose.pilot.yml`
+  - `docker-compose.production.yml`
+  - dashboard minimo de administracion de plataforma
 
 ## Estado funcional actual
 
 Hoy el sistema ya cubre de forma coherente estos flujos:
 
 - registro unificado de usuario y organizacion
+- registro de nuevos representantes sobre organizaciones existentes mediante solicitud de union
+- aprobacion/rechazo de solicitudes de union por representante titular
+- verificacion de email
+- aceptacion versionada de terminos y politica de datos
 - login y logout
+- recuperacion de contrasena
 - landing publica
 - publicacion de desafios por organizaciones `Solicitante`
+- categorizacion de desafios
+- busqueda y filtros de desafios por texto, categoria y estado
 - postulacion de propuestas por organizaciones `Proveedor tecnologico`
 - guardado de borradores privados y reanudacion del mismo borrador desde la misma ruta de postulacion
 - validacion de duplicados por desafio/aplicante
+- adjuntos controlados en desafios y propuestas
+- markdown sanitizado en descripcion de desafio y componentes de propuesta
 - visualizacion de logos/avatares en marketplace
 - separacion interna clara entre concern de publicacion de desafios y concern de postulacion de propuestas
 - ciclo de vida de desafios con apertura, evaluacion y adjudicacion
@@ -139,12 +201,16 @@ Hoy el sistema ya cubre de forma coherente estos flujos:
 - notificaciones internas disparadas por eventos de evaluacion
 - notificacion al proveedor cuando su propuesta recibe una evaluacion
 - notificaciones al equipo de evaluacion cuando se registra actividad de scoring
+- dashboard minimo de administracion de plataforma con KPIs de piloto
+- paginas publicas base de FAQ, terminos y politica de datos
 
 ## Estado tecnico actual
 
 - `manage.py check`: OK
 - `manage.py test`: OK
 - suite actual validada: 109 tests
+- validacion focal de esta sesion: 62 tests OK en `apps.identity.tests apps.marketplace.tests apps.notifications.tests`
+- `manage.py check --deploy` con `DEPLOYMENT_PROFILE=production`: OK, sin issues
 - benchmark actual de pruebas:
   - secuencial: `56.357s`
   - benchmark historico `--parallel 2`: `32.090s`
@@ -169,6 +235,9 @@ Hoy el sistema ya cubre de forma coherente estos flujos:
   - `apps/evaluation/migrations/0008_awarddecision_best_available_applications_snapshot_and_more.py`
   - `apps/notifications/migrations/0001_initial.py`
   - `apps/notifications/migrations/0002_alter_notification_kind.py`
+  - `apps/identity/migrations/0003_organizationjoinrequest_and_more.py`
+  - `apps/identity/migrations/0004_emailverificationtoken.py`
+  - `apps/marketplace/migrations/0009_challengecategory_applicationattachment_and_more.py`
 - documentacion de dominio disponible en `docs/`
 - servidor de desarrollo: no levantado en este momento
 - base local ya sincronizada con las migraciones actuales
@@ -187,10 +256,18 @@ La iteracion actual incluye, entre otros:
 - `apps/marketplace/application_forms.py`
 - `apps/marketplace/challenge_views.py`
 - `apps/marketplace/application_views.py`
+- `apps/marketplace/content.py`
+- `apps/marketplace/management/commands/seed_categories.py`
+- `apps/identity/management/commands/expire_join_requests.py`
 - `apps/evaluation/`
 - `apps/notifications/`
+- `config/admin_views.py`
+- `config/context_processors.py`
+- `docker-compose.pilot.yml`
+- `docker-compose.production.yml`
 - migraciones nuevas de `marketplace`, `evaluation` y `notifications`
 - templates nuevas para evaluacion y notificaciones
+- templates nuevas de legal, ayuda, verificacion de email, recuperacion de contrasena y solicitudes de union
 - sincronizacion de `README.md`, `status_de_desarrollo.md` y este resumen ejecutivo
 - `Makefile` con flujo de validacion rapida
 
@@ -199,8 +276,10 @@ La iteracion actual incluye, entre otros:
 Aunque el salto de calidad fue importante, todavia hay limites claros:
 
 - el proyecto sigue en perfil de desarrollo
-- no existe aun un endurecimiento serio de despliegue/produccion
+- ya existe perfil `pilot`/`production`, pero falta ejecutar despliegue real y smoke test en VPS
 - SQLite sigue siendo la base por defecto
+- Turnstile y SMTP dependen de credenciales reales de entorno; la validacion local no prueba integracion externa real
+- los adjuntos usan filesystem local; la estrategia de backup sigue aceptada como riesgo para piloto
 - aunque los eventos ya son mas utiles, la estrategia sigue concentrada sobre `Evaluation`
 - ya existe evaluacion ciega en los flujos publisher-facing de evaluacion y adjudicacion
 - ya existe un modelo de multiples evaluadores por criterio, con una evaluacion vigente por `(propuesta, criterio, evaluador)`
@@ -241,9 +320,12 @@ El siguiente bloque natural de implementacion deberia ir por uno de estos camino
    - mas notificaciones
    - auditoria
    - timeline mas rico
-3. endurecimiento operativo:
-   - despliegue
-   - seguridad
-   - configuracion productiva
+3. cierre operativo del piloto v1:
+   - VPS
+   - TLS
+   - SMTP real
+   - Turnstile real
+   - smoke test
+   - monitoreo externo
 
-La recomendacion actual es continuar primero por `Evaluation`, y el siguiente faltante funcional real ya no es la separacion tactica minima de `marketplace`, el ranking, la trazabilidad basica, los roles formales, la evaluacion ciega ni la politica de scoring. El siguiente faltante real pasa a ser mejor gobierno de decisiones, auditoria mas rica y la definicion de si algun dia el producto necesitara ponderacion distinta entre criterios.
+La recomendacion actual cambia por prioridad de release: antes de profundizar `Evaluation`, conviene cerrar la validacion operativa del piloto v1. El faltante inmediato ya no es descubrir nuevas reglas de dominio, sino comprobar que el flujo completo opera con infraestructura, email, Turnstile, documentos legales y adjuntos bajo condiciones reales.

@@ -1,5 +1,7 @@
 from django.urls import reverse
 from django.dispatch import receiver
+from django.conf import settings
+from django.core.mail import send_mail
 
 from apps.evaluation.domain.events import (
     ApplicationEvaluationRecorded,
@@ -20,6 +22,16 @@ from apps.notifications.models import Notification
 
 def _build_challenge_link(challenge_id: int) -> str:
     return reverse("marketplace:challenge-detail", args=[challenge_id])
+
+
+def _send_notification_email(notification: Notification) -> None:
+    send_mail(
+        subject=notification.title,
+        message=f"{notification.body}\n\nEnlace: {notification.link}",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[notification.recipient.email],
+        fail_silently=True,
+    )
 
 
 @receiver(
@@ -55,6 +67,8 @@ def create_notifications_for_evaluation_started(sender, *, event, **kwargs):
         for recipient in recipients
     ]
     Notification.objects.bulk_create(notifications)
+    for notification in notifications:
+        _send_notification_email(notification)
 
 
 @receiver(
@@ -118,6 +132,8 @@ def create_notifications_for_challenge_awarded(sender, *, event, **kwargs):
 
     if notifications:
         Notification.objects.bulk_create(notifications)
+        for notification in notifications:
+            _send_notification_email(notification)
 
 
 @receiver(
@@ -184,3 +200,5 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
             )
     if notifications:
         Notification.objects.bulk_create(notifications)
+        for notification in notifications:
+            _send_notification_email(notification)

@@ -270,3 +270,65 @@ Long term:
 2. Deepen `Notifications` and audit consumers around evaluation events.
 3. Deepen evaluation governance and audit now that the approved equal-weight scoring and tie-aware adjudication policy is implemented.
 4. Revisit technical names later, once behavior stabilizes.
+
+## Release v1 Context Extensions
+
+The first official release (`docs/release_plan_v1.md`) extends the responsibilities of three existing contexts and introduces no new bounded context. The bounded-context inventory of the platform stays the same.
+
+### Identity (extended)
+
+New responsibilities planned for v1:
+
+- onboarding of additional representatives into an existing organization through self-association by tax identifier
+- governance of `Solicitud de unión a organización` aggregates with explicit lifecycle (`PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`) and titular-only approval authority
+- governance of titularity, including its transfer between active representatives of the same organization
+- email verification of new representatives before they can operate
+- recording of accepted versions of T&C and Política de Tratamiento at signup
+
+New domain events emitted:
+
+- `RepresentativeJoinRequested`
+- `RepresentativeJoinApproved`
+- `RepresentativeJoinRejected`
+- `RepresentativeJoinExpired`
+- `OrganizationOwnershipTransferred`
+- `LegalDocumentsAccepted`
+
+### Marketplace (extended)
+
+New responsibilities planned for v1:
+
+- closed taxonomy of `Categorías de desafío`, owned by `Administración de plataforma`
+- challenge association to one or more categorías as a publication requirement
+- search-by-text and filter-by-category exposed in the marketplace listing
+- attachments on `Desafío` and on `Application`
+- markdown rendering and sanitization of long-form content on both sides
+
+### Notifications (extended)
+
+New responsibilities planned for v1:
+
+- consumption of identity events for in-app inbox entries (join request lifecycle, titularity transfer)
+- email-channel projection of critical evaluation notifications and identity events through the operator's Gmail SMTP relay
+- email-channel projection of password reset and email verification flows
+
+### Integration additions
+
+#### Identity -> Notifications
+
+- identity emits join-request and titularity-transfer events; notifications consumes them for in-app inbox and email projection.
+
+#### Identity -> Marketplace and Evaluation (preconditions)
+
+- pending-approval and unverified-email accounts are blocked at the application-service boundary; this is enforced by `Identity` and respected by all downstream contexts.
+
+#### Marketplace -> Administración de plataforma
+
+- category catalog management is exposed exclusively through Django Admin; the marketplace context consumes the catalog read-only at challenge publication time.
+
+### What v1 does not change
+
+- the existing bounded-context boundaries are not redrawn
+- `apps/marketplace/` remains a single physical Django app with its current internal split between `Challenge` and `Application` concerns
+- `Evaluation` and the approved equal-weight scoring policy remain unchanged
+- post-adjudication, VIMER stays a matchmaker; no new context is introduced for contract handoff

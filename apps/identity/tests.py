@@ -20,6 +20,7 @@ from apps.identity.application.exceptions import (
     RegistrationValidationError,
 )
 from apps.identity.application.services import register_organization_user
+from apps.identity.models import OrganizationJoinRequest
 
 
 class MediaRootIsolatedTestCase(TestCase):
@@ -81,6 +82,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3001234567",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 
@@ -106,6 +109,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3001234568",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
                 "logo": self.make_test_image(
                     image_format="JPEG",
                     filename="custom-logo.jpg",
@@ -139,6 +144,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3001234569",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
                 "logo": invalid_logo,
             },
         )
@@ -172,7 +179,7 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
 
         self.assertIn("Solo se permiten imagenes PNG o JPG.", captured.exception.message_dict["logo"])
 
-    def test_signup_rejects_duplicate_tax_id_as_form_error(self):
+    def test_signup_existing_tax_id_creates_pending_join_request(self):
         self.client.post(
             reverse("signup"),
             {
@@ -187,6 +194,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3000000000",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 
@@ -204,14 +213,23 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3111111111",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFormError(
-            response.context["form"],
-            "tax_id",
-            "Ya existe una organización registrada con este NIT.",
+        self.assertRedirects(response, reverse("login"))
+        first_user = get_user_model().objects.get(username="first_user")
+        second_user = get_user_model().objects.get(username="second_user")
+        self.assertEqual(second_user.organization, first_user.organization)
+        self.assertEqual(second_user.status, get_user_model().AccountStatus.PENDING_APPROVAL)
+        self.assertFalse(second_user.is_organization_titular)
+        self.assertTrue(
+            OrganizationJoinRequest.objects.filter(
+                organization=first_user.organization,
+                requester=second_user,
+                status=OrganizationJoinRequest.Status.PENDING,
+            ).exists()
         )
 
     def test_signup_rejects_duplicate_username_as_form_error(self):
@@ -244,6 +262,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3007770002",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 
@@ -284,6 +304,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3008880002",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 
@@ -324,6 +346,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3008890002",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 
@@ -349,6 +373,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3222222222",
                 "password": "123",
                 "confirm_password": "123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 
@@ -388,6 +414,8 @@ class RegistrationFlowTests(MediaRootIsolatedTestCase):
                 "contact_phone": "3009999999",
                 "password": "ClaveSegura123",
                 "confirm_password": "ClaveSegura123",
+                "accept_terms": "on",
+                "accept_privacy_policy": "on",
             },
         )
 

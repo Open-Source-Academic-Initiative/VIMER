@@ -1,14 +1,41 @@
 from django.contrib import admin, messages
 from django.contrib.admin.actions import delete_selected
 from django.contrib.auth.admin import UserAdmin
-from .models import User
+from .models import EmailVerificationToken, OrganizationJoinRequest, User
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
-    list_display = ('username', 'email', 'organization', 'is_staff')
-    list_filter = ('organization__role', 'is_staff', 'is_superuser')
+    list_display = (
+        'username',
+        'email',
+        'organization',
+        'status',
+        'is_organization_titular',
+        'is_email_verified',
+        'is_staff',
+    )
+    list_filter = (
+        'organization__role',
+        'status',
+        'is_organization_titular',
+        'is_email_verified',
+        'is_staff',
+        'is_superuser',
+    )
     fieldsets = UserAdmin.fieldsets + (
-        ('Información de Organización', {'fields': ('organization',)}),
+        (
+            'Información de Organización',
+            {
+                'fields': (
+                    'organization',
+                    'status',
+                    'is_organization_titular',
+                    'is_email_verified',
+                    'accepted_terms_version',
+                    'accepted_privacy_policy_version',
+                )
+            },
+        ),
     )
     actions = ('delete_selected_preserving_self',)
 
@@ -43,3 +70,29 @@ class CustomUserAdmin(UserAdmin):
         ):
             return False
         return super().has_delete_permission(request, obj=obj)
+
+
+@admin.register(OrganizationJoinRequest)
+class OrganizationJoinRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        'organization',
+        'requester',
+        'status',
+        'decided_by',
+        'expires_at',
+        'created_at',
+    )
+    list_filter = ('status', 'organization__role')
+    search_fields = (
+        'organization__business_name',
+        'requester__username',
+        'requester__email',
+    )
+    readonly_fields = ('created_at',)
+
+
+@admin.register(EmailVerificationToken)
+class EmailVerificationTokenAdmin(admin.ModelAdmin):
+    list_display = ('user', 'expires_at', 'used_at', 'created_at')
+    search_fields = ('user__username', 'user__email', 'token')
+    readonly_fields = ('token', 'created_at')
