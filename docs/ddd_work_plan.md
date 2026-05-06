@@ -420,3 +420,55 @@ The safest and highest-leverage path now is:
 - rename technical legacy concepts only when the model is already stable
 
 This keeps the current baseline useful while moving VIMER from "working MVP with explicit domain architecture" toward "working MVP with tighter semantic, tactical, and operational discipline".
+
+## Release v1 — Pilot Launch (Active Iteration)
+
+The current active iteration of VIMER is the first official release as a controlled pilot. Its authoritative scope lives in `docs/release_plan_v1.md` and is governed by ADRs 0004 through 0009 in `docs/adr/`.
+
+This iteration overrides "Recommended Execution Order" above for the duration of the release work. Once the release ships, the work plan returns to the long-term direction.
+
+### Goal of v1
+
+Take VIMER from "working MVP with explicit domain architecture" to "controlled pilot in operation under production-grade flows", without rewriting the existing domain or bounded contexts.
+
+### Workstreams of v1
+
+The release is sliced into seven workstreams. The same slicing is detailed in `docs/release_plan_v1.md` section 8.
+
+1. Domain foundations — new aggregates and migrations for `Representante titular`, `Solicitud de unión a organización`, `Categoría de desafío`, attachments and document acceptance.
+2. Application services and write flows — onboarding, titularity transfer, categorización, attachments upload/download, markdown sanitization.
+3. Read views, templates and discovery — multi-representative views, marketplace search and filters, Bootstrap 5 integration.
+4. Identity hardening for public signup — Cloudflare Turnstile, password reset, email verification, T&C and Política checkboxes, email duplication of critical notifications.
+5. Legal and content artifacts — T&C v1, Política de Tratamiento v1, FAQ, catálogo inicial de categorías.
+6. Operational — `DEPLOYMENT_PROFILE`, dual-mode docker compose files, smoke test, deploy runbook, platform administration dashboard.
+7. Governance and traceability — synchronize the domain corpus with the new concepts and invariants.
+
+### Out of scope for v1 (postponed)
+
+- billing, payments, plans, electronic invoicing
+- multi-jurisdiction or RGPD compliance
+- KYC or organization verification beyond email of representative
+- advanced evaluation governance (reapertura, apelación, recusación)
+- formal WCAG commitment beyond responsive layout
+- in-product mensajería between Solicitante and Proveedor after `AWARDED`
+- object storage for attachments
+- Sentry, APM or analytics beyond minimal admin dashboard
+- user-defined tags on challenges
+
+### Accepted risks for v1
+
+Documented in `docs/adr/0009-accepted-release-risks.md`:
+
+- no formal backup of pilot data
+- manual identity recovery only
+- email transaction limited by Gmail SMTP send-rate ceiling
+
+### After v1
+
+Once v1 ships and the operator declares the move to `DEPLOYMENT_PROFILE=production`, the next iterations should target:
+
+- close the risks accepted in ADR 0009 (production-grade backup pipeline, in-product password reset and email change)
+- deepen evaluation governance (reapertura, apelación, recusación)
+- migrate transactional email to a dedicated provider when the Gmail ceiling is approached
+- evaluate user-defined tags as an additive layer on top of the closed taxonomy
+- revisit technical legacy names (`Challenge`, `Application`) for migration when behavior is stable

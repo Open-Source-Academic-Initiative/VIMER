@@ -72,6 +72,15 @@ Versioned domain references:
 - `docs/project_diagrams.md`: current functional-flow and architecture diagrams
 - `docs/testing_strategy.md`: current automated-validation and test-optimization guidance
 
+Release-level governance:
+- `docs/release_plan_v1.md`: rector plan for VIMER's first official release as a controlled pilot
+- `docs/adr/0004-dual-mode-deployment.md`: dual-mode pilot/production deployment
+- `docs/adr/0005-multi-representative-onboarding.md`: multi-representative onboarding with delegable titularity
+- `docs/adr/0006-attachments-and-markdown-content.md`: attachments and sanitized markdown
+- `docs/adr/0007-closed-challenge-taxonomy.md`: closed taxonomy for challenge categorization
+- `docs/adr/0008-pilot-launch-posture.md`: jurisdiction, monetization and support posture
+- `docs/adr/0009-accepted-release-risks.md`: explicitly accepted release risks
+
 ## Architecture
 
 The project follows a simple app-based split:
@@ -364,3 +373,19 @@ The previous full-suite baseline before the optimization pass was `396.022s`. Th
 - Define a persistence and deployment strategy beyond SQLite.
 - Evaluate Django 6.0 template partials or the Tasks framework only if a concrete product flow justifies adopting them.
 - Deepen evaluation audit and governance now that the approved scoring and adjudication policy is implemented.
+
+## Release v1 — Pilot Launch
+
+VIMER's first official release is scoped as a controlled pilot. The full plan, decisions, slices, accepted risks and Definition of Release live in `docs/release_plan_v1.md`. The decisions are codified in ADRs 0004 through 0009 in `docs/adr/`.
+
+Posture in one paragraph:
+
+- closed pilot with public-grade self-service signup, URL distributed externally to participants only
+- jurisdiction Colombia, Habeas Data minimum legal at signup, free of charge
+- VPS+Docker dual-mode deployment: pilot (`gunicorn`+SQLite) and production (Nginx+gunicorn+Postgres/MariaDB) selectable through `DEPLOYMENT_PROFILE`
+- multi-representative onboarding with delegable titularity, email verification, password reset and Cloudflare Turnstile in signup
+- attachments and sanitized markdown in `Desafío` and `Propuesta`, closed taxonomy of categorías, search and filters in the marketplace
+- minimal `Administración de plataforma` dashboard, single support email, FAQ
+- VIMER stays a matchmaker; the cycle closes at `AWARDED`
+
+Key follow-up work outside the release scope is described in `docs/release_plan_v1.md` section 9 and in ADR 0009.

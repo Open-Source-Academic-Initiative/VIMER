@@ -1,7 +1,7 @@
 # Status de Desarrollo - VIMER
 
-Fecha de corte: 2026-03-26
-Rama analizada: `baseline-iteration`
+Fecha de corte: 2026-05-05
+Rama analizada: `main`
 
 ## 1. Alcance del analisis
 
@@ -49,14 +49,37 @@ El estado general puede resumirse asi:
 - La alineacion con Django 6.0 sigue siendo parcial en seguridad avanzada: la CSP todavia permite inline script/style por compatibilidad con templates existentes, y las capacidades nuevas de template partials y Tasks framework no se usan aun porque el producto todavia no las necesita.
 - La estrategia de serving en contenedores ya no depende de `runserver`; ahora usa `gunicorn`.
 - El proceso de evaluacion ya no depende solo de pertenecer a la organizacion publicadora: ahora existe un equipo formal con evaluadores designados, un adjudicador designado y observadores.
+- La sesion actual movio el proyecto desde "MVP con arquitectura explicita" hacia un release v1 de piloto cerrado: existe `docs/release_plan_v1.md`, ADRs 0004-0009, perfiles `pilot`/`production`, compose files diferenciados y una primera implementacion de los flujos v1 mas criticos.
+- `Identity` ya soporta onboarding multi-representante con representante titular, solicitudes de union a organizacion, aprobacion/rechazo por titular, expiracion por comando, transferencia de titularidad, verificacion de correo, aceptacion versionada de documentos legales y Turnstile configurable.
+- `Marketplace` ya soporta categorias cerradas, busqueda/filtros en el listado, markdown sanitizado en contenido largo y adjuntos PDF/JPG/PNG para desafios y propuestas mediante identificadores opacos y vistas de descarga con permisos.
+- Ya existe un dashboard minimo de administracion de plataforma en `/admin/dashboard/` con KPIs de piloto.
+- Ya existen paginas publicas base de ayuda/legal y enlaces de soporte en la UI.
+- `DEPLOYMENT_PROFILE=production` valida con `manage.py check --deploy` sin issues cuando se proveen las variables requeridas.
 - El proyecto ya no depende solo de DDD implicito en el codigo: ahora existe un corpus versionado con context map, lenguaje ubicuo, inventario de invariantes y una ontologia canonica v4 con entidades, actores, roles, permisos, estados, eventos e invariantes.
-- El proyecto no esta listo para produccion todavia.
+- El proyecto no esta listo para produccion general todavia, pero ya tiene una postura de piloto cerrado mucho mas concreta.
+
+## 2.1 Cambios y acciones ejecutadas en la sesion 2026-05-05
+
+Durante esta sesion se consolidaron cambios de producto, arquitectura, operacion y documentacion orientados al primer release controlado:
+
+- Se creo `docs/release_plan_v1.md` como plan rector del piloto cerrado v1.
+- Se agregaron ADRs 0004-0009 para despliegue dual, onboarding multi-representante, adjuntos/markdown, taxonomia cerrada, postura de piloto y riesgos aceptados.
+- Se extendio `Identity` con `OrganizationJoinRequest`, estados de cuenta, titularidad de organizacion, verificacion de email, aceptacion legal versionada, Turnstile configurable y vistas para aprobar/rechazar solicitudes de union.
+- Se agrego el comando `expire_join_requests` para expirar solicitudes pendientes.
+- Se extendio `Marketplace` con `ChallengeCategory`, `ChallengeAttachment`, `ApplicationAttachment`, markdown sanitizado con `markdown`/`bleach`, busqueda por texto, filtros por categoria/estado y comando `seed_categories`.
+- Se agregaron permisos de descarga para adjuntos de desafio y propuesta, respetando el flujo de evaluacion ciega donde aplica.
+- Se agregaron plantillas legales, FAQ, paginas de recuperacion de contrasena, verificacion de correo y administracion de solicitudes de union.
+- Se agrego `config/admin_views.py` con dashboard minimo de administracion de plataforma y ruta `/admin/dashboard/`.
+- Se introdujo `DEPLOYMENT_PROFILE` en settings, junto con `docker-compose.pilot.yml`, `docker-compose.production.yml` y artefactos base bajo `deploy/`.
+- Se actualizaron `README.md`, `docs/ddd_work_plan.md`, `docs/domain/context_map.md`, `docs/domain/glossary.md`, `docs/domain/invariants.md` y `docs/domain/ontology_v4.md` para reflejar el alcance v1.
+- Se ejecuto validacion focal: `READ_DOT_ENV_FILE=False SECRET_KEY=dev-secret-key ./.venv/bin/python manage.py test apps.identity.tests apps.marketplace.tests apps.notifications.tests` con 62 tests OK.
+- Se ejecuto validacion de despliegue: `DEPLOYMENT_PROFILE=production DATABASE_URL=sqlite:////tmp/vimer-check.sqlite3 ... manage.py check --deploy` sin issues.
 
 ## 3. Grado de cumplimiento de requerimientos iniciales
 
 ### 3.1 Requerimiento: registro de usuario y organizacion
 
-Estado: Cumplido
+Estado: Cumplido y ampliado para piloto v1
 
 Evidencia:
 
@@ -66,21 +89,29 @@ Evidencia:
 - Si no se sube imagen, el sistema genera automaticamente un avatar procedural basico en PNG.
 - La unicidad del NIT se valida.
 - La contrasena se valida con el sistema de validadores de Django.
+- Si el NIT ya existe, el nuevo usuario no crea una organizacion duplicada; queda como representante pendiente y se crea una solicitud de union a la organizacion existente.
+- El primer usuario de una organizacion queda como representante titular.
+- El registro persiste aceptacion de terminos y politica de datos por version.
+- El registro puede exigir Turnstile si se configura `TURNSTILE_SECRET_KEY`.
+- El registro dispara token de verificacion de email.
 
 Valoracion:
 
 - El requerimiento principal esta resuelto.
 - La implementacion ya no persiste directamente desde la vista; delega en un servicio de aplicacion.
+- El flujo ya cubre una necesidad operativa real del piloto: multiples representantes por organizacion sin compartir credenciales.
 
 ### 3.2 Requerimiento: autenticacion basica
 
-Estado: Cumplido
+Estado: Cumplido y ampliado
 
 Evidencia:
 
 - Existe login y logout.
 - El logout se maneja por `POST`, lo cual corrige el comportamiento previo menos seguro basado en `GET`.
 - El marketplace exige autenticacion.
+- Existen vistas y plantillas para recuperacion de contrasena.
+- Existe verificacion de email mediante token.
 
 Valoracion:
 
@@ -88,13 +119,15 @@ Valoracion:
 
 ### 3.3 Requerimiento: gestion de roles de negocio
 
-Estado: Cumplido con observaciones
+Estado: Cumplido con observaciones y gobierno organizacional inicial
 
 Evidencia:
 
 - El modelo `Organization` define dos roles persistidos: `DEMAND_SIDE` y `SUPPLY_SIDE`.
 - La semantica visible al usuario se presenta como `Solicitante` y `Proveedor tecnologico`.
 - La navegacion y los permisos de publicacion/postulacion dependen del rol.
+- El modelo `User` ahora distingue estado de cuenta, correo verificado y representante titular.
+- La aprobacion/rechazo de nuevas solicitudes de union queda restringida al representante titular activo.
 
 Observaciones:
 
@@ -118,13 +151,16 @@ Valoracion:
 
 ### 3.5 Requerimiento: consulta de desafios y detalle
 
-Estado: Cumplido
+Estado: Cumplido y ampliado
 
 Evidencia:
 
 - Existe listado autenticado de desafios.
 - Existe vista detalle con descripcion completa.
 - La UI ya permite revisar desafios como usuario autenticado segun rol.
+- El listado ya permite busqueda textual y filtros por categoria y estado.
+- Los desafios ya pueden clasificarse por una taxonomia cerrada de categorias activas.
+- La descripcion puede renderizar markdown sanitizado.
 
 Valoracion:
 
@@ -132,7 +168,7 @@ Valoracion:
 
 ### 3.6 Requerimiento: postulacion de propuestas por proveedores tecnologicos
 
-Estado: Cumplido
+Estado: Cumplido y ampliado
 
 Evidencia:
 
@@ -142,6 +178,8 @@ Evidencia:
 - La misma ruta de postulacion ya permite guardar borrador o enviar propuesta final.
 - Si existe un borrador previo, la misma ruta lo reabre y lo actualiza.
 - Los borradores permanecen privados y no entran en evaluacion ni en vistas publisher-facing hasta el envio final.
+- Las propuestas ya pueden incluir adjuntos controlados.
+- Los cuatro componentes largos de propuesta ya pueden renderizar markdown sanitizado.
 
 Valoracion:
 
@@ -190,33 +228,39 @@ Valoracion:
 
 ### 3.9 Requerimiento: contenedorizacion basica
 
-Estado: Parcialmente cumplido
+Estado: Cumplido para piloto, parcial para produccion general
 
 Evidencia:
 
 - Existen `Dockerfile` y `docker-compose.yml`.
 - La aplicacion puede levantarse en modo desarrollo.
+- Existen `docker-compose.pilot.yml` y `docker-compose.production.yml`.
+- `DEPLOYMENT_PROFILE` permite defaults coherentes para `pilot` y `production`.
 
 Limitacion:
 
-- Aunque el stack sigue siendo de desarrollo, el serving en contenedores ya no usa `runserver`; ahora usa `gunicorn`.
+- La topologia de produccion esta definida, pero aun requiere validacion operativa real en VPS, TLS, monitoreo externo y datos reales de entorno.
 
 ## 4. Requerimientos no cumplidos o solo parcialmente cubiertos
 
 ### 4.1 Produccion y endurecimiento operativo
 
-Estado: Parcial
+Estado: Parcial, con postura v1 definida
 
 Situacion actual:
 
 - Existen settings orientados a seguridad para entornos no `DEBUG`.
 - Se puede exigir `SECRET_KEY` y activar cookies seguras, HSTS y redireccion HTTPS.
+- `DEPLOYMENT_PROFILE=production` exige `DATABASE_URL` y activa defaults seguros cuando `DEBUG=False`.
+- `manage.py check --deploy` valida sin issues con perfil production y variables minimas requeridas.
+- Existen compose files separados para piloto y produccion.
 
 Brechas:
 
 - El despliegue real no esta cerrado.
-- Aunque ya existe `gunicorn` como servidor de aplicacion en contenedores, no hay stack de produccion consolidado.
+- Aunque ya existe `gunicorn` como servidor de aplicacion en contenedores y compose file de produccion, no hay despliegue productivo real validado.
 - No hay pipeline operativo visible en el repo.
+- Falta ejecutar y documentar una prueba real de despliegue sobre VPS.
 
 ### 4.2 Cobertura de pruebas
 
@@ -227,6 +271,7 @@ Situacion actual:
 - La suite automatizada pasa completamente con 109 pruebas.
 - Hay cobertura de registro, validacion de NIT, contrasenas debiles, logout, landing page, publicacion/postulacion basica, errores de duplicado/rol, validacion de imagenes PNG/JPG, generacion procedural de avatar/logo, renderizado del logo en publicaciones del marketplace y proteccion del superusuario frente a autoeliminacion en admin.
 - Ya hay cobertura adicional sobre scoring igualitario por criterio, ranking competitivo con empates compactos, bloqueo de adjudicacion por propuestas incompletas, adjudicacion excepcional auditada, snapshot enriquecido de adjudicacion, eventos de evaluacion por propuesta y notificaciones al proveedor evaluado.
+- En esta sesion se valido el slice focal `apps.identity.tests apps.marketplace.tests apps.notifications.tests`: 62 tests OK en 52.609s.
 
 Brechas:
 
@@ -256,11 +301,19 @@ Situacion actual:
 - Existe un `README.md` bastante completo y sincronizado con el estado actual de la iteracion local.
 - Los documentos locales de apoyo tambien fueron actualizados para reflejar el conteo real de pruebas y el alcance actual del superusuario.
 - `status_de_desarrollo.md` y `resumen_ejecutivo.md` ya forman parte del repositorio versionado y no deben tratarse como notas ignoradas del workspace.
-- Durante esta sesion se construyeron y consolidaron artefactos de modelado de dominio mas fuertes:
+- Durante sesiones previas se construyeron y consolidaron artefactos de modelado de dominio mas fuertes:
   - `docs/domain/ontology_v4.md` como ontologia canonica;
   - `docs/domain/glossary.md` como lenguaje ubicuo preferido;
   - `docs/domain/context_map.md` como mapa de bounded contexts;
   - `docs/domain/invariants.md` como inventario trazable de reglas.
+- Durante esta sesion se agregaron artefactos rectores especificos para release v1:
+  - `docs/release_plan_v1.md`;
+  - `docs/adr/0004-dual-mode-deployment.md`;
+  - `docs/adr/0005-multi-representative-onboarding.md`;
+  - `docs/adr/0006-attachments-and-markdown-content.md`;
+  - `docs/adr/0007-closed-challenge-taxonomy.md`;
+  - `docs/adr/0008-pilot-launch-posture.md`;
+  - `docs/adr/0009-accepted-release-risks.md`.
 
 Brechas:
 
@@ -412,6 +465,7 @@ Descripcion:
   - invariantes;
   - relaciones semanticas.
 - Ya no se mezclan de forma ambigua conceptos como actor humano, rol de mercado, rol en contexto, permiso y mecanismo tecnico.
+- En la sesion actual se extendio la ontologia y el inventario de invariantes con conceptos de release v1: representante titular, solicitud de union, aceptacion legal, categorias, adjuntos, markdown sanitizado, Turnstile y postura de piloto.
 - Se asignaron cardinalidades a relaciones clave del dominio, por ejemplo:
   - una `Organizacion` adopta exactamente un rol de mercado;
   - un `Proveedor tecnologico` envia como maximo una `Propuesta` por `Desafio`;
@@ -444,8 +498,8 @@ Aplicada: Si
 
 Descripcion:
 
-- El trabajo reciente ya esta aislado en la rama local `baseline-iteration`.
-- Hay commits con foco funcional claro.
+- El trabajo reciente esta actualmente en la rama `main` del workspace local.
+- Hay cambios amplios pendientes de commit que conviene agrupar cuidadosamente antes de integrar historial.
 - Existen archivos locales y operativos fuera de Git gracias a `.gitignore`.
 
 Impacto:
@@ -454,7 +508,7 @@ Impacto:
 
 ## 6. Estado actual de alineacion DDD y ontologica
 
-La sesion actual cambio de manera importante el punto de partida del proyecto. Antes de este ejercicio, VIMER mostraba intuiciones sanas de DDD en el codigo, pero sin artefactos formales suficientes para gobernar el dominio. Despues del ejercicio, el estado correcto ya no es "DDD ligero e implicito", sino "modelo de dominio formalizado documentalmente y aun parcialmente implementado en codigo".
+Las sesiones recientes cambiaron de manera importante el punto de partida del proyecto. Antes del ejercicio de modelado, VIMER mostraba intuiciones sanas de DDD en el codigo, pero sin artefactos formales suficientes para gobernar el dominio. Despues de ese trabajo y de la consolidacion v1, el estado correcto ya no es "DDD ligero e implicito", sino "modelo de dominio formalizado documentalmente, parcialmente implementado en codigo y orientado a un piloto cerrado verificable".
 
 ### 6.1 Logros de alineacion ya consolidados
 
@@ -512,6 +566,7 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 
 - El entorno local sigue dependiendo de `.env` para desarrollo y despliegue local.
 - Las pruebas ya no dependen por defecto del `.env` del workspace, pero el comportamiento de deploy sigue condicionado por la configuracion efectiva del entorno.
+- La configuracion por `DEPLOYMENT_PROFILE` reduce ambiguedad entre piloto y produccion, pero todavia no sustituye una validacion real del stack en infraestructura.
 - Aunque Django 6.0 ya ofrece CSP nativa y el proyecto la usa, la politica actual conserva `unsafe-inline` para script/style; eso debe endurecerse antes de considerar un perfil productivo serio.
 - Django 6.0 tambien ofrece template partials y Tasks framework, pero hoy no hay un caso de producto que justifique adoptarlos y hacerlo antes de tiempo agregaria complejidad sin retorno claro.
 
@@ -528,19 +583,21 @@ La sesion actual cambio de manera importante el punto de partida del proyecto. A
 ### 7.5 Riesgo de producto
 
 - El MVP prueba el flujo, pero aun no resuelve una experiencia madura de onboarding, gestion de errores amigable ni administracion avanzada del ciclo de vida de desafios.
+- El onboarding multi-representante ya mejora la operacion del piloto, pero todavia falta cerrar experiencia de transferencia de titularidad y administracion de excepciones mas alla del alcance minimo implementado.
 
 ## 8. Nivel actual de avance
 
 Valoracion general del desarrollo:
 
-- Entre 75% y 85% respecto al MVP funcional inferido.
+- Entre 85% y 92% respecto al MVP funcional inferido.
 - Entre 80% y 90% respecto a la formalizacion conceptual deseada en DDD y ontologias.
-- Entre 55% y 65% respecto a la implementacion efectiva en codigo del modelo DDD/ontologico objetivo.
+- Entre 65% y 75% respecto a la implementacion efectiva en codigo del modelo DDD/ontologico objetivo.
+- Entre 60% y 70% respecto al release v1 de piloto cerrado definido en `docs/release_plan_v1.md`.
 
 Interpretacion de esa estimacion:
 
-- El nucleo funcional principal esta cubierto.
-- La base tecnica es coherente.
+- El nucleo funcional principal esta cubierto y el piloto v1 ya tiene varios prerequisitos implementados.
+- La base tecnica es coherente y ahora distingue mejor entre perfil `pilot` y perfil `production`.
 - La navegacion y el dominio ya se pueden probar manualmente.
 - Ya no falta principalmente "descubrir el dominio"; eso quedo mucho mas avanzado en esta sesion.
 - Lo que falta ahora es trasladar de manera disciplinada ese modelo al codigo, a las pruebas, a los nombres tecnicos y a la operacion del producto.
@@ -548,23 +605,24 @@ Interpretacion de esa estimacion:
 ## 9. Recomendaciones prioritarias
 
 1. Mantener `docs/domain/ontology_v4.md` como documento canónico único y sincronizar con él el resto del corpus de seguimiento.
-2. Traducir primero las invariantes mas criticas a codigo y pruebas:
-   - `INV-05`
-   - `INV-06`
-   - `INV-07`
-   - `INV-08`
-   - `INV-10`
-   - `INV-11`
-3. Mantener la separacion tactica ya lograda en `marketplace` y evitar que nuevos cambios vuelvan a un bucket generico.
-4. Profundizar la evaluacion sobre la base actual de responsabilidades explicitas:
+2. Mantener `docs/release_plan_v1.md` como rector del piloto y actualizarlo junto con ADRs e invariantes cuando cambie el alcance.
+3. Completar validacion end-to-end del release v1:
+   - flujo real de signup con Turnstile;
+   - verificacion de email con SMTP;
+   - recuperacion de contrasena;
+   - subida y descarga de adjuntos;
+   - categorias y filtros;
+   - dashboard admin;
+   - despliegue en VPS.
+4. Mantener la separacion tactica ya lograda en `marketplace` y evitar que nuevos cambios vuelvan a un bucket generico.
+5. Profundizar la evaluacion sobre la base actual de responsabilidades explicitas:
    - `EvaluadorDesignado`
    - `AdjudicadorDesignado`
    - `ObservadorDeEvaluacion`
    - auditoria y gobierno mas ricos sobre empates y adjudicaciones excepcionales
-5. Crear ADRs y una plantilla de especificacion por feature para que el modelo deje de vivir solo en PDFs y notas locales.
 6. Aumentar cobertura automatizada por invariante de dominio, no solo por flujo feliz.
 7. Completar el desacople operativo del `.env` local en los flujos sensibles restantes.
-8. Consolidar la estrategia de despliegue real de produccion alrededor de `gunicorn`, infraestructura externa y configuracion segura.
+8. Consolidar la estrategia de despliegue real de produccion alrededor de `gunicorn`, infraestructura externa, TLS, SMTP y configuracion segura.
 
 ## 10. Ruta sugerida por iteraciones
 

@@ -1,4 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db import models
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -10,7 +11,7 @@ from apps.evaluation.application.queries import (
 )
 from apps.marketplace.application.services import publish_challenge
 from apps.marketplace.challenge_forms import ChallengePublicationForm
-from apps.marketplace.models import Application, Challenge
+from apps.marketplace.models import Application, Challenge, ChallengeCategory
 
 
 class RoleRequiredMixin(UserPassesTestMixin):
@@ -31,10 +32,33 @@ class ChallengeListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         organization = getattr(self.request.user, "organization", None)
-        return (
+        queryset = (
             Challenge.objects.visible_to_organization(organization)
             .select_related("publisher")
+            .prefetch_related("categories")
         )
+        query = (self.request.GET.get("q") or "").strip()
+        category = (self.request.GET.get("category") or "").strip()
+        status = (self.request.GET.get("status") or "").strip()
+        if query:
+            queryset = queryset.filter(
+                models.Q(title__icontains=query)
+                | models.Q(description__icontains=query)
+            )
+        if category:
+            queryset = queryset.filter(categories__slug=category)
+        if status:
+            queryset = queryset.filter(status=status)
+        return queryset.distinct()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["categories"] = ChallengeCategory.objects.filter(is_active=True)
+        context["selected_category"] = self.request.GET.get("category", "")
+        context["selected_status"] = self.request.GET.get("status", "")
+        context["query"] = self.request.GET.get("q", "")
+        context["status_choices"] = Challenge.Status.choices
+        return context
 
 
 class ChallengeDetailView(LoginRequiredMixin, DetailView):
@@ -108,5 +132,6 @@ class ChallengeCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
         publish_challenge(
             publisher=self.request.user.organization,
             command=form.to_command(),
+            actor=self.request.user,
         )
         return HttpResponseRedirect(self.get_success_url())

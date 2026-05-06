@@ -1,8 +1,10 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import FileResponse
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from django.views import View
 from django.views.generic import FormView
 
 from apps.corporate.models import Organization
@@ -16,7 +18,7 @@ from apps.marketplace.application.services import (
 )
 from apps.marketplace.application_forms import ApplicationSubmissionForm
 from apps.marketplace.challenge_views import RoleRequiredMixin
-from apps.marketplace.models import Application, Challenge
+from apps.marketplace.models import Application, ApplicationAttachment, Challenge, ChallengeAttachment
 
 
 class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
@@ -91,6 +93,7 @@ class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
                     challenge=self.get_challenge(),
                     applicant=self.request.user.organization,
                     command=form.to_draft_command(),
+                    actor=self.request.user,
                 )
                 messages.success(
                     self.request,
@@ -101,6 +104,7 @@ class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
                     challenge=self.get_challenge(),
                     applicant=self.request.user.organization,
                     command=form.to_command(),
+                    actor=self.request.user,
                 )
                 messages.success(
                     self.request,
@@ -118,3 +122,47 @@ class ApplicationCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
             return self.form_invalid(form)
 
         return HttpResponseRedirect(self.get_success_url())
+
+
+class ChallengeAttachmentDownloadView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        attachment = get_object_or_404(
+            ChallengeAttachment.objects.select_related("challenge"),
+            opaque_id=kwargs["opaque_id"],
+        )
+        organization = getattr(request.user, "organization", None)
+        if attachment.challenge.status == Challenge.Status.DRAFT and (
+            organization is None or organization.pk != attachment.challenge.publisher_id
+        ):
+            return self.handle_no_permission()
+        return FileResponse(
+            attachment.file.open("rb"),
+            as_attachment=True,
+            filename=attachment.original_filename,
+        )
+
+
+class ApplicationAttachmentDownloadView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        attachment = get_object_or_404(
+            ApplicationAttachment.objects.select_related(
+                "application__challenge",
+                "application__applicant",
+            ),
+            opaque_id=kwargs["opaque_id"],
+        )
+        organization_id = getattr(request.user, "organization_id", None)
+        application = attachment.application
+        challenge = application.challenge
+        is_applicant = organization_id == application.applicant_id
+        is_publisher = organization_id == challenge.publisher_id
+        is_evaluation_team = challenge.evaluation_role_assignments.filter(
+            user=request.user
+        ).exists()
+        if not (is_applicant or is_publisher or is_evaluation_team):
+            return self.handle_no_permission()
+        return FileResponse(
+            attachment.file.open("rb"),
+            as_attachment=True,
+            filename=attachment.original_filename,
+        )

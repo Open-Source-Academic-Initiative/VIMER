@@ -37,7 +37,7 @@ from apps.marketplace.application.exceptions import (
     ChallengePublicationValidationError,
     DuplicateChallengeApplicationError,
 )
-from apps.marketplace.models import Application, Challenge
+from apps.marketplace.models import Application, Challenge, ChallengeCategory
 
 
 class MediaRootIsolatedTestCase(TestCase):
@@ -104,6 +104,7 @@ class MarketplaceSharedFixtureMixin:
             description="Challenge description",
             application_deadline=timezone.localdate() + timedelta(days=7),
         )
+        cls.category = ChallengeCategory.objects.first()
 
     def setUp(self):
         super().setUp()
@@ -117,6 +118,7 @@ class MarketplaceSharedFixtureMixin:
         self.demand_user = User.objects.get(pk=self.demand_user.pk)
         self.supply_user = User.objects.get(pk=self.supply_user.pk)
         self.challenge = Challenge.objects.get(pk=self.challenge.pk)
+        self.category = ChallengeCategory.objects.get(pk=self.category.pk)
 
     def make_application_payload(self):
         return {
@@ -639,6 +641,7 @@ class DesafioServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCa
                     "Costo total"
                 ),
                 "application_deadline": timezone.localdate() + timedelta(days=14),
+                "categories": [self.category.pk],
             },
         )
 

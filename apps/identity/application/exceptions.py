@@ -25,3 +25,15 @@ class RegistrationValidationError(RegistrationError):
             collected_messages.extend(field_messages)
         self.messages = list(dict.fromkeys(collected_messages))
         super().__init__(" ".join(self.messages))
+
+
+class OrganizationJoinRequestError(Exception):
+    def __init__(self, messages):
+        self.messages = list(messages)
+        super().__init__(" ".join(self.messages))
+
+
+class OrganizationTitularityTransferError(Exception):
+    def __init__(self, messages):
+        self.messages = list(messages)
+        super().__init__(" ".join(self.messages))

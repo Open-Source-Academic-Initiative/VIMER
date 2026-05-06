@@ -16,6 +16,14 @@
     <p>NIT: {{ challenge.publisher.tax_id }}</p>
     <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
     <p>
+        <strong>Categorías:</strong>
+        {% for category in challenge.categories.all %}
+            {{ category.name }}{% if not forloop.last %}, {% endif %}
+        {% empty %}
+            Sin categoría
+        {% endfor %}
+    </p>
+    <p>
         <strong>Fecha límite:</strong>
         {% if challenge.application_deadline %}
             {{ challenge.application_deadline }}
@@ -25,7 +33,15 @@
     </p>
     <hr>
     <h3>Descripción</h3>
-    <p>{{ challenge.description|linebreaks }}</p>
+    {{ challenge.rendered_description|safe }}
+    {% if challenge.attachments.exists %}
+        <h3>Adjuntos del desafío</h3>
+        <ul>
+            {% for attachment in challenge.attachments.all %}
+                <li><a href="{% url 'marketplace:challenge-attachment-download' attachment.opaque_id %}">{{ attachment.original_filename }}</a></li>
+            {% endfor %}
+        </ul>
+    {% endif %}
     <h3>Criterios de evaluación</h3>
     {% if evaluation_criteria_items %}
         <ul>
@@ -118,10 +134,26 @@
                     <p><strong>{{ app.evaluation_summary.blind_reference }}:</strong> {{ app.summary_text|truncatewords:20 }}</p>
                 {% endif %}
                 <div>
-                    <strong>Entendimiento:</strong> {{ app.problem_understanding|truncatewords:20 }}<br>
-                    <strong>Capacidades:</strong> {{ app.capabilities_evidence|truncatewords:20 }}<br>
-                    <strong>Plan:</strong> {{ app.execution_plan|truncatewords:20 }}
+                    <strong>Entendimiento:</strong> {{ app.problem_understanding|striptags|truncatewords:20 }}<br>
+                    <strong>Capacidades:</strong> {{ app.capabilities_evidence|striptags|truncatewords:20 }}<br>
+                    <strong>Plan:</strong> {{ app.execution_plan|striptags|truncatewords:20 }}
                 </div>
+                {% if app.attachments.exists %}
+                    <p><strong>Adjuntos:</strong></p>
+                    <ul>
+                        {% for attachment in app.attachments.all %}
+                            <li>
+                                <a href="{% url 'marketplace:application-attachment-download' attachment.opaque_id %}">
+                                    {% if show_applicant_identity %}
+                                        {{ attachment.original_filename }}
+                                    {% else %}
+                                        Adjunto {{ forloop.counter }} de {{ app.evaluation_summary.blind_reference }}
+                                    {% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
                 {% if challenge.status == 'UNDER_EVALUATION' %}
                     {% if app.evaluation_summary.is_complete %}
                         <p>

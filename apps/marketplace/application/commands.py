@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass(frozen=True)
@@ -9,6 +9,8 @@ class PublishChallengeCommand:
     description: str
     evaluation_criteria: str = ""
     application_deadline: Optional[date] = None
+    category_ids: tuple[int, ...] = ()
+    attachments: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,7 @@ class SubmitApplicationCommand:
     proposed_solution: str
     capabilities_evidence: str
     execution_plan: str
+    attachments: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -25,3 +28,4 @@ class SaveApplicationDraftCommand:
     proposed_solution: str = ""
     capabilities_evidence: str = ""
     execution_plan: str = ""
+    attachments: tuple[Any, ...] = ()

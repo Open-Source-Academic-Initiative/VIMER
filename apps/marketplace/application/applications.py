@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.db import IntegrityError, transaction
 
 from apps.corporate.models import Organization
@@ -24,7 +25,7 @@ from apps.marketplace.domain.exceptions import (
     ExistingSubmittedApplication,
     IncompleteChallengeApplication,
 )
-from apps.marketplace.models import Application, Challenge
+from apps.marketplace.models import Application, ApplicationAttachment, Challenge
 
 
 def _upsert_application(
@@ -36,6 +37,8 @@ def _upsert_application(
     proposed_solution: str,
     capabilities_evidence: str,
     execution_plan: str,
+    attachments: tuple = (),
+    uploaded_by=None,
 ) -> Application:
     existing_application = get_existing_application_for_organization(
         challenge,
@@ -62,6 +65,20 @@ def _upsert_application(
 
     try:
         application.save()
+        if attachments:
+            if len(attachments) > settings.MARKETPLACE_ATTACHMENT_MAX_COUNT:
+                raise ChallengeApplicationValidationError(
+                    [f"No puedes adjuntar más de {settings.MARKETPLACE_ATTACHMENT_MAX_COUNT} archivos."]
+                )
+            for attachment in attachments:
+                ApplicationAttachment.objects.create(
+                    application=application,
+                    file=attachment,
+                    original_filename=attachment.name,
+                    content_type=getattr(attachment, "content_type", ""),
+                    size=attachment.size,
+                    uploaded_by=uploaded_by,
+                )
     except IntegrityError as exc:
         raise DuplicateChallengeApplicationError from exc
     except ValidationError as exc:
@@ -75,6 +92,7 @@ def save_application_draft(
     challenge: Challenge,
     applicant: Organization,
     command: SaveApplicationDraftCommand,
+    actor=None,
 ) -> Application:
     try:
         ensure_challenge_is_open_for_applications(challenge)
@@ -97,6 +115,8 @@ def save_application_draft(
         proposed_solution=command.proposed_solution,
         capabilities_evidence=command.capabilities_evidence,
         execution_plan=command.execution_plan,
+        attachments=command.attachments,
+        uploaded_by=actor or applicant.members.order_by("pk").first(),
     )
 
 
@@ -105,6 +125,7 @@ def submit_challenge_application(
     challenge: Challenge,
     applicant: Organization,
     command: SubmitApplicationCommand,
+    actor=None,
 ) -> Application:
     try:
         ensure_challenge_is_open_for_applications(challenge)
@@ -135,4 +156,6 @@ def submit_challenge_application(
         proposed_solution=command.proposed_solution,
         capabilities_evidence=command.capabilities_evidence,
         execution_plan=command.execution_plan,
+        attachments=command.attachments,
+        uploaded_by=actor or applicant.members.order_by("pk").first(),
     )

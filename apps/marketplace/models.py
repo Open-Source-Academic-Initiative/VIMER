@@ -1,9 +1,17 @@
+import mimetypes
+
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from apps.corporate.models import Organization
+from apps.marketplace.content import (
+    build_attachment_upload_path,
+    new_opaque_id,
+    render_markdown,
+    validate_attachment_file,
+)
 
 
 class ChallengeQuerySet(models.QuerySet):
@@ -54,6 +62,11 @@ class Challenge(models.Model):
     application_deadline = models.DateField(
         _("Fecha límite de aplicación"),
         null=True,
+        blank=True,
+    )
+    categories = models.ManyToManyField(
+        "marketplace.ChallengeCategory",
+        related_name="challenges",
         blank=True,
     )
     
@@ -171,6 +184,10 @@ class Challenge(models.Model):
     def __str__(self):
         return self.title
 
+    @property
+    def rendered_description(self) -> str:
+        return render_markdown(self.description)
+
     @classmethod
     def publicly_visible_statuses(cls) -> tuple[str, ...]:
         return (
@@ -210,6 +227,22 @@ class ChallengeEvaluationCriterion(models.Model):
 
     def __str__(self):
         return f"{self.challenge}: {self.label}"
+
+
+class ChallengeCategory(models.Model):
+    name = models.CharField(_("Nombre"), max_length=120, unique=True)
+    slug = models.SlugField(_("Slug"), max_length=140, unique=True)
+    description = models.TextField(_("Descripción"), blank=True, default="")
+    is_active = models.BooleanField(_("Activa"), default=True)
+    position = models.PositiveIntegerField(_("Posición"), default=0)
+
+    class Meta:
+        verbose_name = _("Categoría de desafío")
+        verbose_name_plural = _("Categorías de desafío")
+        ordering = ["position", "name"]
+
+    def __str__(self):
+        return self.name
 
 
 class ApplicationQuerySet(models.QuerySet):
@@ -389,6 +422,22 @@ class Application(models.Model):
     def summary_text(self) -> str:
         return self.proposed_solution or self.proposal_text
 
+    @property
+    def rendered_problem_understanding(self) -> str:
+        return render_markdown(self.problem_understanding)
+
+    @property
+    def rendered_proposed_solution(self) -> str:
+        return render_markdown(self.proposed_solution)
+
+    @property
+    def rendered_capabilities_evidence(self) -> str:
+        return render_markdown(self.capabilities_evidence)
+
+    @property
+    def rendered_execution_plan(self) -> str:
+        return render_markdown(self.execution_plan)
+
     def __str__(self):
         return f"Propuesta de {self.applicant} para {self.challenge}"
 
@@ -401,3 +450,74 @@ class Application(models.Model):
                 f"Plan de ejecución: {(self.execution_plan or '').strip()}",
             ]
         )
+
+
+class AttachmentBase(models.Model):
+    opaque_id = models.CharField(
+        _("Identificador opaco"),
+        max_length=32,
+        unique=True,
+        default=new_opaque_id,
+        editable=False,
+    )
+    file = models.FileField(
+        _("Archivo"),
+        upload_to=build_attachment_upload_path,
+        validators=[validate_attachment_file],
+    )
+    original_filename = models.CharField(_("Nombre original"), max_length=255)
+    content_type = models.CharField(_("Tipo de contenido"), max_length=120)
+    size = models.PositiveIntegerField(_("Tamaño en bytes"))
+    uploaded_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.PROTECT,
+        related_name="%(class)s_uploads",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+        ordering = ["created_at", "id"]
+
+    def clean(self):
+        validate_attachment_file(self.file)
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            self.original_filename = self.original_filename or self.file.name
+            self.content_type = (
+                self.content_type
+                or getattr(self.file, "content_type", "")
+                or mimetypes.guess_type(self.file.name)[0]
+                or ""
+            )
+            self.size = self.size or self.file.size
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.original_filename
+
+
+class ChallengeAttachment(AttachmentBase):
+    challenge = models.ForeignKey(
+        Challenge,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+
+    class Meta(AttachmentBase.Meta):
+        verbose_name = _("Adjunto de desafío")
+        verbose_name_plural = _("Adjuntos de desafío")
+
+
+class ApplicationAttachment(AttachmentBase):
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+
+    class Meta(AttachmentBase.Meta):
+        verbose_name = _("Adjunto de propuesta")
+        verbose_name_plural = _("Adjuntos de propuesta")

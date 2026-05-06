@@ -17,3 +17,16 @@ class RegisterOrganizationUserCommand:
     role: Organization.MarketRole
     contact_phone: str
     logo_upload: Any = None
+    accepted_terms: bool = True
+    accepted_privacy_policy: bool = True
+    turnstile_token: str = ""
+
+
+@dataclass(frozen=True)
+class DecideOrganizationJoinRequestCommand:
+    join_request_id: int
+
+
+@dataclass(frozen=True)
+class TransferOrganizationTitularityCommand:
+    target_user_id: int

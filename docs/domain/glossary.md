@@ -279,6 +279,111 @@ Notes:
 - This is not a market role.
 - Do not mix it with `Solicitante` or `Proveedor tecnológico`.
 
+## Release v1 Canonical Terms (Planned)
+
+These terms are introduced as part of VIMER's first official release (`docs/release_plan_v1.md`). They are canonical from the moment they ship in code. Until then, any user-facing copy referencing these concepts should already use the canonical form, never an alternative.
+
+### Representante titular
+
+Business meaning:
+
+- representative that holds governance over an organization on the platform.
+
+Status:
+
+- `Planned`
+
+Notes:
+
+- the first representative registered for an organization is automatically the titular.
+- the titular approves or rejects pending join requests for its organization.
+- the titular can transfer the role to another active representative of the same organization.
+- this is not an evaluation-governance role and not a market role.
+
+### Solicitud de unión a organización
+
+Business meaning:
+
+- pending request created when a representative self-registers using a tax identifier already associated with an existing organization.
+
+Status:
+
+- `Planned`
+
+Notes:
+
+- has lifecycle states `PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`.
+- only the current `Representante titular` of the target organization can approve or reject.
+- expires automatically after a configurable window.
+
+### Transferencia de titularidad
+
+Business meaning:
+
+- explicit, auditable action that moves the role of `Representante titular` from one active representative to another within the same organization.
+
+Status:
+
+- `Planned`
+
+### Categoría de desafío
+
+Business meaning:
+
+- classification term applied to a `Desafío`, drawn from a closed catalog managed by `Administración de plataforma`.
+
+Status:
+
+- `Planned`
+
+Notes:
+
+- vocabulary is curated, not user-created.
+- a published `Desafío` must reference at least one categoría.
+
+### Adjunto de desafío
+
+Business meaning:
+
+- file attached to a `Desafío` to provide richer context (technical brief, supporting material).
+
+Status:
+
+- `Planned`
+
+Notes:
+
+- visible to all authenticated representatives once the challenge is published.
+
+### Adjunto de propuesta
+
+Business meaning:
+
+- file attached to a `Propuesta` to provide richer evidence (technical document, deck, supporting material).
+
+Status:
+
+- `Planned`
+
+Notes:
+
+- access is restricted by ownership and by evaluation team membership.
+- blind-evaluation rules extend to attachment metadata: applicant identity must not leak through filenames presented to evaluators until adjudication.
+
+### Aceptación de documentos legales
+
+Business meaning:
+
+- record that links a `Representante` to the version of T&C and Política de Tratamiento de Datos accepted at signup.
+
+Status:
+
+- `Planned`
+
+Notes:
+
+- aligned with Habeas Data minimum legal posture for the pilot release.
+
 ## Technical Legacy Terms
 
 These terms are acceptable in code while the migration is incomplete, but should be treated as technical debt when they appear outside technical internals.
@@ -316,6 +421,7 @@ A change should be questioned if it introduces new user-facing language that dri
 - `Solicitante`
 - `Proveedor tecnológico`
 - `Representante`
+- `Representante titular`
 - `Desafío`
 - `Propuesta`
 - `Evaluación`
@@ -324,4 +430,9 @@ A change should be questioned if it introduces new user-facing language that dri
 - `Observador de evaluacion`
 - `Evento de historial del desafio`
 - `Notificacion interna`
+- `Solicitud de unión a organización`
+- `Transferencia de titularidad`
+- `Categoría de desafío`
+- `Adjunto de desafío`
+- `Adjunto de propuesta`
 - `Administración de plataforma`
