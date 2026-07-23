@@ -11,8 +11,8 @@ from apps.marketplace.application.exceptions import (
     ChallengeApplicationValidationError,
     DuplicateChallengeApplicationError,
 )
+from apps.marketplace.content import build_application_summary
 from apps.marketplace.domain.applications import (
-    build_application_summary,
     ensure_challenge_is_open_for_applications,
     ensure_existing_application_is_not_submitted,
     ensure_organization_can_submit_application,
