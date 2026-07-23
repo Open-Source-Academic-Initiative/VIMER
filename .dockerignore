@@ -1,0 +1,39 @@
+# Keep the Debian-slim image lean: never ship local dev artifacts.
+.git
+.gitignore
+.venv
+venv
+ENV
+env
+__pycache__
+*.py[cod]
+*.so
+
+# Local database, media and static build output
+db.sqlite3
+db.sqlite3-journal
+data
+media
+staticfiles
+static
+backups
+artifacts
+
+# Local secrets and logs
+.env
+deploy/tls
+*.log
+server.log
+
+# Editors / OS
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Session / scratch docs not needed at runtime
+test_users.txt
+usuarios_prueba.txt
+django_skill.md
+django-report.md
+manual_lan_test.sh

@@ -32,6 +32,10 @@ wheels/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+data/
+backups/
+artifacts/
+deploy/tls/
 
 # Medios y Estáticos (Carga de usuario)
 media/

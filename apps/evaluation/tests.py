@@ -78,24 +78,28 @@ class EvaluacionServiceTests(TestCase):
             email="publisher-eval@example.com",
             password="ClaveSegura123",
             organization=cls.publisher,
+            is_email_verified=True,
         )
         cls.publisher_colleague_user = User.objects.create_user(
             username="publisher_colleague_eval",
             email="publisher-colleague-eval@example.com",
             password="ClaveSegura123",
             organization=cls.publisher,
+            is_email_verified=True,
         )
         cls.other_publisher_user = User.objects.create_user(
             username="other_publisher_eval",
             email="other-publisher-eval@example.com",
             password="ClaveSegura123",
             organization=cls.other_publisher,
+            is_email_verified=True,
         )
         cls.challenge = Challenge.objects.create(
             publisher=cls.publisher,
             title="Challenge under evaluation",
             description="Description",
             evaluation_criteria="Experiencia, viabilidad técnica y plan de ejecución.",
+            status=Challenge.Status.PUBLISHED,
             application_deadline=timezone.localdate() + timedelta(days=7),
         )
         cls.application = Application.objects.create(
@@ -168,6 +172,25 @@ class EvaluacionServiceTests(TestCase):
             execution_plan="Plan",
         )
 
+    def configure_evaluation_criteria_before_applications(
+        self,
+        evaluation_criteria="Capacidad técnica\nExperiencia sectorial",
+    ):
+        self.application.delete()
+        self.challenge.evaluation_criteria = evaluation_criteria
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.sync_evaluation_criteria_items()
+        self.application = Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.provider,
+            status=Application.Status.SUBMITTED,
+            proposal_text="Resumen",
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
+
     def setUp(self):
         self.publisher = Organization.objects.get(pk=self.publisher.pk)
         self.provider = Organization.objects.get(pk=self.provider.pk)
@@ -181,7 +204,14 @@ class EvaluacionServiceTests(TestCase):
         self.challenge = Challenge.objects.get(pk=self.challenge.pk)
         self.application = Application.objects.get(pk=self.application.pk)
 
+    def close_reception(self):
+        Challenge.objects.filter(pk=self.challenge.pk).update(
+            status=Challenge.Status.CLOSED
+        )
+        self.challenge.refresh_from_db()
+
     def test_start_challenge_evaluation_sets_under_evaluation_status(self):
+        self.close_reception()
         start_challenge_evaluation(challenge=self.challenge, actor=self.publisher_user)
 
         self.challenge.refresh_from_db()
@@ -198,6 +228,7 @@ class EvaluacionServiceTests(TestCase):
             capabilities_evidence="",
             execution_plan="",
         )
+        self.close_reception()
 
         with self.assertRaises(ChallengeEvaluationValidationError) as captured:
             start_challenge_evaluation(
@@ -211,6 +242,7 @@ class EvaluacionServiceTests(TestCase):
         )
 
     def test_start_challenge_evaluation_emits_domain_event_after_commit(self):
+        self.close_reception()
         received_events = []
 
         def receiver(sender, event, **kwargs):
@@ -240,6 +272,7 @@ class EvaluacionServiceTests(TestCase):
         self.assertEqual(event.started_by_user_id, self.publisher_user.pk)
 
     def test_start_challenge_evaluation_records_timeline_entry_after_commit(self):
+        self.close_reception()
         with self.captureOnCommitCallbacks(execute=True):
             start_challenge_evaluation(
                 challenge=self.challenge,
@@ -257,6 +290,7 @@ class EvaluacionServiceTests(TestCase):
         )
 
     def test_start_challenge_evaluation_rejects_non_publisher(self):
+        self.close_reception()
         with self.assertRaises(ChallengeEvaluationValidationError) as captured:
             start_challenge_evaluation(
                 challenge=self.challenge,
@@ -270,6 +304,7 @@ class EvaluacionServiceTests(TestCase):
 
     def test_start_challenge_evaluation_rejects_missing_applications(self):
         self.application.delete()
+        self.close_reception()
 
         with self.assertRaises(ChallengeEvaluationValidationError) as captured:
             start_challenge_evaluation(challenge=self.challenge, actor=self.publisher_user)
@@ -280,8 +315,10 @@ class EvaluacionServiceTests(TestCase):
         )
 
     def test_start_challenge_evaluation_rejects_missing_evaluation_criteria(self):
-        self.challenge.evaluation_criteria = ""
-        self.challenge.save()
+        self.configure_evaluation_criteria_before_applications(
+            evaluation_criteria=""
+        )
+        self.close_reception()
 
         with self.assertRaises(ChallengeEvaluationValidationError) as captured:
             start_challenge_evaluation(challenge=self.challenge, actor=self.publisher_user)
@@ -293,6 +330,7 @@ class EvaluacionServiceTests(TestCase):
 
     def test_start_challenge_evaluation_requires_evaluation_team(self):
         self.challenge.evaluation_role_assignments.all().delete()
+        self.close_reception()
 
         with self.assertRaises(ChallengeEvaluationValidationError) as captured:
             start_challenge_evaluation(challenge=self.challenge, actor=self.publisher_user)
@@ -307,8 +345,7 @@ class EvaluacionServiceTests(TestCase):
         )
 
     def test_award_decision_view_shows_structured_evaluation_criteria(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save()
+        self.configure_evaluation_criteria_before_applications()
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save()
         self.client.force_login(self.publisher_user)
@@ -624,10 +661,7 @@ class EvaluacionServiceTests(TestCase):
         )
 
     def test_build_challenge_application_evaluation_summaries_exposes_average_score(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save(update_fields=["status"])
 
@@ -754,10 +788,7 @@ class EvaluacionServiceTests(TestCase):
         self.assertEqual(summary.criterion_results[0].average_score, 4.5)
 
     def test_build_challenge_application_evaluation_summaries_ranks_complete_applications_first(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         second_provider = Organization.objects.create(
             tax_id="910000099",
             business_name="Proveedor Mejor Posicionado",
@@ -859,10 +890,7 @@ class EvaluacionServiceTests(TestCase):
         self.assertEqual([application.pk for application in summaries], [self.application.pk])
 
     def test_build_challenge_application_evaluation_summaries_averages_by_criterion_before_ranking(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save(update_fields=["status"])
         self.assign_secondary_evaluator_role()
@@ -918,10 +946,7 @@ class EvaluacionServiceTests(TestCase):
         self.assertEqual(summary.criterion_results[1].average_score, 1.0)
 
     def test_build_challenge_application_evaluation_summaries_marks_ties_with_compact_positions(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         second_application = self.create_application(
             tax_id="910000098",
             business_name="Proveedor Empatado",
@@ -968,11 +993,9 @@ class EvaluacionServiceTests(TestCase):
         self.assertEqual(summaries[2].evaluation_summary.tied_application_count, 1)
 
     def test_adjudicate_challenge_requires_all_active_proposals_complete(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
-        second_application = self.create_application(
+        self.configure_evaluation_criteria_before_applications()
+        # Segunda propuesta activa sin evaluar: debe bloquear la adjudicación.
+        self.create_application(
             tax_id="910000096",
             business_name="Proveedor Pendiente",
         )
@@ -1016,10 +1039,7 @@ class EvaluacionServiceTests(TestCase):
         )
 
     def test_adjudicate_challenge_requires_reason_and_confirmation_for_exceptional_selection(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         second_application = self.create_application(
             tax_id="910000095",
             business_name="Proveedor Mejor Posicionado Para Excepción",
@@ -1089,10 +1109,7 @@ class EvaluacionServiceTests(TestCase):
         )
 
     def test_adjudicate_challenge_records_exceptional_snapshot_and_reason(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         second_application = self.create_application(
             tax_id="910000094",
             business_name="Proveedor Mejor Posicionado Auditado",
@@ -1188,24 +1205,28 @@ class EvaluacionFlowTests(TestCase):
             email="publisher-flow@example.com",
             password="ClaveSegura123",
             organization=cls.publisher,
+            is_email_verified=True,
         )
         cls.publisher_colleague_user = User.objects.create_user(
             username="publisher_flow_colleague",
             email="publisher-flow-colleague@example.com",
             password="ClaveSegura123",
             organization=cls.publisher,
+            is_email_verified=True,
         )
         cls.provider_user = User.objects.create_user(
             username="provider_flow",
             email="provider-flow@example.com",
             password="ClaveSegura123",
             organization=cls.provider,
+            is_email_verified=True,
         )
         cls.challenge = Challenge.objects.create(
             publisher=cls.publisher,
             title="Challenge flow",
             description="Description",
             evaluation_criteria="Capacidad técnica y experiencia previa.",
+            status=Challenge.Status.PUBLISHED,
             application_deadline=timezone.localdate() + timedelta(days=7),
         )
         cls.application = Application.objects.create(
@@ -1265,7 +1286,33 @@ class EvaluacionFlowTests(TestCase):
         self.challenge = Challenge.objects.get(pk=self.challenge.pk)
         self.application = Application.objects.get(pk=self.application.pk)
 
+    def configure_evaluation_criteria_before_applications(
+        self,
+        evaluation_criteria="Capacidad técnica\nExperiencia sectorial",
+    ):
+        self.application.delete()
+        self.challenge.evaluation_criteria = evaluation_criteria
+        self.challenge.save(update_fields=["evaluation_criteria"])
+        self.challenge.sync_evaluation_criteria_items()
+        self.application = Application.objects.create(
+            challenge=self.challenge,
+            applicant=self.provider,
+            status=Application.Status.SUBMITTED,
+            proposal_text="Resumen",
+            problem_understanding="Entendimiento",
+            proposed_solution="Solución",
+            capabilities_evidence="Capacidades",
+            execution_plan="Plan",
+        )
+
+    def close_reception(self):
+        Challenge.objects.filter(pk=self.challenge.pk).update(
+            status=Challenge.Status.CLOSED
+        )
+        self.challenge.refresh_from_db()
+
     def test_challenge_detail_shows_start_evaluation_action_for_publisher(self):
+        self.close_reception()
         self.client.force_login(self.publisher_user)
 
         response = self.client.get(
@@ -1277,10 +1324,12 @@ class EvaluacionFlowTests(TestCase):
         self.assertContains(response, "Gestionar equipo de evaluación")
 
     def test_start_evaluation_view_redirects_and_updates_status(self):
+        self.close_reception()
         self.client.force_login(self.publisher_user)
 
         response = self.client.post(
-            reverse("evaluation:challenge-evaluation-start", args=[self.challenge.pk])
+            reverse("evaluation:challenge-evaluation-start", args=[self.challenge.pk]),
+            {"confirm": "on"},
         )
 
         self.assertRedirects(
@@ -1306,6 +1355,7 @@ class EvaluacionFlowTests(TestCase):
             {
                 "winning_application": self.application.pk,
                 "comment": "Seleccionada por su solidez técnica.",
+                "confirm_award": "on",
             },
         )
 
@@ -1355,6 +1405,7 @@ class EvaluacionFlowTests(TestCase):
         self.assertNotContains(response, self.provider.business_name)
 
     def test_challenge_detail_shows_evaluation_history_for_publisher(self):
+        self.close_reception()
         self.client.force_login(self.publisher_user)
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -1489,10 +1540,7 @@ class EvaluacionFlowTests(TestCase):
         )
 
     def test_award_decision_view_shows_application_evaluation_summary(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save(update_fields=["status"])
         evaluate_application_by_criteria(
@@ -1526,7 +1574,7 @@ class EvaluacionFlowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ranking competitivo de Propuestas")
+        self.assertContains(response, "Ranking competitivo de propuestas")
         self.assertContains(response, "Promedio competitivo actual")
         self.assertContains(response, "4,50 / 5")
         self.assertContains(
@@ -1576,10 +1624,7 @@ class EvaluacionFlowTests(TestCase):
         self.assertContains(response, "Pendientes: Propuesta 02 (1 criterio pendiente).")
 
     def test_challenge_detail_shows_award_decision_evaluation_snapshot(self):
-        self.challenge.evaluation_criteria = "Capacidad técnica\nExperiencia sectorial"
-        self.challenge.save(update_fields=["evaluation_criteria"])
-        self.challenge.evaluation_criteria_items.all().delete()
-        self.challenge.sync_evaluation_criteria_items()
+        self.configure_evaluation_criteria_before_applications()
         self.challenge.status = Challenge.Status.UNDER_EVALUATION
         self.challenge.save(update_fields=["status"])
         criteria = list(self.challenge.evaluation_criteria_items.order_by("position"))

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Mis propuestas - VIMER{% endblock %}
+{% block content %}
+<h1>Mis propuestas</h1>
+<div class="card-grid">
+    {% for application in applications %}
+        <article class="card">
+            <h2><a href="{% url 'marketplace:challenge-detail' application.challenge.pk %}">{{ application.challenge.title }}</a></h2>
+            <p><strong>Convocante:</strong> {{ application.challenge.publisher.business_name }}</p>
+            <p><strong>Estado de propuesta:</strong> {{ application.get_status_display }}</p>
+            <p><strong>Estado del desafío:</strong> {{ application.challenge.get_status_display }}</p>
+            <p><strong>Plazo:</strong> {{ application.challenge.application_deadline|default:"Sin definir" }}</p>
+            {% if application.offered_amount is not None %}
+                <p><strong>Oferta:</strong> {{ application.offered_amount|floatformat:2 }} {{ application.offer_currency }}</p>
+            {% endif %}
+            {% if application.status == 'DRAFT' and application.is_editable_draft %}
+                <p><a class="btn btn-primary" href="{% url 'marketplace:challenge-apply' application.challenge.pk %}">Continuar borrador</a></p>
+            {% else %}
+                <p><strong>Próxima acción:</strong> seguir el estado del proceso.</p>
+            {% endif %}
+        </article>
+    {% empty %}
+        <p>Aún no tienes propuestas guardadas o enviadas.</p>
+    {% endfor %}
+</div>
+{% include 'includes/pagination.html' %}
+{% endblock %}

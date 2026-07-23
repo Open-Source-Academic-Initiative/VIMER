@@ -1,9 +1,84 @@
 {% extends 'base.html' %}
-{% block title %}Política de Tratamiento de Datos - VIMER{% endblock %}
+{% block title %}Política de tratamiento de datos - VIMER{% endblock %}
 {% block content %}
-<h1>Política de Tratamiento de Datos Personales VIMER v1</h1>
-<p>Esta política aplica al piloto VIMER en Colombia bajo el marco de Habeas Data.</p>
-<p>Los datos se usan para registrar representantes, asociarlos con organizaciones, operar desafíos, propuestas, evaluación, adjudicación y notificaciones.</p>
-<p>El canal para consultas, actualización, rectificación o revocatoria de autorización es {{ support_email }}.</p>
-<p>No se implementa en este release un flujo automático de exportación o eliminación de cuenta; las solicitudes se atienden por el canal de soporte.</p>
+{% firstof privacy_email support_email as privacy_contact_email %}
+<article aria-labelledby="privacy-title">
+    <h1 id="privacy-title">Política de tratamiento de datos personales</h1>
+    <p><strong>Versión:</strong> {{ legal_privacy_version }}</p>
+
+    <h2>Responsable del tratamiento</h2>
+    <address>
+        <strong>{{ legal_controller_name }}</strong><br>
+        Identificación: {{ legal_controller_id }}<br>
+        Domicilio o dirección: {{ legal_controller_address }}<br>
+        Canal general: {{ legal_controller_contact_channel }}<br>
+        Privacidad y derechos de titulares:
+        <a href="mailto:{{ privacy_contact_email }}">{{ privacy_contact_email }}</a>
+    </address>
+
+    <h2>Alcance y datos tratados</h2>
+    <p>
+        Esta política se aplica a VIMER y a las personas que representan
+        organizaciones convocantes, proponentes y equipos de evaluación. La
+        plataforma trata datos de identificación y contacto, relación con una
+        organización, credenciales, registros de acceso, solicitudes de
+        membresía, comunicaciones y las actuaciones necesarias para operar
+        desafíos, propuestas, evaluaciones y decisiones.
+    </p>
+    <p>
+        Los documentos de una propuesta pueden contener información empresarial,
+        técnica o personal suministrada por la organización proponente. Quien los
+        carga debe contar con autorización y evitar datos personales que no sean
+        necesarios para el proceso.
+    </p>
+
+    <h2>Finalidades</h2>
+    <ul>
+        <li>crear, verificar y proteger cuentas;</li>
+        <li>validar la representación y membresía de organizaciones;</li>
+        <li>publicar desafíos y recibir propuestas dentro de sus plazos;</li>
+        <li>coordinar evaluación, decisión y notificaciones;</li>
+        <li>mantener seguridad, integridad, trazabilidad y soporte;</li>
+        <li>cumplir obligaciones legales y atender derechos de titulares.</li>
+    </ul>
+
+    <h2>Acceso y circulación</h2>
+    <p>
+        La información se limita por rol, organización y fase del proceso. Las
+        propuestas no se publican de forma abierta. Proveedores de alojamiento,
+        correo, seguridad o soporte solo pueden tratar los datos necesarios para
+        prestar su servicio bajo las condiciones aplicables.
+    </p>
+
+    <h2>Conservación y seguridad</h2>
+    <p>
+        Los registros se conservan durante el tiempo necesario para operar y
+        auditar el proceso, atender obligaciones y resolver controversias. VIMER
+        aplica controles de autenticación, autorización por organización,
+        cifrado en tránsito, registro de eventos, respaldos y validación de
+        archivos. Ningún control elimina por completo el riesgo; los incidentes
+        se gestionan por el canal de privacidad.
+    </p>
+
+    <h2>Derechos de las personas titulares</h2>
+    <p>
+        Puedes consultar, actualizar, rectificar o solicitar la supresión de tus
+        datos, pedir prueba de autorización, conocer su uso y revocar la
+        autorización cuando legalmente proceda. Envía la solicitud a
+        <a href="mailto:{{ privacy_contact_email }}">{{ privacy_contact_email }}</a> e incluye
+        información suficiente para verificar tu identidad y localizar la cuenta.
+    </p>
+
+    <h2>Cambios</h2>
+    <p>
+        Las modificaciones materiales se publicarán con una nueva versión. Si el
+        cambio requiere nueva aceptación, VIMER la solicitará antes de continuar
+        con operaciones protegidas.
+    </p>
+
+    <p class="muted">
+        Este texto es un artefacto operativo de la plataforma y debe conservar
+        evidencia de revisión y aprobación jurídica antes de una salida pública.
+    </p>
+</article>
 {% endblock %}

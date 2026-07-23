@@ -1,0 +1,62 @@
+<div class="card">
+    <p class="org-chip">
+        {% if challenge.publisher.logo %}
+            <img
+                src="{{ challenge.publisher.logo.url }}"
+                alt="Logo de {{ challenge.publisher.business_name }}"
+                class="avatar avatar-marketplace"
+            >
+        {% endif %}
+        <span>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></span>
+    </p>
+    <p>NIT: {{ challenge.publisher.tax_id }}</p>
+    <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+    <p>
+        <strong>Categorías:</strong>
+        {% for category in challenge.categories.all %}
+            {{ category.name }}{% if not forloop.last %}, {% endif %}
+        {% empty %}
+            Sin categoría
+        {% endfor %}
+    </p>
+    <p>
+        <strong>Fecha límite:</strong>
+        {% if challenge.application_deadline %}
+            {{ challenge.application_deadline }}
+        {% else %}
+            Sin fecha límite
+        {% endif %}
+    </p>
+    <p>
+        <strong>Presupuesto máximo:</strong>
+        {% if challenge.budget_amount is not None %}
+            {{ challenge.budget_amount|floatformat:2 }} {{ challenge.budget_currency }}
+        {% else %}
+            No informado en este registro histórico
+        {% endif %}
+    </p>
+    <hr>
+    <h2>Descripción</h2>
+    {{ challenge.rendered_description|safe }}
+    {% if challenge.attachments.exists %}
+        <h2>Adjuntos del desafío</h2>
+        <ul>
+            {% for attachment in challenge.attachments.all %}
+                <li><a href="{% url 'marketplace:challenge-attachment-download' attachment.opaque_id %}">{{ attachment.original_filename }}</a></li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <h2>Criterios de evaluación</h2>
+    {% if evaluation_criteria_items %}
+        <ul>
+            {% for criterion in challenge.evaluation_criteria_items.all %}
+                <li>
+                    {{ criterion.label }} — {{ criterion.weight|floatformat:2 }} %
+                    ({{ criterion.get_criterion_type_display }})
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Aún no se han definido criterios de evaluación para este desafío.</p>
+    {% endif %}
+</div>

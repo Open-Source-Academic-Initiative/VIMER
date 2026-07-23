@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Evaluar Propuesta Ciega - VIMER{% endblock %}
 {% block content %}
-<h2>Evaluar Propuesta Ciega</h2>
-<h3>{{ application_blind_reference }}</h3>
+<h1>Evaluar propuesta ciega</h1>
+<h2>{{ application_blind_reference }}</h2>
 <p><strong>Desafío:</strong> {{ challenge.title }}</p>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
 <p>La identidad del postulante permanece oculta hasta que se registre la adjudicación.</p>
@@ -10,18 +10,20 @@
 <form method="post">
     {% csrf_token %}
     {% if form.non_field_errors %}
-        <div class="card">
+        <div class="card" role="alert">
             {{ form.non_field_errors }}
         </div>
     {% endif %}
     {% for field in form %}
         <p>{{ field.label_tag }} {{ field }}</p>
         {% if field.help_text %}
-            <small>{{ field.help_text }}</small>
+            <small id="{{ field.auto_id }}_help">{{ field.help_text }}</small>
         {% endif %}
-        {% for error in field.errors %}
-            <p>{{ error }}</p>
-        {% endfor %}
+        <div id="{{ field.auto_id }}_errors" role="alert">
+            {% for error in field.errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+        </div>
     {% endfor %}
     <button type="submit" class="btn btn-primary">Guardar evaluación</button>
 </form>

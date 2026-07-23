@@ -66,6 +66,11 @@ def assign_challenge_evaluation_roles(
     actor,
     command: AssignChallengeEvaluationRolesCommand,
 ) -> Challenge:
+    challenge = (
+        Challenge.objects.select_for_update()
+        .select_related("publisher")
+        .get(pk=challenge.pk)
+    )
     messages = []
     invariant_ids = []
 
@@ -79,9 +84,14 @@ def assign_challenge_evaluation_roles(
         ),
     )
 
-    if challenge.status in {Challenge.Status.AWARDED, Challenge.Status.ARCHIVED}:
+    if challenge.status not in {
+        Challenge.Status.DRAFT,
+        Challenge.Status.PUBLISHED,
+        Challenge.Status.CLOSED,
+    }:
         messages.append(
-            "No puedes redefinir el equipo de evaluación para un desafío adjudicado o archivado."
+            "El equipo de evaluación queda congelado cuando inicia la evaluación "
+            "o el desafío llega a un estado terminal."
         )
 
     if not command.evaluator_user_ids:
@@ -140,6 +150,11 @@ def assign_challenge_evaluation_roles(
 
 @transaction.atomic
 def start_challenge_evaluation(*, challenge: Challenge, actor) -> Challenge:
+    challenge = (
+        Challenge.objects.select_for_update()
+        .select_related("publisher")
+        .get(pk=challenge.pk)
+    )
     messages = []
     invariant_ids = []
 
@@ -153,8 +168,10 @@ def start_challenge_evaluation(*, challenge: Challenge, actor) -> Challenge:
         ),
     )
 
-    if challenge.status != Challenge.Status.PUBLISHED:
-        messages.append("Solo los desafíos publicados pueden pasar a evaluación.")
+    if challenge.status != Challenge.Status.CLOSED:
+        messages.append(
+            "Solo los desafíos con recepción cerrada pueden pasar a evaluación."
+        )
 
     if not challenge.applications.submitted().exists():
         messages.append("No puedes iniciar evaluación sin propuestas registradas.")
@@ -199,6 +216,16 @@ def evaluate_application_by_criteria(
     actor,
     command: EvaluateApplicationCommand,
 ) -> Application:
+    challenge = (
+        Challenge.objects.select_for_update()
+        .select_related("publisher")
+        .get(pk=challenge.pk)
+    )
+    application = (
+        Application.objects.select_for_update()
+        .select_related("challenge", "applicant")
+        .get(pk=application.pk)
+    )
     messages = []
     invariant_ids = []
 
@@ -226,6 +253,8 @@ def evaluate_application_by_criteria(
 
     if application.challenge_id != challenge.pk:
         messages.append("La propuesta evaluada no pertenece a este desafío.")
+    if application.status != Application.Status.SUBMITTED:
+        messages.append("Solo una propuesta enviada puede evaluarse.")
 
     _ensure_structured_criteria_items(challenge)
     criteria = list(challenge.evaluation_criteria_items.order_by("position"))
@@ -302,6 +331,105 @@ def evaluate_application_by_criteria(
     return application
 
 
+def _resolve_award_selection(
+    *,
+    challenge: Challenge,
+    winning_application: Application,
+    command: AwardDecisionCommand,
+    messages: list[str],
+    invariant_ids: list[str],
+) -> dict:
+    """Resolve ranking context and selection mode for a candidate winner.
+
+    Appends every rule violation to ``messages``/``invariant_ids`` and returns
+    the selection data the ``AwardDecision`` snapshot needs.
+    """
+    selection = {
+        "winning_summary": None,
+        "selection_mode": AwardDecision.SelectionMode.BEST_RANKED,
+        "exceptional_reason": "",
+        "best_available_applications": [],
+        "higher_ranked_applications": [],
+    }
+
+    challenge_summaries = build_challenge_application_evaluation_summaries(challenge)
+    pending_award_messages = build_pending_award_messages(challenge_summaries)
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_all_active_applications_have_complete_coverage(
+            has_incomplete_active_applications=bool(pending_award_messages)
+        ),
+    )
+    if pending_award_messages:
+        messages.extend(pending_award_messages[1:])
+
+    _collect_rule_violation(
+        messages=messages,
+        invariant_ids=invariant_ids,
+        callback=lambda: ensure_application_has_required_criterion_coverage_for_award(
+            winning_application
+        ),
+    )
+    winning_application_with_summary = next(
+        (
+            application
+            for application in challenge_summaries
+            if application.pk == winning_application.pk
+        ),
+        None,
+    )
+    if winning_application_with_summary is None:
+        messages.append(
+            "No fue posible reconstruir el resumen de evaluación de la propuesta seleccionada."
+        )
+        return selection
+
+    winning_summary = winning_application_with_summary.evaluation_summary
+    selection["winning_summary"] = winning_summary
+    selection["best_available_applications"] = [
+        application
+        for application in challenge_summaries
+        if application.evaluation_summary.ranking_position == 1
+    ]
+    selection["higher_ranked_applications"] = [
+        application
+        for application in challenge_summaries
+        if (
+            application.evaluation_summary.ranking_position is not None
+            and winning_summary.ranking_position is not None
+            and application.evaluation_summary.ranking_position
+            < winning_summary.ranking_position
+        )
+    ]
+    is_exceptional_award = (
+        winning_summary.ranking_position is not None
+        and winning_summary.ranking_position > 1
+    )
+    selection["exceptional_reason"] = (command.exceptional_reason or "").strip()
+    if is_exceptional_award and not command.confirm_exceptional_selection:
+        messages.append(
+            "Debes confirmar explícitamente que deseas adjudicar fuera del mejor lugar disponible."
+        )
+        invariant_ids.append(
+            INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION
+        )
+    if is_exceptional_award and not selection["exceptional_reason"]:
+        messages.append(
+            "Debes registrar un motivo estructurado para adjudicar fuera del mejor lugar disponible."
+        )
+        invariant_ids.append(
+            INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION
+        )
+
+    if is_exceptional_award:
+        selection["selection_mode"] = AwardDecision.SelectionMode.EXCEPTIONAL
+    elif winning_summary.is_tied:
+        selection["selection_mode"] = AwardDecision.SelectionMode.TIE_BREAK
+
+    return selection
+
+
 @transaction.atomic
 def adjudicate_challenge(
     *,
@@ -309,6 +437,11 @@ def adjudicate_challenge(
     actor,
     command: AwardDecisionCommand,
 ) -> AwardDecision:
+    challenge = (
+        Challenge.objects.select_for_update()
+        .select_related("publisher")
+        .get(pk=challenge.pk)
+    )
     messages = []
     invariant_ids = []
 
@@ -337,96 +470,29 @@ def adjudicate_challenge(
     if AwardDecision.objects.filter(challenge=challenge).exists():
         messages.append("Este desafío ya tiene una decisión de adjudicación registrada.")
 
-    winning_application = Application.objects.submitted().filter(
+    winning_application = Application.objects.select_for_update().submitted().filter(
         pk=command.winning_application_id
     ).select_related("challenge", "applicant").first()
-    winning_application_summary = None
-    winning_application_with_summary = None
-    challenge_summaries = []
-    best_available_applications = []
-    higher_ranked_applications = []
-    selection_mode = AwardDecision.SelectionMode.BEST_RANKED
-    exceptional_reason = ""
+    selection = {
+        "winning_summary": None,
+        "selection_mode": AwardDecision.SelectionMode.BEST_RANKED,
+        "exceptional_reason": "",
+        "best_available_applications": [],
+        "higher_ranked_applications": [],
+    }
     _ensure_structured_criteria_items(challenge)
     if winning_application is None:
         messages.append("Debes seleccionar una propuesta válida para adjudicar.")
     elif winning_application.challenge_id != challenge.pk:
         messages.append("La propuesta seleccionada no pertenece a este desafío.")
     else:
-        challenge_summaries = build_challenge_application_evaluation_summaries(challenge)
-        pending_award_messages = build_pending_award_messages(challenge_summaries)
-        _collect_rule_violation(
+        selection = _resolve_award_selection(
+            challenge=challenge,
+            winning_application=winning_application,
+            command=command,
             messages=messages,
             invariant_ids=invariant_ids,
-            callback=lambda: ensure_all_active_applications_have_complete_coverage(
-                has_incomplete_active_applications=bool(pending_award_messages)
-            ),
         )
-        if pending_award_messages:
-            messages.extend(pending_award_messages[1:])
-
-        _collect_rule_violation(
-            messages=messages,
-            invariant_ids=invariant_ids,
-            callback=lambda: ensure_application_has_required_criterion_coverage_for_award(
-                winning_application
-            ),
-        )
-        winning_application_with_summary = next(
-            (
-                application
-                for application in challenge_summaries
-                if application.pk == winning_application.pk
-            ),
-            None,
-        )
-        if winning_application_with_summary is None:
-            messages.append(
-                "No fue posible reconstruir el resumen de evaluación de la propuesta seleccionada."
-            )
-        else:
-            winning_application_summary = (
-                winning_application_with_summary.evaluation_summary
-            )
-            best_available_applications = [
-                application
-                for application in challenge_summaries
-                if application.evaluation_summary.ranking_position == 1
-            ]
-            higher_ranked_applications = [
-                application
-                for application in challenge_summaries
-                if (
-                    application.evaluation_summary.ranking_position is not None
-                    and winning_application_summary.ranking_position is not None
-                    and application.evaluation_summary.ranking_position
-                    < winning_application_summary.ranking_position
-                )
-            ]
-            is_exceptional_award = (
-                winning_application_summary.ranking_position is not None
-                and winning_application_summary.ranking_position > 1
-            )
-            exceptional_reason = (command.exceptional_reason or "").strip()
-            if is_exceptional_award and not command.confirm_exceptional_selection:
-                messages.append(
-                    "Debes confirmar explícitamente que deseas adjudicar fuera del mejor lugar disponible."
-                )
-                invariant_ids.append(
-                    INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION
-                )
-            if is_exceptional_award and not exceptional_reason:
-                messages.append(
-                    "Debes registrar un motivo estructurado para adjudicar fuera del mejor lugar disponible."
-                )
-                invariant_ids.append(
-                    INV_34_EXCEPTIONAL_AWARDS_REQUIRE_REASON_AND_JUSTIFICATION
-                )
-
-            if is_exceptional_award:
-                selection_mode = AwardDecision.SelectionMode.EXCEPTIONAL
-            elif winning_application_summary.is_tied:
-                selection_mode = AwardDecision.SelectionMode.TIE_BREAK
 
     if not (command.comment or "").strip():
         messages.append("Debes registrar un comentario de adjudicación.")
@@ -436,6 +502,12 @@ def adjudicate_challenge(
             messages,
             invariant_ids=invariant_ids,
         )
+
+    winning_application_summary = selection["winning_summary"]
+    selection_mode = selection["selection_mode"]
+    exceptional_reason = selection["exceptional_reason"]
+    best_available_applications = selection["best_available_applications"]
+    higher_ranked_applications = selection["higher_ranked_applications"]
 
     decision = AwardDecision(
         challenge=challenge,

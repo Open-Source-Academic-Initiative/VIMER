@@ -1,15 +1,20 @@
 import mimetypes
+import re
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 
 from django.db import models
 from django.db.models import UniqueConstraint
+from django.db.models.deletion import ProtectedError
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from apps.corporate.models import Organization
 from apps.marketplace.content import (
+    build_application_summary,
     build_attachment_upload_path,
     new_opaque_id,
     render_markdown,
+    sniff_attachment_content_type,
     validate_attachment_file,
 )
 
@@ -36,7 +41,14 @@ class Challenge(models.Model):
         CLOSED = "CLOSED", _("Cerrado")
         UNDER_EVALUATION = "UNDER_EVALUATION", _("En evaluación")
         AWARDED = "AWARDED", _("Adjudicado")
+        CANCELLED = "CANCELLED", _("Cancelado")
+        DESERTED = "DESERTED", _("Desierto")
         ARCHIVED = "ARCHIVED", _("Archivado")
+
+    class Currency(models.TextChoices):
+        COP = "COP", _("Peso colombiano (COP)")
+        USD = "USD", _("Dólar estadounidense (USD)")
+        EUR = "EUR", _("Euro (EUR)")
 
     objects = ChallengeQuerySet.as_manager()
 
@@ -57,12 +69,29 @@ class Challenge(models.Model):
         _("Estado"),
         max_length=24,
         choices=Status.choices,
-        default=Status.PUBLISHED,
+        default=Status.DRAFT,
     )
     application_deadline = models.DateField(
         _("Fecha límite de aplicación"),
         null=True,
         blank=True,
+    )
+    budget_amount = models.DecimalField(
+        _("Presupuesto máximo"),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            "Los registros históricos pueden no tener presupuesto. "
+            "Toda nueva publicación debe definirlo."
+        ),
+    )
+    budget_currency = models.CharField(
+        _("Moneda del presupuesto"),
+        max_length=3,
+        choices=Currency.choices,
+        default=Currency.COP,
     )
     categories = models.ManyToManyField(
         "marketplace.ChallengeCategory",
@@ -77,6 +106,15 @@ class Challenge(models.Model):
         verbose_name = _("Desafío")
         verbose_name_plural = _("Desafíos")
         ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(budget_amount__isnull=True)
+                    | models.Q(budget_amount__gt=0)
+                ),
+                name="challenge_budget_amount_positive_or_null",
+            ),
+        ]
 
     def clean(self):
         errors = {}
@@ -95,6 +133,61 @@ class Challenge(models.Model):
                 "La fecha límite de aplicación no puede estar en el pasado para un desafío publicado."
             )
 
+        if self.budget_amount is not None and self.budget_amount <= 0:
+            errors["budget_amount"] = _("El presupuesto debe ser mayor que cero.")
+
+        try:
+            criteria_specs = self._parse_evaluation_criteria_specs()
+        except ValidationError as exc:
+            errors["evaluation_criteria"] = " ".join(exc.messages)
+            criteria_specs = []
+        parsed_criteria = [label for label, _, _ in criteria_specs]
+        if any(len(label) > 255 for label in parsed_criteria):
+            errors["evaluation_criteria"] = _(
+                "Cada criterio de evaluación debe tener máximo 255 caracteres."
+            )
+        normalized_criteria = [label.casefold() for label in parsed_criteria]
+        if len(normalized_criteria) != len(set(normalized_criteria)):
+            errors["evaluation_criteria"] = _(
+                "Los criterios de evaluación no pueden estar repetidos."
+            )
+
+        if self.pk:
+            original = Challenge.objects.filter(pk=self.pk).first()
+            if original is not None:
+                protected_process = (
+                    original.applications.exists()
+                    or original.status
+                    in {
+                        self.Status.CLOSED,
+                        self.Status.UNDER_EVALUATION,
+                        self.Status.AWARDED,
+                        self.Status.CANCELLED,
+                        self.Status.DESERTED,
+                        self.Status.ARCHIVED,
+                    }
+                )
+                if (
+                    protected_process
+                    and original.evaluation_criteria != self.evaluation_criteria
+                ):
+                    errors["evaluation_criteria"] = _(
+                        "Los criterios no pueden modificarse después de recibir propuestas o cerrar el desafío."
+                    )
+                protected_commercial_fields = (
+                    "budget_amount",
+                    "budget_currency",
+                    "application_deadline",
+                )
+                if protected_process and any(
+                    getattr(original, field_name) != getattr(self, field_name)
+                    for field_name in protected_commercial_fields
+                ):
+                    errors["__all__"] = _(
+                        "El presupuesto, la moneda y el plazo no pueden modificarse "
+                        "después de recibir propuestas o cerrar el desafío."
+                    )
+
         if errors:
             raise ValidationError(errors)
 
@@ -108,10 +201,19 @@ class Challenge(models.Model):
         return True
 
     def has_evaluation_criteria(self) -> bool:
-        return bool(self._parse_evaluation_criteria_text())
+        try:
+            return bool(self._parse_evaluation_criteria_specs())
+        except ValidationError:
+            return False
 
     def evaluation_criteria_list(self) -> list[str]:
-        parsed_items = self._parse_evaluation_criteria_text()
+        try:
+            parsed_items = [
+                label
+                for label, _, _ in self._parse_evaluation_criteria_specs()
+            ]
+        except ValidationError:
+            parsed_items = []
         if parsed_items:
             return parsed_items
 
@@ -126,7 +228,7 @@ class Challenge(models.Model):
         if self.pk is None:
             return
 
-        desired_items = self._parse_evaluation_criteria_text()
+        desired_items = self._parse_evaluation_criteria_specs()
         existing_items = {
             item.position: item
             for item in self.evaluation_criteria_items.all()
@@ -139,7 +241,10 @@ class Challenge(models.Model):
         items_to_create = []
         items_to_update = []
 
-        for position, label in enumerate(desired_items, start=1):
+        for position, (label, weight, criterion_type) in enumerate(
+            desired_items,
+            start=1,
+        ):
             existing_item = existing_items.get(position)
             if existing_item is None:
                 items_to_create.append(
@@ -147,12 +252,20 @@ class Challenge(models.Model):
                         challenge=self,
                         label=label,
                         position=position,
+                        weight=weight,
+                        criterion_type=criterion_type,
                     )
                 )
                 continue
 
-            if existing_item.label != label:
+            if (
+                existing_item.label != label
+                or existing_item.weight != weight
+                or existing_item.criterion_type != criterion_type
+            ):
                 existing_item.label = label
+                existing_item.weight = weight
+                existing_item.criterion_type = criterion_type
                 items_to_update.append(existing_item)
 
         stale_positions = set(existing_items) - set(range(1, len(desired_items) + 1))
@@ -160,7 +273,10 @@ class Challenge(models.Model):
             self.evaluation_criteria_items.filter(position__in=stale_positions).delete()
 
         if items_to_update:
-            ChallengeEvaluationCriterion.objects.bulk_update(items_to_update, ["label"])
+            ChallengeEvaluationCriterion.objects.bulk_update(
+                items_to_update,
+                ["label", "weight", "criterion_type"],
+            )
 
         if items_to_create:
             ChallengeEvaluationCriterion.objects.bulk_create(items_to_create)
@@ -195,17 +311,180 @@ class Challenge(models.Model):
             cls.Status.CLOSED,
             cls.Status.UNDER_EVALUATION,
             cls.Status.AWARDED,
+            cls.Status.CANCELLED,
+            cls.Status.DESERTED,
         )
 
     def _parse_evaluation_criteria_text(self) -> list[str]:
-        return [
-            line.lstrip("-*0123456789. ").strip()
-            for line in (self.evaluation_criteria or "").splitlines()
-            if line.strip()
-        ]
+        try:
+            return [
+                label
+                for label, _, _ in self._parse_evaluation_criteria_specs()
+            ]
+        except ValidationError:
+            return []
+
+    def _parse_evaluation_criteria_specs(
+        self,
+    ) -> list[tuple[str, Decimal, str]]:
+        raw_items: list[tuple[str, Decimal | None]] = []
+        list_prefix = re.compile(r"^\s*(?:[-*•]\s+|\d+[.)]\s+)")
+        weight_suffix = re.compile(
+            r"^(?P<label>.+?)\s*\|\s*(?P<weight>\d+(?:[.,]\d{1,2})?)\s*%?\s*$"
+        )
+        for raw_line in (self.evaluation_criteria or "").splitlines():
+            stripped_line = raw_line.strip()
+            if not stripped_line or stripped_line in {"-", "*", "•"}:
+                continue
+            label = list_prefix.sub("", stripped_line, count=1).strip()
+            weight = None
+            weighted_match = weight_suffix.match(label)
+            if weighted_match:
+                label = weighted_match.group("label").strip()
+                try:
+                    weight = Decimal(
+                        weighted_match.group("weight").replace(",", ".")
+                    )
+                except InvalidOperation as exc:
+                    raise ValidationError(
+                        {
+                            "evaluation_criteria": _(
+                                "El peso de cada criterio debe ser un porcentaje válido."
+                            )
+                        }
+                    ) from exc
+            elif "|" in label:
+                raise ValidationError(
+                    {
+                        "evaluation_criteria": _(
+                            "Usa el formato «Criterio | porcentaje» para definir pesos."
+                        )
+                    }
+                )
+            if label:
+                raw_items.append((label, weight))
+
+        if not raw_items:
+            return []
+
+        explicit_total = sum(
+            (weight for _, weight in raw_items if weight is not None),
+            start=Decimal("0"),
+        )
+        missing_count = sum(weight is None for _, weight in raw_items)
+        if explicit_total > Decimal("100"):
+            raise ValidationError(
+                {
+                    "evaluation_criteria": _(
+                        "La suma de pesos no puede superar 100 %."
+                    )
+                }
+            )
+        if missing_count == 0 and explicit_total != Decimal("100"):
+            raise ValidationError(
+                {
+                    "evaluation_criteria": _(
+                        "Cuando indicas todos los pesos, su suma debe ser 100 %."
+                    )
+                }
+            )
+        if missing_count and explicit_total >= Decimal("100"):
+            raise ValidationError(
+                {
+                    "evaluation_criteria": _(
+                        "Debe quedar un porcentaje positivo para los criterios sin peso."
+                    )
+                }
+            )
+
+        remaining = Decimal("100") - explicit_total
+        implicit_weights: list[Decimal] = []
+        if missing_count:
+            base_weight = (
+                remaining / missing_count
+            ).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+            implicit_weights = [base_weight] * missing_count
+            implicit_weights[0] += remaining - sum(implicit_weights)
+
+        economic_terms = (
+            "costo",
+            "precio",
+            "económ",
+            "econom",
+            "valor ofert",
+        )
+        result = []
+        implicit_index = 0
+        for label, weight in raw_items:
+            if weight is None:
+                weight = implicit_weights[implicit_index]
+                implicit_index += 1
+            if weight <= 0:
+                raise ValidationError(
+                    {
+                        "evaluation_criteria": _(
+                            "Todos los criterios deben tener un peso mayor que cero."
+                        )
+                    }
+                )
+            normalized_label = label.casefold()
+            criterion_type = (
+                ChallengeEvaluationCriterion.CriterionType.ECONOMIC
+                if any(term in normalized_label for term in economic_terms)
+                else ChallengeEvaluationCriterion.CriterionType.TECHNICAL
+            )
+            result.append((label, weight, criterion_type))
+        return result
+
+
+class ChallengeLifecycleEvent(models.Model):
+    """Immutable audit record for every explicit challenge transition."""
+
+    class EventType(models.TextChoices):
+        DRAFT_CREATED = "DRAFT_CREATED", _("Borrador creado")
+        DRAFT_UPDATED = "DRAFT_UPDATED", _("Borrador actualizado")
+        PUBLISHED = "PUBLISHED", _("Desafío publicado")
+        CLOSED = "CLOSED", _("Recepción cerrada")
+        CANCELLED = "CANCELLED", _("Desafío cancelado")
+        DESERTED = "DESERTED", _("Desafío declarado desierto")
+
+    challenge = models.ForeignKey(
+        Challenge,
+        on_delete=models.PROTECT,
+        related_name="lifecycle_events",
+    )
+    event_type = models.CharField(
+        _("Tipo de evento"),
+        max_length=24,
+        choices=EventType.choices,
+    )
+    from_status = models.CharField(_("Estado anterior"), max_length=24, blank=True)
+    to_status = models.CharField(_("Estado resultante"), max_length=24)
+    actor = models.ForeignKey(
+        "identity.User",
+        on_delete=models.PROTECT,
+        related_name="challenge_lifecycle_events",
+        null=True,
+        blank=True,
+    )
+    is_automatic = models.BooleanField(_("Transición automática"), default=False)
+    reason = models.TextField(_("Motivo"), blank=True, default="")
+    occurred_at = models.DateTimeField(_("Fecha del evento"), default=timezone.now)
+
+    class Meta:
+        verbose_name = _("Evento de ciclo de vida del desafío")
+        verbose_name_plural = _("Eventos de ciclo de vida del desafío")
+        ordering = ["-occurred_at", "-id"]
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} - {self.challenge}"
 
 
 class ChallengeEvaluationCriterion(models.Model):
+    class CriterionType(models.TextChoices):
+        TECHNICAL = "TECHNICAL", _("Técnico")
+        ECONOMIC = "ECONOMIC", _("Económico")
+
     challenge = models.ForeignKey(
         Challenge,
         on_delete=models.CASCADE,
@@ -213,6 +492,18 @@ class ChallengeEvaluationCriterion(models.Model):
     )
     label = models.CharField(_("Criterio"), max_length=255)
     position = models.PositiveIntegerField(_("Posición"))
+    weight = models.DecimalField(
+        _("Peso porcentual"),
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("100.00"),
+    )
+    criterion_type = models.CharField(
+        _("Tipo de criterio"),
+        max_length=16,
+        choices=CriterionType.choices,
+        default=CriterionType.TECHNICAL,
+    )
 
     class Meta:
         verbose_name = _("Criterio de evaluación")
@@ -223,13 +514,30 @@ class ChallengeEvaluationCriterion(models.Model):
                 fields=["challenge", "position"],
                 name="unique_evaluation_criterion_position_per_challenge",
             ),
+            models.CheckConstraint(
+                condition=models.Q(weight__gt=0) & models.Q(weight__lte=100),
+                name="evaluation_criterion_weight_between_zero_and_100",
+            ),
         ]
 
     def __str__(self):
         return f"{self.challenge}: {self.label}"
 
 
+class ChallengeCategoryQuerySet(models.QuerySet):
+    def delete(self):
+        referenced = self.filter(challenges__isnull=False).distinct()
+        if referenced.exists():
+            raise ProtectedError(
+                "Las categorías referenciadas no pueden eliminarse; desactívalas.",
+                list(referenced),
+            )
+        return super().delete()
+
+
 class ChallengeCategory(models.Model):
+    objects = ChallengeCategoryQuerySet.as_manager()
+
     name = models.CharField(_("Nombre"), max_length=120, unique=True)
     slug = models.SlugField(_("Slug"), max_length=140, unique=True)
     description = models.TextField(_("Descripción"), blank=True, default="")
@@ -243,6 +551,14 @@ class ChallengeCategory(models.Model):
 
     def __str__(self):
         return self.name
+
+    def delete(self, *args, **kwargs):
+        if self.challenges.exists():
+            raise ProtectedError(
+                "Una categoría referenciada no puede eliminarse; desactívala.",
+                [self],
+            )
+        return super().delete(*args, **kwargs)
 
 
 class ApplicationQuerySet(models.QuerySet):
@@ -296,6 +612,25 @@ class Application(models.Model):
         blank=True,
         default="",
     )
+    offered_amount = models.DecimalField(
+        _("Valor total ofertado"),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    offer_currency = models.CharField(
+        _("Moneda de la oferta"),
+        max_length=3,
+        choices=Challenge.Currency.choices,
+        blank=True,
+        default="",
+    )
+    estimated_duration_days = models.PositiveIntegerField(
+        _("Duración estimada (días)"),
+        null=True,
+        blank=True,
+    )
     status = models.CharField(
         _("Estado"),
         max_length=16,
@@ -317,6 +652,20 @@ class Application(models.Model):
             UniqueConstraint(
                 fields=["challenge", "applicant"],
                 name="unique_application_per_challenge_and_applicant",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(offered_amount__isnull=True)
+                    | models.Q(offered_amount__gt=0)
+                ),
+                name="application_offered_amount_positive_or_null",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(estimated_duration_days__isnull=True)
+                    | models.Q(estimated_duration_days__gt=0)
+                ),
+                name="application_duration_days_positive_or_null",
             ),
         ]
 
@@ -361,6 +710,28 @@ class Application(models.Model):
                 errors["applied_at"] = _(
                     "Una propuesta enviada debe registrar su fecha de envío."
                 )
+            if self.challenge and self.challenge.budget_amount is not None:
+                if self.offered_amount is None:
+                    errors["offered_amount"] = _(
+                        "Debes indicar el valor total de la oferta."
+                    )
+                elif self.offered_amount <= 0:
+                    errors["offered_amount"] = _(
+                        "El valor total ofertado debe ser mayor que cero."
+                    )
+                elif self.offered_amount > self.challenge.budget_amount:
+                    errors["offered_amount"] = _(
+                        "El valor total ofertado no puede superar el presupuesto "
+                        "máximo del desafío."
+                    )
+                if self.offer_currency != self.challenge.budget_currency:
+                    errors["offer_currency"] = _(
+                        "La moneda de la oferta debe coincidir con la moneda del presupuesto."
+                    )
+                if not self.estimated_duration_days:
+                    errors["estimated_duration_days"] = _(
+                        "Debes indicar la duración estimada de ejecución."
+                    )
 
         if original is not None:
             identity_fields = ("challenge_id", "applicant_id")
@@ -379,6 +750,9 @@ class Application(models.Model):
                 "proposed_solution",
                 "capabilities_evidence",
                 "execution_plan",
+                "offered_amount",
+                "offer_currency",
+                "estimated_duration_days",
                 "applied_at",
             )
             if original.status == self.Status.SUBMITTED and any(
@@ -442,13 +816,11 @@ class Application(models.Model):
         return f"Propuesta de {self.applicant} para {self.challenge}"
 
     def _build_application_summary(self) -> str:
-        return "\n\n".join(
-            [
-                f"Entendimiento del problema: {(self.problem_understanding or '').strip()}",
-                f"Solución propuesta: {(self.proposed_solution or '').strip()}",
-                f"Capacidades y evidencia: {(self.capabilities_evidence or '').strip()}",
-                f"Plan de ejecución: {(self.execution_plan or '').strip()}",
-            ]
+        return build_application_summary(
+            problem_understanding=self.problem_understanding,
+            proposed_solution=self.proposed_solution,
+            capabilities_evidence=self.capabilities_evidence,
+            execution_plan=self.execution_plan,
         )
 
 
@@ -485,8 +857,11 @@ class AttachmentBase(models.Model):
     def save(self, *args, **kwargs):
         if self.file:
             self.original_filename = self.original_filename or self.file.name
+            # El tipo persistido sale del contenido real del archivo; la
+            # cabecera del cliente y la extensión son solo fallbacks.
             self.content_type = (
-                self.content_type
+                sniff_attachment_content_type(self.file)
+                or self.content_type
                 or getattr(self.file, "content_type", "")
                 or mimetypes.guess_type(self.file.name)[0]
                 or ""

@@ -16,7 +16,9 @@ Current status:
 - The current Phase 6 semantic-alignment slice is now closed for marketplace and evaluation UI, business-oriented tests, and core project documentation.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 109 tests.
+- The automated test suite currently passes with 151 tests.
+- Operating the platform (publishing challenges, applying, and running evaluation) now requires a verified email and an active account, enforced through a native `OperationalUserRequiredMixin`; unverified users keep read-only navigation.
+- Outbound email links (email verification and in-app notifications) are now built as absolute URLs from `PUBLIC_BASE_URL`, and the signup verification email no longer fails silently: if it cannot be sent, registration rolls back so no account is left stranded.
 - Django Admin now prevents a platform superuser from deleting its own account.
 - Organizations can upload a custom logo during signup, limited to PNG/JPG; otherwise a procedural default avatar is generated automatically.
 - Organization logos/avatars are visible in marketplace publications and proposal listings.
@@ -49,7 +51,17 @@ Current status:
 - Django 6.0 template partials and the Tasks framework are available in the platform reference set, but they are not currently used in VIMER because no concrete product flow requires them yet.
 - Containerized serving now uses `gunicorn` instead of Django's development server.
 - Challenges now support a formal evaluation team with designated evaluators, one designated adjudicator, and optional observers.
-- The project is not production-ready yet: security hardening, broader test coverage, and several operational gaps still need to be addressed.
+- A completed remediation pass closed the earlier security and usability findings: secure-by-default settings, protected private attachments, static-file serving, attachment hardening, confirm-step email verification, and UI/UX improvements.
+- `DEBUG` is now opt-in for every profile: a pilot or production container without an explicit `SECRET_KEY` fails fast at startup instead of booting with development defaults.
+- Static files (Django admin assets) are collected during the image build and served by WhiteNoise under gunicorn in the pilot profile; the production compose now populates the nginx `static_data` volume before starting gunicorn.
+- Private challenge/proposal attachments are no longer reachable by direct `/media/` URL in production: the nginx location is `internal` and authorized downloads are delegated through `X-Accel-Redirect` (`ATTACHMENT_X_ACCEL_REDIRECT`).
+- Attachment uploads are now validated by magic bytes (PDF/PNG/JPG signatures), not by the client-supplied content type; the per-application attachment limit is enforced cumulatively across draft saves, and draft attachments can be deleted from the proposal form.
+- Email verification is now a two-step flow: the emailed link shows a confirmation page (GET) and only an explicit POST consumes the token, so mail scanners cannot trigger the state change.
+- Notification email delivery failures are now logged instead of silently discarded.
+- Challenge publication rejects a missing category selection explicitly instead of silently assigning a default category.
+- Challenge and notification lists are paginated; the marketplace UI shares one palette defined in `base.html`, the signup form is grouped into fieldsets, and `challenge_detail` is split into focused template includes.
+- `ruff` (lint) and `coverage` are now part of the development toolchain (`make lint`, `make test-coverage`); `make verify-fast` runs compile + lint + checks + tests.
+- The project is not production-ready yet: broader test coverage and several operational gaps (CSP tightening, email queueing) still need to be addressed.
 
 ## Domain
 
@@ -198,8 +210,8 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 109 tests.
-- The repository is well structured, and the current active local iteration branch is `baseline-iteration`.
+- `python manage.py test` currently passes with 151 tests.
+- The repository is well structured, and the current active local iteration branch is `feature/v1-pilot-readiness`.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
 - The root route now exposes a dedicated landing page instead of sending users directly to signup.
@@ -221,8 +233,7 @@ Strengths:
 - Notifications now live in their own Django app and consume evaluation domain events.
 
 Current limitations:
-- The default runtime profile remains development-oriented unless environment variables are configured carefully.
-- Deployment security still depends on correct environment configuration.
+- Deployment security still depends on correct environment configuration and real infrastructure validation.
 - Test coverage is still limited.
 - SQLite is still the default database.
 - `README.md` should be kept in sync as the local iteration evolves, since some operational details change faster than the core architecture.
@@ -266,6 +277,16 @@ Priority issues identified during the audit were fixed:
 - Expanded automated coverage to 109 tests, including duplicate username/email handling, registration-service validation errors, image-format validation, avatar generation, marketplace logo rendering, superuser self-deletion safeguards, negative flow/service tests for marketplace role restrictions, challenge lifecycle enforcement, proposal completeness, persisted draft-save and draft-promotion flows, post-submission immutability, evaluation/adjudication flows, equal-weight criterion scoring, incomplete-proposal adjudication blocking, compact tie handling, exceptional adjudication governance, evaluation domain-event emission after commit, event-driven evaluation history persistence/rendering, internal notification delivery/read-state flows, evaluation-criteria enforcement in publication/evaluation flows, structured evaluation-criteria rendering/persistence, criterion-assessment enforcement before adjudication, publisher-facing evaluation summary rendering, adjudication snapshots, proposal-evaluation events, formal evaluation-role enforcement, challenge-detail isolation of publisher-only evaluation read models, blind evaluation/adjudication identity protection until award, multiple-evaluator aggregation/update semantics, draft-visibility regressions, model-level logo validation, and structured-criteria reconciliation.
 - Marketplace subdomain coverage is now organized explicitly into challenge flow tests, application flow tests, challenge service tests, and application service tests.
 
+## Pilot-readiness hardening (v1)
+
+This slice closed the gap between "code-complete" and "functionally verified" for the v1 pilot, using only native Django capabilities:
+
+- Enforced email verification before operating: a native `OperationalUserRequiredMixin` (`apps/identity/mixins.py`) now gates the write-side views of `marketplace` and `evaluation` on `User.can_operate`; read-only navigation stays open.
+- Fixed outbound email links to be absolute through a new `PUBLIC_BASE_URL` setting (email verification and in-app notification emails); the in-app inbox keeps relative links.
+- Made the signup verification email non-silent: if it cannot be sent, registration now rolls back inside its transaction instead of leaving an unverifiable account behind.
+- Expanded the automated suite from 109 to 144 tests, adding service- and flow-level coverage for email verification and gating, organization join-request approval/rejection, titularity transfer, password reset, the Turnstile failure path, attachment download permissions, markdown sanitization, marketplace search/filters, and the platform dashboard KPIs.
+- Added a `.dockerignore` plus a `make test-docker` target that builds the lightweight `python:3.12-slim-bookworm` image and runs the full suite inside the container, which is the reproducible way to validate the suite when the working tree lives on a `noexec` mount. The full 144-test suite was validated green inside that container.
+
 ## Main routes
 
 - `/`: public landing page
@@ -308,8 +329,16 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
+python manage.py seed_categories      # closed challenge-category catalog
 python manage.py createsuperuser
 python manage.py runserver
+```
+
+For manual QA, a single idempotent command seeds a complete set of test
+accounts covering every role and account state:
+
+```bash
+python manage.py seed_test_users      # QA/staging only
 ```
 
 Relevant environment variables:
@@ -320,6 +349,8 @@ Relevant environment variables:
 - `DATABASE_URL`
 - `CSRF_TRUSTED_ORIGINS`
 - `READ_DOT_ENV_FILE`
+- `PUBLIC_BASE_URL` (absolute base URL used to build links in outbound emails)
+- `DEPLOYMENT_PROFILE` (`pilot` or `production`)
 
 Environment behavior:
 - Development: `DEBUG=True`, SQLite by default, secure cookies disabled, and local `ALLOWED_HOSTS` entries automatically included.

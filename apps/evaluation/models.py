@@ -54,9 +54,10 @@ class ChallengeEvaluationRoleAssignment(models.Model):
         errors = {}
 
         if self.challenge_id and self.user_id:
-            if self.user.organization_id != self.challenge.publisher_id:
+            if not self.user.is_operational_member_of(self.challenge.publisher_id):
                 errors["user"] = _(
-                    "Los roles de evaluación solo pueden asignarse a miembros de la organización publicadora."
+                    "Los roles de evaluación solo pueden asignarse a miembros "
+                    "operativos de la organización publicadora."
                 )
 
         if errors:
@@ -272,7 +273,7 @@ class ApplicationCriterionEvaluation(models.Model):
     )
     criterion = models.ForeignKey(
         ChallengeEvaluationCriterion,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="application_evaluations",
     )
     score = models.PositiveSmallIntegerField(

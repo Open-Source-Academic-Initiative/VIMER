@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 {% block title %}Iniciar Sesión - VIMER{% endblock %}
 {% block content %}
-<h2>Iniciar Sesión</h2>
+<h1>Iniciar sesión</h1>
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit" class="btn btn-primary">Entrar</button>
 </form>
+<p><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></p>
 <p>¿No tienes cuenta? <a href="{% url 'signup' %}">Regístrate aquí</a></p>
 {% endblock %}

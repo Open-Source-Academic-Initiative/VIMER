@@ -1,0 +1,37 @@
+<h3>Equipo de evaluación</h3>
+<div class="card">
+    <p>
+        <strong>Evaluadores designados:</strong>
+        {% for assignment in evaluation_team.evaluators %}
+            {{ assignment.user.username }}{% if not forloop.last %}, {% endif %}
+        {% empty %}
+            Aún no definidos
+        {% endfor %}
+    </p>
+    <p>
+        <strong>Adjudicador designado:</strong>
+        {% if evaluation_team.adjudicator %}
+            {{ evaluation_team.adjudicator.user.username }}
+        {% else %}
+            Aún no definido
+        {% endif %}
+    </p>
+    <p>
+        <strong>Observadores:</strong>
+        {% for assignment in evaluation_team.observers %}
+            {{ assignment.user.username }}{% if not forloop.last %}, {% endif %}
+        {% empty %}
+            Sin observadores designados
+        {% endfor %}
+    </p>
+    {% if can_manage_evaluation_team %}
+        <p>
+            <a href="{% url 'evaluation:challenge-evaluation-roles-update' challenge.pk %}" class="btn btn-primary">
+                Gestionar equipo de evaluación
+            </a>
+        </p>
+    {% endif %}
+    {% if not has_required_evaluation_team %}
+        <p>Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación.</p>
+    {% endif %}
+</div>

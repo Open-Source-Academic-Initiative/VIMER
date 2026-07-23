@@ -3,8 +3,10 @@ import tempfile
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -37,7 +39,14 @@ from apps.marketplace.application.exceptions import (
     ChallengePublicationValidationError,
     DuplicateChallengeApplicationError,
 )
-from apps.marketplace.models import Application, Challenge, ChallengeCategory
+from apps.marketplace.content import render_markdown
+from apps.marketplace.models import (
+    Application,
+    ApplicationAttachment,
+    Challenge,
+    ChallengeAttachment,
+    ChallengeCategory,
+)
 
 
 class MediaRootIsolatedTestCase(TestCase):
@@ -91,17 +100,20 @@ class MarketplaceSharedFixtureMixin:
             email="demand_user@example.com",
             password="ClaveSegura123",
             organization=cls.demand_organization,
+            is_email_verified=True,
         )
         cls.supply_user = User.objects.create_user(
             username="supply_user",
             email="supply_user@example.com",
             password="ClaveSegura123",
             organization=cls.supply_organization,
+            is_email_verified=True,
         )
         cls.challenge = Challenge.objects.create(
             publisher=cls.demand_organization,
             title="Existing challenge",
             description="Challenge description",
+            status=Challenge.Status.PUBLISHED,
             application_deadline=timezone.localdate() + timedelta(days=7),
         )
         cls.category = ChallengeCategory.objects.first()
@@ -128,6 +140,7 @@ class MarketplaceSharedFixtureMixin:
                 "Tenemos experiencia, equipo y casos previos relevantes."
             ),
             "execution_plan": "Ejecutaremos en fases con hitos y seguimiento.",
+            "confirm_submission": "on",
         }
 
     def create_submitted_application(self):
@@ -303,7 +316,9 @@ class DesafioFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase)
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Propuesta 01")
+        self.assertContains(response, "Su contenido permanece sellado")
+        self.assertEqual(response.context["submitted_application_count"], 1)
+        self.assertEqual(response.context["challenge_applications"], [])
         self.assertNotContains(response, self.supply_organization.business_name)
 
     def test_challenge_detail_hides_evaluation_read_models_from_non_publisher(self):
@@ -580,6 +595,9 @@ class DesafioServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCa
                 description="Description",
                 evaluation_criteria="Viabilidad técnica\nExperiencia\nCosto",
                 application_deadline=future_deadline,
+                budget_amount="150000000.00",
+                budget_currency=Challenge.Currency.COP,
+                category_ids=(self.category.pk,),
             ),
         )
 
@@ -619,12 +637,32 @@ class DesafioServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCa
                     description="Description",
                     evaluation_criteria="Criterios",
                     application_deadline=timezone.localdate() - timedelta(days=1),
+                    category_ids=(self.category.pk,),
                 ),
             )
 
         self.assertIn(
             "La fecha límite de aplicación no puede estar en el pasado para un desafío publicado.",
             captured.exception.messages,
+        )
+
+    def test_publish_challenge_rejects_missing_categories(self):
+        with self.assertRaises(ChallengePublicationValidationError) as captured:
+            publish_challenge(
+                publisher=self.demand_organization,
+                command=PublishChallengeCommand(
+                    title="Challenge without categories",
+                    description="Description",
+                    evaluation_criteria="Criterios",
+                ),
+            )
+
+        self.assertIn(
+            "Debes seleccionar al menos una categoría para el desafío.",
+            captured.exception.messages,
+        )
+        self.assertFalse(
+            Challenge.objects.filter(title="Challenge without categories").exists()
         )
 
     def test_challenge_create_persists_evaluation_criteria(self):
@@ -641,6 +679,8 @@ class DesafioServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCa
                     "Costo total"
                 ),
                 "application_deadline": timezone.localdate() + timedelta(days=14),
+                "budget_amount": "250000000.00",
+                "budget_currency": Challenge.Currency.COP,
                 "categories": [self.category.pk],
             },
         )
@@ -854,3 +894,345 @@ class PropuestaServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTest
             "Una propuesta enviada no puede modificarse después del envío.",
         ):
             application.save()
+
+
+class MarkdownSanitizationTests(TestCase):
+    def test_render_markdown_keeps_safe_formatting(self):
+        html = render_markdown("**Solución** con [enlace](https://vimer.example.org)")
+
+        self.assertIn("<strong>Solución</strong>", html)
+        self.assertIn('href="https://vimer.example.org"', html)
+
+    def test_render_markdown_strips_script_tags(self):
+        html = render_markdown("Texto<script>alert('xss')</script>")
+
+        self.assertNotIn("<script>", html)
+        self.assertNotIn("</script>", html)
+
+    def test_render_markdown_drops_unsafe_link_protocols(self):
+        html = render_markdown("[click](javascript:alert(1))")
+
+        self.assertNotIn("javascript:", html)
+
+    def test_challenge_rendered_description_is_sanitized(self):
+        challenge = Challenge.objects.create(
+            publisher=self.demand_organization
+            if hasattr(self, "demand_organization")
+            else Organization.objects.create(
+                tax_id="900000909",
+                business_name="Markdown Org",
+                chamber_of_commerce_record="CC-MD",
+                role="DEMAND_SIDE",
+                contact_email="md@example.com",
+                contact_phone="3000000000",
+            ),
+            title="Reto markdown",
+            description="**Importante**<script>alert(1)</script>",
+        )
+
+        rendered = challenge.rendered_description
+
+        self.assertIn("<strong>Importante</strong>", rendered)
+        self.assertNotIn("<script>", rendered)
+
+
+class ChallengeSearchAndFilterTests(
+    MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase
+):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.search_category = ChallengeCategory.objects.create(
+            name="Categoría de búsqueda",
+            slug="categoria-busqueda",
+            position=99,
+        )
+        cls.robotics_challenge = Challenge.objects.create(
+            publisher=cls.demand_organization,
+            title="Robótica industrial",
+            description="Automatización de planta",
+            status=Challenge.Status.PUBLISHED,
+        )
+        cls.robotics_challenge.categories.add(cls.search_category)
+        cls.solar_challenge = Challenge.objects.create(
+            publisher=cls.demand_organization,
+            title="Energía solar",
+            description="Optimización de paneles",
+            status=Challenge.Status.PUBLISHED,
+        )
+        cls.closed_challenge = Challenge.objects.create(
+            publisher=cls.demand_organization,
+            title="Reto cerrado",
+            description="Ya no admite propuestas",
+            status=Challenge.Status.CLOSED,
+        )
+
+    def test_search_filters_by_title(self):
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(reverse("marketplace:challenge-list"), {"q": "Robótica"})
+
+        self.assertContains(response, "Robótica industrial")
+        self.assertNotContains(response, "Energía solar")
+
+    def test_filter_by_category(self):
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-list"),
+            {"category": self.search_category.slug},
+        )
+
+        self.assertContains(response, "Robótica industrial")
+        self.assertNotContains(response, "Energía solar")
+
+    def test_filter_by_status(self):
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse("marketplace:challenge-list"),
+            {"status": Challenge.Status.CLOSED},
+        )
+
+        self.assertContains(response, "Reto cerrado")
+        self.assertNotContains(response, "Robótica industrial")
+
+
+class AttachmentDownloadPermissionTests(
+    MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase
+):
+    def setUp(self):
+        super().setUp()
+        User = get_user_model()
+        self.outsider_organization = Organization.objects.create(
+            tax_id="900000303",
+            business_name="Organización ajena",
+            chamber_of_commerce_record="CC-303",
+            role="SUPPLY_SIDE",
+            contact_email="ajena@example.com",
+            contact_phone="3333333",
+        )
+        self.outsider_user = User.objects.create_user(
+            username="outsider_user",
+            email="outsider@example.com",
+            password="ClaveSegura123",
+            organization=self.outsider_organization,
+            is_email_verified=True,
+        )
+
+    def _make_pdf(self, name="documento.pdf"):
+        return SimpleUploadedFile(
+            name, b"%PDF-1.4 contenido de prueba", content_type="application/pdf"
+        )
+
+    def _create_application_attachment(self):
+        application = self.create_submitted_application()
+        attachment = ApplicationAttachment(
+            application=application,
+            uploaded_by=self.supply_user,
+            file=self._make_pdf("propuesta.pdf"),
+        )
+        attachment.save()
+        return attachment
+
+    def test_applicant_can_download_application_attachment(self):
+        attachment = self._create_application_attachment()
+        self.client.force_login(self.supply_user)
+
+        response = self.client.get(
+            reverse(
+                "marketplace:application-attachment-download",
+                args=[attachment.opaque_id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_publisher_cannot_download_application_attachment_before_award(self):
+        attachment = self._create_application_attachment()
+        self.client.force_login(self.demand_user)
+
+        response = self.client.get(
+            reverse(
+                "marketplace:application-attachment-download",
+                args=[attachment.opaque_id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_unrelated_organization_cannot_download_application_attachment(self):
+        attachment = self._create_application_attachment()
+        self.client.force_login(self.outsider_user)
+
+        response = self.client.get(
+            reverse(
+                "marketplace:application-attachment-download",
+                args=[attachment.opaque_id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_user_is_redirected_to_login(self):
+        attachment = self._create_application_attachment()
+
+        response = self.client.get(
+            reverse(
+                "marketplace:application-attachment-download",
+                args=[attachment.opaque_id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
+
+    def test_draft_challenge_attachment_is_private_to_publisher(self):
+        draft_challenge = Challenge.objects.create(
+            publisher=self.demand_organization,
+            title="Desafío en borrador",
+            description="Aún no publicado",
+            status=Challenge.Status.DRAFT,
+        )
+        attachment = ChallengeAttachment(
+            challenge=draft_challenge,
+            uploaded_by=self.demand_user,
+            file=self._make_pdf("anexo.pdf"),
+        )
+        attachment.save()
+        download_url = reverse(
+            "marketplace:challenge-attachment-download", args=[attachment.opaque_id]
+        )
+
+        self.client.force_login(self.outsider_user)
+        forbidden_response = self.client.get(download_url)
+        self.assertEqual(forbidden_response.status_code, 403)
+
+        self.client.force_login(self.demand_user)
+        allowed_response = self.client.get(download_url)
+        self.assertEqual(allowed_response.status_code, 200)
+
+
+class DraftAttachmentManagementTests(
+    MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase
+):
+    def _make_pdf(self, name="documento.pdf"):
+        return SimpleUploadedFile(
+            name, b"%PDF-1.4 contenido de prueba", content_type="application/pdf"
+        )
+
+    def _make_fake_pdf(self, name="falso.pdf"):
+        return SimpleUploadedFile(
+            name, b"MZ ejecutable disfrazado", content_type="application/pdf"
+        )
+
+    def _save_draft_with_attachments(self, attachments):
+        return save_application_draft(
+            challenge=self.challenge,
+            applicant=self.supply_organization,
+            command=SaveApplicationDraftCommand(
+                problem_understanding="Borrador",
+                attachments=tuple(attachments),
+            ),
+            actor=self.supply_user,
+        )
+
+    def test_attachment_count_limit_is_cumulative_across_draft_saves(self):
+        max_count = settings.MARKETPLACE_ATTACHMENT_MAX_COUNT
+        self._save_draft_with_attachments(
+            [self._make_pdf(f"adjunto-{index}.pdf") for index in range(max_count)]
+        )
+
+        with self.assertRaises(ChallengeApplicationValidationError) as captured:
+            self._save_draft_with_attachments([self._make_pdf("uno-mas.pdf")])
+
+        self.assertIn(str(max_count), captured.exception.messages[0])
+        application = Application.objects.get(
+            challenge=self.challenge, applicant=self.supply_organization
+        )
+        self.assertEqual(application.attachments.count(), max_count)
+
+    def test_attachment_with_spoofed_content_type_is_rejected(self):
+        with self.assertRaises(ChallengeApplicationValidationError) as captured:
+            self._save_draft_with_attachments([self._make_fake_pdf()])
+
+        self.assertIn(
+            "Solo se permiten archivos PDF, JPG o PNG.",
+            captured.exception.messages,
+        )
+
+    def test_owner_can_delete_attachment_from_draft(self):
+        draft = self._save_draft_with_attachments([self._make_pdf()])
+        attachment = draft.attachments.first()
+        self.client.force_login(self.supply_user)
+
+        response = self.client.post(
+            reverse(
+                "marketplace:application-attachment-delete",
+                args=[attachment.opaque_id],
+            ),
+            {"confirm": "on"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("marketplace:challenge-apply", args=[self.challenge.pk]),
+        )
+        self.assertFalse(
+            ApplicationAttachment.objects.filter(pk=attachment.pk).exists()
+        )
+
+    def test_other_organization_cannot_delete_draft_attachment(self):
+        draft = self._save_draft_with_attachments([self._make_pdf()])
+        attachment = draft.attachments.first()
+        User = get_user_model()
+        outsider_organization = Organization.objects.create(
+            tax_id="900000404",
+            business_name="Proveedor ajeno",
+            chamber_of_commerce_record="CC-404",
+            role="SUPPLY_SIDE",
+            contact_email="ajeno@example.com",
+            contact_phone="4444444",
+        )
+        outsider_user = User.objects.create_user(
+            username="outsider_deleter",
+            email="outsider_deleter@example.com",
+            password="ClaveSegura123",
+            organization=outsider_organization,
+            is_email_verified=True,
+        )
+        self.client.force_login(outsider_user)
+
+        self.client.post(
+            reverse(
+                "marketplace:application-attachment-delete",
+                args=[attachment.opaque_id],
+            ),
+            {"confirm": "on"},
+        )
+
+        self.assertTrue(
+            ApplicationAttachment.objects.filter(pk=attachment.pk).exists()
+        )
+
+    def test_submitted_application_attachment_cannot_be_deleted(self):
+        application = self.create_submitted_application()
+        attachment = ApplicationAttachment(
+            application=application,
+            uploaded_by=self.supply_user,
+            file=self._make_pdf("propuesta-final.pdf"),
+        )
+        attachment.save()
+        self.client.force_login(self.supply_user)
+
+        self.client.post(
+            reverse(
+                "marketplace:application-attachment-delete",
+                args=[attachment.opaque_id],
+            ),
+            {"confirm": "on"},
+        )
+
+        self.assertTrue(
+            ApplicationAttachment.objects.filter(pk=attachment.pk).exists()
+        )

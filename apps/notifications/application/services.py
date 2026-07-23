@@ -6,6 +6,8 @@ from apps.notifications.models import Notification
 
 @transaction.atomic
 def mark_all_notifications_as_read(*, recipient) -> int:
+    if not recipient.can_operate:
+        return 0
     return Notification.objects.filter(
         recipient=recipient,
         read_at__isnull=True,

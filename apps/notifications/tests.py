@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -17,6 +18,7 @@ from apps.evaluation.application.services import (
     start_challenge_evaluation,
 )
 from apps.evaluation.models import ChallengeEvaluationRoleAssignment
+from apps.marketplace.application.challenges import close_challenge
 from apps.marketplace.models import Application, Challenge
 from apps.notifications.application.services import mark_all_notifications_as_read
 from apps.notifications.models import Notification
@@ -55,30 +57,35 @@ class NotificationEventIntegrationTests(TestCase):
             email="publisher-notifications@example.com",
             password="ClaveSegura123",
             organization=cls.publisher,
+            is_email_verified=True,
         )
         cls.publisher_observer_user = User.objects.create_user(
             username="publisher_observer_notifications",
             email="publisher-observer-notifications@example.com",
             password="ClaveSegura123",
             organization=cls.publisher,
+            is_email_verified=True,
         )
         cls.provider_user = User.objects.create_user(
             username="provider_notifications",
             email="provider-notifications@example.com",
             password="ClaveSegura123",
             organization=cls.provider,
+            is_email_verified=True,
         )
         cls.other_provider_user = User.objects.create_user(
             username="other_provider_notifications",
             email="other-provider-notifications@example.com",
             password="ClaveSegura123",
             organization=cls.other_provider,
+            is_email_verified=True,
         )
         cls.challenge = Challenge.objects.create(
             publisher=cls.publisher,
             title="Challenge notifications",
             description="Description",
             evaluation_criteria="Experiencia, viabilidad técnica y plan de entrega.",
+            status=Challenge.Status.PUBLISHED,
             application_deadline=timezone.localdate() + timedelta(days=7),
         )
         cls.application = Application.objects.create(
@@ -148,6 +155,10 @@ class NotificationEventIntegrationTests(TestCase):
         self.other_application = Application.objects.get(pk=self.other_application.pk)
 
     def test_start_evaluation_creates_notifications_for_applicant_members(self):
+        Challenge.objects.filter(pk=self.challenge.pk).update(
+            status=Challenge.Status.CLOSED
+        )
+        self.challenge.refresh_from_db()
         with self.captureOnCommitCallbacks(execute=True):
             start_challenge_evaluation(
                 challenge=self.challenge,
@@ -184,6 +195,10 @@ class NotificationEventIntegrationTests(TestCase):
             capabilities_evidence="",
             execution_plan="",
         )
+        Challenge.objects.filter(pk=self.challenge.pk).update(
+            status=Challenge.Status.CLOSED
+        )
+        self.challenge.refresh_from_db()
 
         with self.captureOnCommitCallbacks(execute=True):
             start_challenge_evaluation(
@@ -202,6 +217,30 @@ class NotificationEventIntegrationTests(TestCase):
                 recipient=self.other_provider_user,
                 title="Tu propuesta entró en evaluación",
             ).exists()
+        )
+
+    def test_close_challenge_sends_email_for_each_lifecycle_notification(self):
+        with patch(
+            "apps.notifications.domain.lifecycle_handlers.send_notification_email"
+        ) as mocked_send_email:
+            with self.captureOnCommitCallbacks(execute=True):
+                close_challenge(
+                    challenge=self.challenge,
+                    actor=self.publisher_user,
+                    reason="Cierre anticipado aprobado para validar propuestas.",
+                )
+
+        notifications = Notification.objects.filter(
+            kind=Notification.Kind.CHALLENGE_CLOSED
+        )
+        self.assertEqual(notifications.count(), 4)
+        self.assertEqual(mocked_send_email.call_count, 4)
+        notified_recipient_ids = {
+            call.args[0].recipient_id for call in mocked_send_email.call_args_list
+        }
+        self.assertEqual(
+            notified_recipient_ids,
+            set(notifications.values_list("recipient_id", flat=True)),
         )
 
     def test_award_creates_notifications_for_publisher_and_applicants(self):
@@ -332,6 +371,7 @@ class NotificationFlowTests(TestCase):
             email="flow-notifications@example.com",
             password="ClaveSegura123",
             organization=organization,
+            is_email_verified=True,
         )
         cls.notification = Notification.objects.create(
             recipient=cls.user,
@@ -372,4 +412,5 @@ class NotificationFlowTests(TestCase):
 
         response = self.client.get(reverse("notifications:list"))
 
-        self.assertContains(response, "Notificaciones (1)")
+        self.assertContains(response, "Notificaciones")
+        self.assertContains(response, 'aria-label="1 sin leer"')

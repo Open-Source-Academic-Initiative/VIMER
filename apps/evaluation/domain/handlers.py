@@ -56,6 +56,13 @@ def record_application_evaluation_recorded(sender, *, event, **kwargs):
     else:
         ranking_fragment = " La propuesta sigue fuera del ranking competitivo."
 
+    # average_score está tipado como float | None: nunca formatear sin guard.
+    average_fragment = (
+        f"Promedio actual: {event.average_score:.2f}/5."
+        if event.average_score is not None
+        else "Sin promedio registrado aún."
+    )
+
     ChallengeTimelineEntry.objects.create(
         challenge_id=event.challenge_id,
         event_type=ChallengeTimelineEntry.EventType.APPLICATION_EVALUATED,
@@ -64,7 +71,7 @@ def record_application_evaluation_recorded(sender, *, event, **kwargs):
             f"Se registró actividad de evaluación sobre {event.blind_reference}. "
             f"Cobertura actual: {event.evaluated_count}/{event.criteria_total} criterios. "
             f"Evaluaciones acumuladas: {event.assessment_count}. "
-            f"Promedio actual: {event.average_score:.2f}/5."
+            f"{average_fragment}"
             f"{ranking_fragment}"
         ),
         occurred_at=event.occurred_at,

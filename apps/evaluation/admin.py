@@ -22,6 +22,20 @@ class AwardDecisionAdmin(admin.ModelAdmin):
     )
     list_filter = ("selection_mode", "exceptional_reason", "decided_at")
     search_fields = ("challenge__title", "comment", "winning_application__applicant__business_name")
+    readonly_fields = tuple(
+        field.name
+        for field in AwardDecision._meta.fields
+        if field.name != "id"
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(ChallengeTimelineEntry)
@@ -29,6 +43,20 @@ class ChallengeTimelineEntryAdmin(admin.ModelAdmin):
     list_display = ("challenge", "event_type", "actor", "occurred_at")
     list_filter = ("event_type", "occurred_at")
     search_fields = ("challenge__title", "description", "actor__username")
+    readonly_fields = tuple(
+        field.name
+        for field in ChallengeTimelineEntry._meta.fields
+        if field.name != "id"
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(ApplicationCriterionEvaluation)
@@ -42,9 +70,27 @@ class ApplicationCriterionEvaluationAdmin(admin.ModelAdmin):
         "comment",
     )
 
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(ChallengeEvaluationRoleAssignment)
 class ChallengeEvaluationRoleAssignmentAdmin(admin.ModelAdmin):
     list_display = ("challenge", "role", "user", "created_at")
     list_filter = ("role", "created_at")
     search_fields = ("challenge__title", "user__username", "user__email")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

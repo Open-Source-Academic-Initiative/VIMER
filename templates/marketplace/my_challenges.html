@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Mis desafíos - VIMER{% endblock %}
+{% block content %}
+<h1>Mis desafíos</h1>
+<p><a class="btn btn-primary" href="{% url 'marketplace:challenge-create' %}">Crear desafío</a></p>
+<div class="card-grid">
+    {% for challenge in challenges %}
+        <article class="card">
+            <h2><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">{{ challenge.title }}</a></h2>
+            <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+            <p><strong>Plazo:</strong> {{ challenge.application_deadline|default:"Sin definir" }}</p>
+            <p><strong>Propuestas recibidas:</strong> {{ challenge.applications.submitted.count }}</p>
+            <p>
+                <strong>Próxima acción:</strong>
+                {% if challenge.status == 'DRAFT' %}
+                    revisar y publicar
+                {% elif challenge.status == 'PUBLISHED' %}
+                    recibir propuestas o cerrar
+                {% elif challenge.status == 'CLOSED' %}
+                    definir equipo e iniciar evaluación
+                {% elif challenge.status == 'UNDER_EVALUATION' %}
+                    completar evaluación y decidir
+                {% else %}
+                    consultar el expediente
+                {% endif %}
+            </p>
+        </article>
+    {% empty %}
+        <p>Aún no has creado desafíos.</p>
+    {% endfor %}
+</div>
+{% include 'includes/pagination.html' %}
+{% endblock %}

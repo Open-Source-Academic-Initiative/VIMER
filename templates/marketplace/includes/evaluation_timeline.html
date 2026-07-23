@@ -1,0 +1,16 @@
+<h3>Historial de evaluación</h3>
+<ul>
+    {% for entry in timeline_entries %}
+        <li>
+            <strong>{{ entry.get_event_type_display }}</strong>:
+            {{ entry.description }}
+            <br>
+            <small>
+                {{ entry.occurred_at|date:"d M Y, H:i" }} por {{ entry.actor.username }}
+                {% if entry.award_decision %}
+                    | Propuesta ganadora: {{ entry.award_decision.winning_application.applicant.business_name }}
+                {% endif %}
+            </small>
+        </li>
+    {% endfor %}
+</ul>

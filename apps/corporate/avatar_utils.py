@@ -1,31 +1,80 @@
 from __future__ import annotations
 
+import warnings
 from io import BytesIO
+from pathlib import Path
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.utils.text import slugify
-from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
+from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 
 ALLOWED_IMAGE_FORMATS = {"PNG", "JPEG"}
+MAX_LOGO_BYTES = 2 * 1024 * 1024
+MAX_LOGO_DIMENSION = 2048
+NORMALIZED_LOGO_DIMENSION = 512
 
 
 def validate_logo_image(uploaded_file) -> None:
     if not uploaded_file:
         return
 
+    uploaded_size = getattr(uploaded_file, "size", None)
+    if uploaded_size is not None and uploaded_size > MAX_LOGO_BYTES:
+        raise ValidationError("El logo no puede superar 2 MiB.")
+
     try:
-        image = Image.open(uploaded_file)
-        image.verify()
-        image_format = (image.format or "").upper()
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
-        raise ValidationError("Debes subir una imagen valida en formato PNG o JPG.") from exc
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            image = Image.open(uploaded_file)
+            image_format = (image.format or "").upper()
+            width, height = image.size
+            if width > MAX_LOGO_DIMENSION or height > MAX_LOGO_DIMENSION:
+                raise ValidationError(
+                    "El logo no puede superar 2048 pixeles de ancho o alto."
+                )
+            image.verify()
+    except ValidationError:
+        raise
+    except (
+        Image.DecompressionBombError,
+        Image.DecompressionBombWarning,
+        UnidentifiedImageError,
+        OSError,
+        ValueError,
+    ) as exc:
+        raise ValidationError(
+            "Debes subir una imagen valida en formato PNG o JPG."
+        ) from exc
     finally:
         if hasattr(uploaded_file, "seek"):
             uploaded_file.seek(0)
 
     if image_format not in ALLOWED_IMAGE_FORMATS:
         raise ValidationError("Solo se permiten imagenes PNG o JPG.")
+
+
+def normalize_logo_image(uploaded_file, *, filename_stem: str = "organization") -> ContentFile:
+    """Return a metadata-free, web-sized PNG after strict validation."""
+
+    validate_logo_image(uploaded_file)
+    uploaded_file.seek(0)
+    try:
+        with Image.open(uploaded_file) as source:
+            image = ImageOps.exif_transpose(source)
+            image.thumbnail(
+                (NORMALIZED_LOGO_DIMENSION, NORMALIZED_LOGO_DIMENSION),
+                Image.Resampling.LANCZOS,
+            )
+            target_mode = "RGBA" if "A" in image.getbands() else "RGB"
+            normalized = image.convert(target_mode)
+            buffer = BytesIO()
+            normalized.save(buffer, format="PNG", optimize=True)
+    finally:
+        uploaded_file.seek(0)
+
+    safe_stem = slugify(Path(filename_stem).stem) or "organization"
+    return ContentFile(buffer.getvalue(), name=f"{safe_stem}.png")
 
 
 def generate_default_logo(*, business_name: str, tax_id: str) -> ContentFile:

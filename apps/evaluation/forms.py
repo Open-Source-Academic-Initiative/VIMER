@@ -50,7 +50,11 @@ class ChallengeEvaluationRoleAssignmentForm(forms.Form):
     def __init__(self, *args, challenge: Challenge, **kwargs):
         super().__init__(*args, **kwargs)
         self.challenge = challenge
-        member_queryset = challenge.publisher.members.order_by("username")
+        member_queryset = (
+            get_user_model()
+            .objects.operational_members_of(challenge.publisher_id)
+            .order_by("username")
+        )
         current_assignments = challenge.evaluation_role_assignments.all()
         evaluator_ids = list(
             current_assignments.filter(
@@ -97,6 +101,13 @@ class AwardDecisionForm(forms.Form):
     confirm_exceptional_selection = forms.BooleanField(
         required=False,
         label="Confirmo que deseo adjudicar fuera del mejor lugar disponible",
+    )
+    confirm_award = forms.BooleanField(
+        required=True,
+        label=(
+            "Confirmo que revisé el ranking, la propuesta seleccionada y que "
+            "la decisión quedará registrada"
+        ),
     )
     comment = forms.CharField(
         widget=forms.Textarea,
@@ -171,6 +182,7 @@ class AwardDecisionForm(forms.Form):
                 "exceptional_reason",
                 "confirm_exceptional_selection",
                 "comment",
+                "confirm_award",
             ]
         )
         self.fields["winning_application"].help_text = (
@@ -203,10 +215,6 @@ class AwardDecisionForm(forms.Form):
             return cleaned_data
 
         if winning_application.pk not in self.best_available_application_ids:
-            self.add_error(
-                None,
-                "Estás intentando adjudicar una propuesta fuera del mejor lugar disponible.",
-            )
             if not cleaned_data.get("confirm_exceptional_selection"):
                 self.add_error(
                     "confirm_exceptional_selection",
@@ -250,7 +258,6 @@ class ApplicationCriterionEvaluationForm(forms.Form):
         self.challenge = challenge
         self.application = application
         self.evaluator = evaluator
-        self.challenge.sync_evaluation_criteria_items()
         criteria = challenge.evaluation_criteria_items.order_by("position")
         existing_evaluations = {
             evaluation.criterion_id: evaluation
@@ -267,9 +274,38 @@ class ApplicationCriterionEvaluationForm(forms.Form):
                 choices=ApplicationCriterionEvaluation.Score.choices,
                 label=f"{criterion.label} - puntaje",
                 initial=str(existing.score) if existing else "",
+                widget=forms.Select(
+                    attrs={
+                        "aria-describedby": (
+                            f"id_{score_field_name}_help "
+                            f"id_{score_field_name}_errors"
+                        )
+                    }
+                ),
             )
+            self.fields[score_field_name].help_text = (
+                f"Peso: {criterion.weight} %."
+            )
+            if (
+                criterion.criterion_type
+                == criterion.CriterionType.ECONOMIC
+                and application.offered_amount is not None
+            ):
+                self.fields[score_field_name].help_text += (
+                    " Oferta estructurada: "
+                    f"{application.offered_amount} {application.offer_currency}; "
+                    "presupuesto máximo: "
+                    f"{challenge.budget_amount} {challenge.budget_currency}."
+                )
             self.fields[comment_field_name] = forms.CharField(
-                widget=forms.Textarea,
+                widget=forms.Textarea(
+                    attrs={
+                        "aria-describedby": (
+                            f"id_{comment_field_name}_help "
+                            f"id_{comment_field_name}_errors"
+                        )
+                    }
+                ),
                 label=f"{criterion.label} - comentario",
                 initial=existing.comment if existing else "",
             )

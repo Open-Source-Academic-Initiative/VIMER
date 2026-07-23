@@ -1,0 +1,20 @@
+{% if requester_application and requester_application.status == 'SUBMITTED' %}
+    <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Ver mi propuesta enviada</a>
+    <p>Tu organización ya envió una propuesta para este desafío.</p>
+{% elif challenge.is_open_for_applications %}
+    <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">
+        {% if requester_application and requester_application.status == 'DRAFT' %}
+            Continuar borrador
+        {% else %}
+            Presentar propuesta
+        {% endif %}
+    </a>
+    {% if requester_application and requester_application.status == 'DRAFT' %}
+        <p>Tienes un borrador privado guardado para este desafío.</p>
+    {% endif %}
+{% else %}
+    <p>Este desafío no está abierto para guardar o enviar propuestas.</p>
+    {% if requester_application and requester_application.status == 'DRAFT' %}
+        <p>Tu borrador privado quedó sin editar porque el período de postulación ya cerró.</p>
+    {% endif %}
+{% endif %}

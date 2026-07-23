@@ -25,7 +25,7 @@ def platform_dashboard(request):
     )
     context = {
         "organization_count": Organization.objects.count(),
-        "active_representative_count": User.objects.filter(is_active=True).count(),
+        "active_representative_count": User.objects.operational().count(),
         "challenge_counts": Challenge.objects.values("status").annotate(count=Count("id")),
         "submitted_application_count": Application.objects.submitted().count(),
         "mean_award_duration": mean_award_duration,

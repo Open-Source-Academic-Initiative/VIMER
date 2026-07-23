@@ -6,6 +6,8 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from apps.identity.managers import UserManager
+
 
 def new_email_verification_token() -> str:
     return uuid4().hex
@@ -55,6 +57,7 @@ class User(AbstractUser):
         blank=True,
         default="",
     )
+    objects = UserManager()
 
     class Meta:
         verbose_name = _("usuario")
@@ -69,7 +72,39 @@ class User(AbstractUser):
 
     @property
     def can_operate(self) -> bool:
-        return self.status == self.AccountStatus.ACTIVE and self.is_email_verified
+        return (
+            self.is_active
+            and self.status == self.AccountStatus.ACTIVE
+            and self.is_email_verified
+            and self.organization_id is not None
+        )
+
+    @property
+    def can_govern_organization(self) -> bool:
+        return self.can_operate and self.is_organization_titular
+
+    def is_operational_member_of(self, organization) -> bool:
+        organization_id = getattr(organization, "pk", organization)
+        return self.can_operate and self.organization_id == organization_id
+
+    def save(self, *args, **kwargs):
+        """Keep Django's authentication flag aligned with terminal states.
+
+        ``PENDING_APPROVAL`` remains authentication-capable so the requester can
+        verify their email and see the public account-state messaging. Rejected
+        and expired requests transition to ``INACTIVE`` and must invalidate any
+        existing authenticated session on the next request.
+        """
+        if self.status == self.AccountStatus.INACTIVE:
+            self.is_active = False
+            self.is_organization_titular = False
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = set(update_fields) | {
+                    "is_active",
+                    "is_organization_titular",
+                }
+        super().save(*args, **kwargs)
 
     def __str__(self):
         role_label = f" [{self.organization.role}]" if self.organization else ""
@@ -131,7 +166,8 @@ class OrganizationJoinRequest(models.Model):
         self.decided_by = actor
         self.decided_at = timezone.now()
         self.requester.status = User.AccountStatus.ACTIVE
-        self.requester.save(update_fields=["status"])
+        self.requester.is_active = True
+        self.requester.save(update_fields=["status", "is_active"])
         self.save(update_fields=["status", "decided_by", "decided_at"])
 
     def mark_rejected(self, *, actor: User) -> None:
@@ -139,7 +175,23 @@ class OrganizationJoinRequest(models.Model):
         self.decided_by = actor
         self.decided_at = timezone.now()
         self.requester.status = User.AccountStatus.INACTIVE
-        self.requester.save(update_fields=["status"])
+        self.requester.is_active = False
+        self.requester.is_organization_titular = False
+        self.requester.save(
+            update_fields=["status", "is_active", "is_organization_titular"]
+        )
+        self.save(update_fields=["status", "decided_by", "decided_at"])
+
+    def mark_expired(self, *, occurred_at=None) -> None:
+        self.status = self.Status.EXPIRED
+        self.decided_by = None
+        self.decided_at = occurred_at or timezone.now()
+        self.requester.status = User.AccountStatus.INACTIVE
+        self.requester.is_active = False
+        self.requester.is_organization_titular = False
+        self.requester.save(
+            update_fields=["status", "is_active", "is_organization_titular"]
+        )
         self.save(update_fields=["status", "decided_by", "decided_at"])
 
     def __str__(self):
@@ -171,3 +223,80 @@ class EmailVerificationToken(models.Model):
         self.user.is_email_verified = True
         self.user.save(update_fields=["is_email_verified"])
         self.save(update_fields=["used_at"])
+
+
+class IdentityAuditEntry(models.Model):
+    """Immutable projection of identity-governance domain events."""
+
+    class EventType(models.TextChoices):
+        REPRESENTATIVE_JOIN_REQUESTED = (
+            "REPRESENTATIVE_JOIN_REQUESTED",
+            _("Solicitud de unión creada"),
+        )
+        REPRESENTATIVE_JOIN_APPROVED = (
+            "REPRESENTATIVE_JOIN_APPROVED",
+            _("Solicitud de unión aprobada"),
+        )
+        REPRESENTATIVE_JOIN_REJECTED = (
+            "REPRESENTATIVE_JOIN_REJECTED",
+            _("Solicitud de unión rechazada"),
+        )
+        REPRESENTATIVE_JOIN_EXPIRED = (
+            "REPRESENTATIVE_JOIN_EXPIRED",
+            _("Solicitud de unión expirada"),
+        )
+        ORGANIZATION_OWNERSHIP_TRANSFERRED = (
+            "ORGANIZATION_OWNERSHIP_TRANSFERRED",
+            _("Titularidad transferida"),
+        )
+
+    event_type = models.CharField(
+        _("Tipo de evento"),
+        max_length=40,
+        choices=EventType.choices,
+    )
+    organization = models.ForeignKey(
+        "corporate.Organization",
+        on_delete=models.PROTECT,
+        related_name="identity_audit_entries",
+    )
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="identity_audit_actions",
+        null=True,
+        blank=True,
+    )
+    subject = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="identity_audit_subjects",
+        null=True,
+        blank=True,
+    )
+    secondary_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="secondary_identity_audit_entries",
+        null=True,
+        blank=True,
+    )
+    join_request = models.ForeignKey(
+        OrganizationJoinRequest,
+        on_delete=models.SET_NULL,
+        related_name="audit_entries",
+        null=True,
+        blank=True,
+    )
+    description = models.CharField(_("Descripción"), max_length=255)
+    snapshot = models.JSONField(_("Snapshot"), default=dict, blank=True)
+    occurred_at = models.DateTimeField(_("Fecha del evento"))
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Entrada de auditoría de identidad")
+        verbose_name_plural = _("Entradas de auditoría de identidad")
+        ordering = ["-occurred_at", "-id"]
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} - {self.organization}"
