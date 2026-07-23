@@ -8,3 +8,5 @@ class NotificationsConfig(AppConfig):
 
     def ready(self):
         import apps.notifications.domain.handlers  # noqa: F401
+        import apps.notifications.domain.lifecycle_handlers  # noqa: F401
+        import apps.notifications.domain.identity_handlers  # noqa: F401

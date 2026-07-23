@@ -1,13 +1,23 @@
 {% extends 'base.html' %}
-{% block title %}Publicar Desafío - VIMER{% endblock %}
+{% block title %}Crear desafío - VIMER{% endblock %}
 {% block content %}
-<h2>Publicar Nuevo Desafío</h2>
+<h1>{% if is_editing_draft %}Editar borrador{% else %}Crear nuevo desafío{% endif %}</h1>
+{% if is_editing_draft and challenge.attachments.exists %}
+    <div class="card">
+        <h2>Adjuntos ya guardados</h2>
+        <ul>
+            {% for attachment in challenge.attachments.all %}
+                <li>{{ attachment.original_filename }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
 <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Publicar</button>
+    <button type="submit" name="intent" value="draft" class="btn btn-secondary">Guardar borrador</button>
+    <button type="submit" name="intent" value="publish" class="btn btn-primary">Publicar</button>
 </form>
-<p>Los desafíos se publican en estado <strong>Publicado</strong>.</p>
-<p>Define criterios de evaluación claros para poder iniciar la evaluación cuando lleguen propuestas.</p>
+<p>El presupuesto, la moneda, el plazo y los criterios publicados quedan protegidos cuando se recibe la primera propuesta.</p>
 <p><a href="{% url 'marketplace:challenge-list' %}">Cancelar</a></p>
 {% endblock %}

@@ -1,173 +1,101 @@
 {% extends 'base.html' %}
-{% block title %}VIMER | Innovación Colaborativa{% endblock %}
-{% block extra_head %}
-<style>
-    .landing-shell {
-        display: grid;
-        gap: 2rem;
-        padding: 1rem 0 3rem;
-    }
-    .hero {
-        background: linear-gradient(135deg, #0f3d3e 0%, #1f6f78 52%, #f0f4d7 100%);
-        border-radius: 24px;
-        color: #fff;
-        overflow: hidden;
-        padding: 3rem;
-        position: relative;
-    }
-    .hero::after {
-        background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 65%);
-        content: "";
-        height: 320px;
-        position: absolute;
-        right: -80px;
-        top: -60px;
-        width: 320px;
-    }
-    .hero h1 {
-        font-size: clamp(2.2rem, 5vw, 4rem);
-        line-height: 1.05;
-        margin: 0 0 1rem;
-        max-width: 10ch;
-    }
-    .hero p {
-        font-size: 1.05rem;
-        margin: 0 0 1.5rem;
-        max-width: 62ch;
-    }
-    .hero-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.8rem;
-    }
-    .btn-secondary {
-        background: rgba(255, 255, 255, 0.16);
-        border: 1px solid rgba(255, 255, 255, 0.35);
-        color: #fff;
-    }
-    .stats {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    }
-    .stat-card {
-        background: #f8f8ef;
-        border: 1px solid #dfe6d0;
-        border-radius: 18px;
-        padding: 1.2rem;
-    }
-    .stat-card strong {
-        color: #0f3d3e;
-        display: block;
-        font-size: 1.8rem;
-        margin-bottom: 0.35rem;
-    }
-    .feature-grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    }
-    .feature-card {
-        background: #fff;
-        border: 1px solid #e5e5e5;
-        border-radius: 18px;
-        padding: 1.4rem;
-    }
-    .feature-card h3 {
-        margin-top: 0;
-    }
-    .highlight {
-        color: #1f6f78;
-        font-size: 0.9rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-    }
-    .journey {
-        background: #101820;
-        border-radius: 24px;
-        color: #f6f6f1;
-        padding: 2rem;
-    }
-    .journey ol {
-        margin: 1rem 0 0;
-        padding-left: 1.2rem;
-    }
-    .journey li + li {
-        margin-top: 0.7rem;
-    }
-    @media (max-width: 700px) {
-        .hero {
-            padding: 2rem 1.5rem;
-        }
-    }
-</style>
-{% endblock %}
+{% block title %}VIMER | Innovación aplicada con propósito{% endblock %}
 {% block content %}
-<section class="landing-shell">
-    <section class="hero">
-        <div class="highlight">Plataforma MVP</div>
-        <h1>Conecta desafíos con soluciones</h1>
-        <p>
-            VIMER es un espacio para que organizaciones Solicitantes publiquen necesidades
-            de I+D+i y Proveedores tecnológicos presenten propuestas con enfoque práctico.
-        </p>
-        <div class="hero-actions">
-            <a href="{% url 'signup' %}" class="btn btn-primary">Crear cuenta</a>
-            <a href="{% url 'login' %}" class="btn btn-secondary">Ingresar</a>
-            {% if user.is_authenticated %}
-                <a href="{% url 'marketplace:challenge-list' %}" class="btn btn-secondary">Ir al marketplace</a>
-            {% endif %}
+<div class="landing-shell">
+    <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-content">
+            <div class="eyebrow">Innovación abierta · I+D+i · OpenSAI</div>
+            <h1 id="hero-title">Desafíos reales. Soluciones que avanzan.</h1>
+            <p>
+                VIMER conecta organizaciones con necesidades de investigación,
+                desarrollo e innovación con universidades, startups, empresas y
+                laboratorios capaces de proponer soluciones técnicas y económicas.
+            </p>
+            <div class="actions hero-actions">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'marketplace:challenge-list' %}" class="btn btn-primary">
+                        Explorar desafíos
+                    </a>
+                    {% if user.can_operate and user.organization.role == 'DEMAND_SIDE' %}
+                        <a href="{% url 'marketplace:challenge-create' %}" class="btn btn-secondary">
+                            Publicar un desafío
+                        </a>
+                    {% endif %}
+                {% else %}
+                    <a href="{% url 'signup' %}" class="btn btn-primary">Crear una cuenta</a>
+                    <a href="{% url 'marketplace:challenge-list' %}" class="btn btn-secondary">
+                        Conocer los desafíos
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </section>
 
-    <section class="stats">
-        <article class="stat-card">
-            <strong>1</strong>
-            Punto de entrada claro para visitantes nuevos.
-        </article>
-        <article class="stat-card">
-            <strong>2</strong>
-            Roles principales: Solicitantes y Proveedores tecnológicos.
-        </article>
-        <article class="stat-card">
-            <strong>3</strong>
-            Flujos disponibles: registro, login y marketplace privado.
-        </article>
+    <section aria-labelledby="value-title">
+        <div class="section-heading">
+            <h2 id="value-title">Un proceso claro de principio a fin</h2>
+            <p>
+                La convocatoria, la propuesta, la evaluación y la decisión viven en
+                un mismo espacio, con fechas, criterios y responsabilidades visibles.
+            </p>
+        </div>
+        <div class="value-grid">
+            <article class="value-card">
+                <strong>Necesidades bien definidas</strong>
+                <span>Alcance, presupuesto, categorías, criterios y calendario en un contexto común.</span>
+            </article>
+            <article class="value-card">
+                <strong>Propuestas comparables</strong>
+                <span>Capacidades, enfoque, evidencia, solución, valor económico y documentos de soporte.</span>
+            </article>
+            <article class="value-card">
+                <strong>Decisiones trazables</strong>
+                <span>Equipo evaluador, calificaciones, adjudicación y comunicaciones conservadas.</span>
+            </article>
+        </div>
     </section>
 
-    <section class="feature-grid">
-        <article class="feature-card">
-            <h3>Para organizaciones Solicitantes</h3>
-            <p>
-                Publica desafíos, describe una necesidad concreta y revisa las propuestas
-                recibidas desde un espacio centralizado.
-            </p>
-        </article>
-        <article class="feature-card">
-            <h3>Para Proveedores tecnológicos</h3>
-            <p>
-                Explora retos activos, evalúa el contexto del problema y envía propuestas
-                alineadas con tus capacidades técnicas.
-            </p>
-        </article>
-        <article class="feature-card">
-            <h3>Para pruebas manuales</h3>
-            <p>
-                Esta portada diferencia claramente la navegación pública del flujo de
-                registro y facilita validar la experiencia desde el navegador.
-            </p>
-        </article>
+    <section aria-labelledby="participants-title">
+        <div class="section-heading">
+            <h2 id="participants-title">Diseñado para colaborar con confianza</h2>
+        </div>
+        <div class="feature-grid">
+            <article class="feature-card">
+                <h3>Para organizaciones convocantes</h3>
+                <p>
+                    Publica una necesidad de I+D+i, recibe propuestas dentro del
+                    plazo y coordina una evaluación con criterios previamente definidos.
+                </p>
+            </article>
+            <article class="feature-card">
+                <h3>Para organizaciones proponentes</h3>
+                <p>
+                    Identifica oportunidades pertinentes y presenta una propuesta
+                    técnica, económica y documental alineada con tus capacidades.
+                </p>
+            </article>
+            <article class="feature-card">
+                <h3>Para equipos de evaluación</h3>
+                <p>
+                    Compara propuestas con referencias ciegas, registra la valoración
+                    por criterio y sustenta la decisión final.
+                </p>
+            </article>
+        </div>
     </section>
 
-    <section class="journey">
-        <div class="highlight">Recorrido sugerido</div>
-        <h2>Cómo navegar el MVP</h2>
+    <section class="journey" aria-labelledby="journey-title">
+        <div class="eyebrow">Cómo funciona</div>
+        <h2 id="journey-title">Del desafío a la solución seleccionada</h2>
         <ol>
-            <li>Entra por esta landing para entender el propósito general de la plataforma.</li>
-            <li>Usa <a href="{% url 'login' %}" style="color: #f0f4d7;">Iniciar Sesión</a> para acceder con usuarios de prueba.</li>
-            <li>Explora el marketplace según el rol y valida cómo cambia la navegación.</li>
+            <li>La organización convocante publica el desafío, su presupuesto, criterios y fecha límite.</li>
+            <li>Las organizaciones proponentes preparan y envían sus ofertas dentro del plazo.</li>
+            <li>Después del cierre, el equipo autorizado evalúa las propuestas recibidas.</li>
+            <li>La decisión se registra y se comunica a las organizaciones participantes.</li>
         </ol>
+        {% if not user.is_authenticated %}
+            <p><a href="{% url 'login' %}">Ya tengo una cuenta: iniciar sesión</a></p>
+        {% endif %}
     </section>
-</section>
+</div>
 {% endblock %}

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}{{ action_label }} - VIMER{% endblock %}
+{% block content %}
+<h1>{{ action_label }}</h1>
+<div class="card">
+    <p><strong>Desafío:</strong> {{ challenge.title }}</p>
+    <p><strong>Estado actual:</strong> {{ challenge.get_status_display }}</p>
+</div>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">{{ action_label }}</button>
+</form>
+<p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver sin realizar cambios</a></p>
+{% endblock %}

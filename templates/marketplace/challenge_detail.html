@@ -1,351 +1,54 @@
 {% extends 'base.html' %}
 {% block title %}{{ challenge.title }} - VIMER{% endblock %}
 {% block content %}
-<h2>{{ challenge.title }}</h2>
-<div class="card">
-    <p class="org-chip">
-        {% if challenge.publisher.logo %}
-            <img
-                src="{{ challenge.publisher.logo.url }}"
-                alt="Logo de {{ challenge.publisher.business_name }}"
-                class="avatar avatar-marketplace"
-            >
-        {% endif %}
-        <span>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></span>
-    </p>
-    <p>NIT: {{ challenge.publisher.tax_id }}</p>
-    <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
-    <p>
-        <strong>Categorías:</strong>
-        {% for category in challenge.categories.all %}
-            {{ category.name }}{% if not forloop.last %}, {% endif %}
-        {% empty %}
-            Sin categoría
-        {% endfor %}
-    </p>
-    <p>
-        <strong>Fecha límite:</strong>
-        {% if challenge.application_deadline %}
-            {{ challenge.application_deadline }}
-        {% else %}
-            Sin fecha límite
-        {% endif %}
-    </p>
-    <hr>
-    <h3>Descripción</h3>
-    {{ challenge.rendered_description|safe }}
-    {% if challenge.attachments.exists %}
-        <h3>Adjuntos del desafío</h3>
-        <ul>
-            {% for attachment in challenge.attachments.all %}
-                <li><a href="{% url 'marketplace:challenge-attachment-download' attachment.opaque_id %}">{{ attachment.original_filename }}</a></li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    <h3>Criterios de evaluación</h3>
-    {% if evaluation_criteria_items %}
-        <ul>
-            {% for criterion in evaluation_criteria_items %}
-                <li>{{ criterion }}</li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>Aún no se han definido criterios de evaluación para este desafío.</p>
-    {% endif %}
-</div>
+<h1>{{ challenge.title }}</h1>
+{% include 'marketplace/includes/challenge_summary_card.html' %}
 
 {% if user.organization and user.organization.role == 'SUPPLY_SIDE' %}
-    {% if requester_application and requester_application.status == 'SUBMITTED' %}
-        <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">Ver mi propuesta enviada</a>
-        <p>Tu organización ya envió una propuesta para este desafío.</p>
-    {% elif challenge.is_open_for_applications %}
-        <a href="{% url 'marketplace:challenge-apply' challenge.pk %}" class="btn btn-primary">
-            {% if requester_application and requester_application.status == 'DRAFT' %}
-                Continuar borrador
-            {% else %}
-                Presentar propuesta
-            {% endif %}
-        </a>
-        {% if requester_application and requester_application.status == 'DRAFT' %}
-            <p>Tienes un borrador privado guardado para este desafío.</p>
-        {% endif %}
-    {% else %}
-        <p>Este desafío no está abierto para guardar o enviar propuestas.</p>
-        {% if requester_application and requester_application.status == 'DRAFT' %}
-            <p>Tu borrador privado quedó sin editar porque el período de postulación ya cerró.</p>
-        {% endif %}
-    {% endif %}
+    {% include 'marketplace/includes/applicant_actions.html' %}
 {% endif %}
 
-    {% if user.organization and user.organization == challenge.publisher %}
-    <h3>Equipo de evaluación</h3>
-    <div class="card">
-        <p>
-            <strong>Evaluadores designados:</strong>
-            {% for assignment in evaluation_team.evaluators %}
-                {{ assignment.user.username }}{% if not forloop.last %}, {% endif %}
-            {% empty %}
-                Aún no definidos
-            {% endfor %}
-        </p>
-        <p>
-            <strong>Adjudicador designado:</strong>
-            {% if evaluation_team.adjudicator %}
-                {{ evaluation_team.adjudicator.user.username }}
-            {% else %}
-                Aún no definido
-            {% endif %}
-        </p>
-        <p>
-            <strong>Observadores:</strong>
-            {% for assignment in evaluation_team.observers %}
-                {{ assignment.user.username }}{% if not forloop.last %}, {% endif %}
-            {% empty %}
-                Sin observadores designados
-            {% endfor %}
-        </p>
-        {% if can_manage_evaluation_team %}
-            <p>
-                <a href="{% url 'evaluation:challenge-evaluation-roles-update' challenge.pk %}" class="btn btn-primary">
-                    Gestionar equipo de evaluación
-                </a>
-            </p>
+{% if is_challenge_publisher %}
+    <section aria-labelledby="challenge-actions-heading">
+        <h2 id="challenge-actions-heading">Gestión del proceso</h2>
+        {% if can_edit_challenge %}
+            <a class="btn btn-secondary" href="{% url 'marketplace:challenge-edit' challenge.pk %}">Editar borrador</a>
         {% endif %}
-        {% if not has_required_evaluation_team %}
-            <p>Debes definir al menos un evaluador designado y un adjudicador designado antes de iniciar la evaluación.</p>
+        {% if can_publish_challenge %}
+            <a class="btn btn-primary" href="{% url 'marketplace:challenge-publish' challenge.pk %}">Revisar y publicar</a>
         {% endif %}
-    </div>
-    <h3>Postulaciones recibidas</h3>
-    <ul>
-        {% for app in challenge_applications %}
-            <li>
-                {% if show_applicant_identity %}
-                    <span class="org-chip">
-                        {% if app.applicant.logo %}
-                            <img
-                                src="{{ app.applicant.logo.url }}"
-                                alt="Logo de {{ app.applicant.business_name }}"
-                                class="avatar avatar-marketplace"
-                            >
-                        {% endif %}
-                        <span><strong>{{ app.applicant.business_name }}:</strong> {{ app.summary_text|truncatewords:20 }}</span>
-                    </span>
-                {% else %}
-                    <p><strong>{{ app.evaluation_summary.blind_reference }}:</strong> {{ app.summary_text|truncatewords:20 }}</p>
-                {% endif %}
-                <div>
-                    <strong>Entendimiento:</strong> {{ app.problem_understanding|striptags|truncatewords:20 }}<br>
-                    <strong>Capacidades:</strong> {{ app.capabilities_evidence|striptags|truncatewords:20 }}<br>
-                    <strong>Plan:</strong> {{ app.execution_plan|striptags|truncatewords:20 }}
-                </div>
-                {% if app.attachments.exists %}
-                    <p><strong>Adjuntos:</strong></p>
-                    <ul>
-                        {% for attachment in app.attachments.all %}
-                            <li>
-                                <a href="{% url 'marketplace:application-attachment-download' attachment.opaque_id %}">
-                                    {% if show_applicant_identity %}
-                                        {{ attachment.original_filename }}
-                                    {% else %}
-                                        Adjunto {{ forloop.counter }} de {{ app.evaluation_summary.blind_reference }}
-                                    {% endif %}
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-                {% if challenge.status == 'UNDER_EVALUATION' %}
-                    {% if app.evaluation_summary.is_complete %}
-                        <p>
-                            <strong>Posición competitiva actual:</strong>
-                            #{{ app.evaluation_summary.ranking_position }}
-                            {% if app.evaluation_summary.is_tied %}
-                                (empatada con {{ app.evaluation_summary.tied_application_count }} propuestas)
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p><strong>Estado competitivo:</strong> No elegible aún</p>
-                    {% endif %}
-                    <p>
-                        <strong>Evaluación por criterios:</strong>
-                        {{ app.evaluation_summary.evaluated_count }}/{{ app.evaluation_summary.criteria_total }}
-                        completados
-                    </p>
-                    {% if not app.evaluation_summary.is_complete %}
-                        <p>
-                            <strong>Criterios pendientes:</strong>
-                            {{ app.evaluation_summary.missing_criteria_count }}
-                            {% if app.evaluation_summary.missing_criteria_labels %}
-                                ({{ app.evaluation_summary.missing_criteria_labels|join:", " }})
-                            {% endif %}
-                        </p>
-                    {% endif %}
-                    <p>
-                        <strong>Evaluaciones registradas:</strong>
-                        {{ app.evaluation_summary.assessment_count }}
-                    </p>
-                    {% if app.evaluation_summary.average_score is not None %}
-                        <p>
-                            <strong>Promedio actual:</strong>
-                            {{ app.evaluation_summary.average_score|floatformat:2 }} / 5
-                            | <strong>Puntaje acumulado:</strong>
-                            {{ app.evaluation_summary.total_score }}
-                        </p>
-                    {% endif %}
-                    {% if app.evaluation_summary.criterion_results %}
-                        <details>
-                            <summary>Detalle por criterio</summary>
-                            <ul>
-                                {% for result in app.evaluation_summary.criterion_results %}
-                                    <li>
-                                        <strong>{{ result.label }}:</strong>
-                                        {% if result.evaluation_count %}
-                                            promedio {{ result.average_score|floatformat:2 }}/5
-                                            con {{ result.evaluation_count }} evaluacion{{ result.evaluation_count|pluralize:"es" }}
-                                            <ul>
-                                                {% for evaluation in result.evaluations %}
-                                                    <li>
-                                                        {{ evaluation.score }}/5. {{ evaluation.comment }}
-                                                        ({{ evaluation.evaluated_by_username }}, {{ evaluation.evaluated_at }})
-                                                    </li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            Pendiente
-                                        {% endif %}
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        </details>
-                    {% endif %}
-                    {% if can_evaluate_applications %}
-                        <p>
-                            <a
-                                href="{% url 'evaluation:application-criterion-evaluation-update' challenge.pk app.pk %}"
-                                class="btn btn-primary"
-                            >
-                                Evaluar Propuesta Ciega
-                            </a>
-                        </p>
-                    {% endif %}
-                {% endif %}
-            </li>
-        {% empty %}
-            <li>Aún no hay propuestas para este desafío.</li>
-        {% endfor %}
-    </ul>
-
-    {% if best_available_applications and challenge.status == 'UNDER_EVALUATION' %}
-        <div class="card">
-            <p><strong>Mejor lugar disponible:</strong></p>
-            <ul>
-                {% for app in best_available_applications %}
-                    <li>
-                        {{ app.evaluation_summary.blind_reference }}
-                        con promedio {{ app.evaluation_summary.average_score|floatformat:2 }}/5
-                        en la posición #{{ app.evaluation_summary.ranking_position }}
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-    {% endif %}
-
-    {% if can_start_evaluation %}
-        <form method="post" action="{% url 'evaluation:challenge-evaluation-start' challenge.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-primary">Iniciar evaluación</button>
-        </form>
-    {% elif can_award_challenge %}
-        <p><a href="{% url 'evaluation:award-decision-create' challenge.pk %}" class="btn btn-primary">Adjudicar desafío</a></p>
-    {% elif can_adjudicate_challenge and challenge.status == 'UNDER_EVALUATION' and award_blocking_messages %}
-        <div class="card">
-            <p><strong>La adjudicación está bloqueada por ahora.</strong></p>
-            {% for message in award_blocking_messages %}
-                <p>{{ message }}</p>
-            {% endfor %}
-        </div>
-    {% endif %}
-
+        {% if can_close_challenge %}
+            <a class="btn btn-secondary" href="{% url 'marketplace:challenge-close' challenge.pk %}">Cerrar recepción</a>
+        {% endif %}
+        {% if can_cancel_challenge %}
+            <a class="btn btn-danger" href="{% url 'marketplace:challenge-cancel' challenge.pk %}">Cancelar desafío</a>
+        {% endif %}
+        {% if can_declare_deserted %}
+            <a class="btn btn-danger" href="{% url 'marketplace:challenge-desert' challenge.pk %}">Declarar desierto</a>
+        {% endif %}
+    </section>
+    {% include 'marketplace/includes/evaluation_team_card.html' %}
+    {% include 'marketplace/includes/applications_panel.html' %}
     {% if award_decision %}
-        <h3>Decisión de adjudicación</h3>
-        <div class="card">
-            <p><strong>Propuesta ganadora:</strong> {{ award_decision.winning_application.applicant.business_name }}</p>
-            <p><strong>Comentario:</strong> {{ award_decision.comment }}</p>
-            <p><strong>Decidido por:</strong> {{ award_decision.decided_by.username }}</p>
-            {% if award_decision.winning_ranking_position %}
-                <p>
-                    <strong>Posición comparativa registrada al adjudicar:</strong>
-                    #{{ award_decision.winning_ranking_position }}
-                </p>
-            {% endif %}
-            {% if award_decision.winning_eligible_ranking_position %}
-                <p>
-                    <strong>Posición elegible registrada al adjudicar:</strong>
-                    #{{ award_decision.winning_eligible_ranking_position }}
-                </p>
-            {% endif %}
-            <p><strong>Modo de adjudicación:</strong> {{ award_decision.get_selection_mode_display }}</p>
-            {% if award_decision.exceptional_reason %}
-                <p>
-                    <strong>Motivo estructurado:</strong>
-                    {{ award_decision.get_exceptional_reason_display }}
-                </p>
-            {% endif %}
-            {% if award_decision.winning_average_score is not None %}
-                <p>
-                    <strong>Promedio registrado al adjudicar:</strong>
-                    {{ award_decision.winning_average_score|floatformat:2 }} / 5
-                    | <strong>Puntaje total registrado:</strong>
-                    {{ award_decision.winning_total_score }}
-                </p>
-            {% endif %}
-            {% if award_decision.winning_evaluated_criteria_count is not None and award_decision.winning_criteria_total is not None %}
-                <p>
-                    <strong>Criterios evaluados al adjudicar:</strong>
-                    {{ award_decision.winning_evaluated_criteria_count }}/{{ award_decision.winning_criteria_total }}
-                </p>
-            {% endif %}
-            {% if award_decision.best_available_applications_snapshot %}
-                <p><strong>Propuestas en la mejor posición disponible al adjudicar:</strong></p>
-                <ul>
-                    {% for snapshot in award_decision.best_available_applications_snapshot %}
-                        <li>
-                            {{ snapshot.blind_reference }}
-                            en posición #{{ snapshot.ranking_position }}
-                            con promedio {{ snapshot.average_score|floatformat:2 }}/5
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-            {% if award_decision.higher_ranked_applications_snapshot %}
-                <p><strong>Propuestas con mejor posición que la adjudicada:</strong></p>
-                <ul>
-                    {% for snapshot in award_decision.higher_ranked_applications_snapshot %}
-                        <li>
-                            {{ snapshot.blind_reference }}
-                            en posición #{{ snapshot.ranking_position }}
-                            con promedio {{ snapshot.average_score|floatformat:2 }}/5
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        </div>
+        {% include 'marketplace/includes/award_decision_card.html' %}
     {% endif %}
-
     {% if timeline_entries %}
-        <h3>Historial de evaluación</h3>
+        {% include 'marketplace/includes/evaluation_timeline.html' %}
+    {% endif %}
+    {% if lifecycle_events %}
+        <h2>Historial del ciclo de vida</h2>
         <ul>
-            {% for entry in timeline_entries %}
+            {% for entry in lifecycle_events %}
                 <li>
-                    <strong>{{ entry.get_event_type_display }}</strong>:
-                    {{ entry.description }}
-                    <br>
-                    <small>
-                        {{ entry.occurred_at }} por {{ entry.actor.username }}
-                        {% if entry.award_decision %}
-                            | Propuesta ganadora: {{ entry.award_decision.winning_application.applicant.business_name }}
-                        {% endif %}
-                    </small>
+                    <strong>{{ entry.get_event_type_display }}</strong>
+                    — {{ entry.occurred_at|date:"d M Y, H:i" }}
+                    por
+                    {% if entry.actor %}
+                        {{ entry.actor.username }}
+                    {% else %}
+                        el sistema
+                    {% endif %}
+                    {% if entry.reason %}<br>{{ entry.reason }}{% endif %}
                 </li>
             {% endfor %}
         </ul>

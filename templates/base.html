@@ -1,86 +1,131 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="VIMER conecta desafíos empresariales de I+D+i con organizaciones capaces de convertirlos en soluciones.">
     <title>{% block title %}VIMER{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'vimer/css/app.css' %}">
     {% block extra_head %}{% endblock %}
-    <style>
-        body { font-family: sans-serif; line-height: 1.6; margin: 0; padding: 0; }
-        nav { background: #333; color: #fff; padding: 1rem; display: flex; justify-content: space-between; }
-        nav a { color: #fff; text-decoration: none; margin-left: 1rem; }
-        nav form { display: inline; margin-left: 1rem; }
-        .container { padding: 2rem; max-width: 1200px; margin: auto; }
-        .badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; }
-        .badge-demand_side { background: #007bff; color: #fff; }
-        .badge-supply_side { background: #28a745; color: #fff; }
-        .identity-chip { align-items: center; display: inline-flex; gap: 0.5rem; }
-        .avatar { border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 999px; height: 36px; object-fit: cover; width: 36px; }
-        .avatar-marketplace { border-color: #d7d7d7; }
-        .org-chip { align-items: center; display: inline-flex; gap: 0.75rem; }
-        .card { border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
-        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-primary { background: #007bff; color: #fff; }
-        .btn-link { background: transparent; color: #fff; padding: 0; }
-        footer { border-top: 1px solid #ddd; margin: 2rem auto 0; max-width: 1200px; padding: 1rem 2rem; }
-        footer a { margin-right: 1rem; }
-    </style>
-    {% if turnstile_site_key %}
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    {% endif %}
 </head>
 <body>
-    <nav>
-        <div>
-            <strong><a href="/">VIMER</a></strong>
-            {% if user.is_authenticated and user.organization %}
-                <span class="identity-chip">
-                    {% if user.organization.logo %}
-                        <img
-                            src="{{ user.organization.logo.url }}"
-                            alt="Logo de {{ user.organization.business_name }}"
-                            class="avatar"
-                        >
-                    {% endif %}
-                    <span class="badge badge-{{ user.organization.role|lower }}">
-                        {{ user.organization.get_role_display }}
-                    </span>
+    <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+
+    <header class="site-header">
+        <nav class="site-nav" aria-label="Navegación principal">
+            <a class="brand-lockup" href="{% url 'home' %}" aria-label="VIMER, un proyecto de OpenSAI. Ir al inicio">
+                <img
+                    class="brand-logo"
+                    src="{% static 'vimer/images/opensai-glider.png' %}"
+                    alt=""
+                    width="45"
+                    height="45"
+                >
+                <span>
+                    <span class="brand-product">VIMER</span>
+                    <span class="brand-parent">Un proyecto de OpenSAI</span>
                 </span>
-            {% endif %}
-        </div>
-        <div>
-            {% if user.is_authenticated %}
+            </a>
+
+            <div class="nav-links">
                 <a href="{% url 'marketplace:challenge-list' %}">Desafíos</a>
-                <a href="{% url 'notifications:list' %}">Notificaciones ({{ notifications_unread_count }})</a>
-                {% if user.is_organization_titular %}
-                    <a href="{% url 'organization-join-requests' %}">Mi organización</a>
+                {% if user.is_authenticated %}
+                    {% if user.can_operate %}
+                        {% if user.organization.role == 'DEMAND_SIDE' %}
+                            <a href="{% url 'marketplace:my-challenges' %}">Mis desafíos</a>
+                        {% elif user.organization.role == 'SUPPLY_SIDE' %}
+                            <a href="{% url 'marketplace:my-applications' %}">Mis propuestas</a>
+                        {% endif %}
+                        <a href="{% url 'notifications:list' %}">
+                            Notificaciones
+                            {% if notifications_unread_count %}
+                                <span aria-label="{{ notifications_unread_count }} sin leer">({{ notifications_unread_count }})</span>
+                            {% endif %}
+                        </a>
+                        {% if user.is_organization_titular %}
+                            <a href="{% url 'organization-join-requests' %}">Mi organización</a>
+                        {% endif %}
+                        {% if user.organization and user.organization.role == 'DEMAND_SIDE' %}
+                            <a href="{% url 'marketplace:challenge-create' %}">Publicar desafío</a>
+                        {% endif %}
+                    {% endif %}
+                    {% if user.can_operate and user.organization %}
+                        <span class="identity-chip" aria-label="Organización y rol">
+                            {% if user.organization.logo %}
+                                <img
+                                    src="{{ user.organization.logo.url }}"
+                                    alt=""
+                                    class="avatar"
+                                    width="36"
+                                    height="36"
+                                >
+                            {% endif %}
+                            <span class="badge badge-{{ user.organization.role|lower }}">
+                                {{ user.organization.get_role_display }}
+                            </span>
+                        </span>
+                    {% endif %}
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link">
+                            Cerrar sesión <span class="visually-hidden">de {{ user.username }}</span>
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}">Iniciar sesión</a>
+                    <a href="{% url 'signup' %}">Crear cuenta</a>
                 {% endif %}
-                {% if user.organization and user.organization.role == 'DEMAND_SIDE' %}
-                    <a href="{% url 'marketplace:challenge-create' %}">Publicar Reto</a>
+            </div>
+        </nav>
+    </header>
+
+    {% if user.is_authenticated and not user.can_operate %}
+        <aside class="status-banner" aria-labelledby="account-status-title">
+            <div class="status-banner-inner">
+                <strong id="account-status-title">Tu cuenta todavía no puede operar.</strong>
+                {% if user.status == 'PENDING_APPROVAL' %}
+                    La persona titular de la organización debe aprobar tu solicitud.
+                {% elif user.status == 'INACTIVE' %}
+                    La cuenta está inactiva. Contacta a {{ support_email }} si necesitas revisar la decisión.
                 {% endif %}
-                <form method="post" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-link">Cerrar Sesión ({{ user.username }})</button>
-                </form>
-            {% else %}
-                <a href="{% url 'login' %}">Iniciar Sesión</a>
-                <a href="{% url 'signup' %}">Registrarse</a>
-            {% endif %}
-        </div>
-    </nav>
-    <div class="container">
+                {% if not user.is_email_verified and user.is_active %}
+                    Revisa tu correo y completa la verificación antes de publicar, aplicar o administrar la organización.
+                    <form class="inline-form" method="post" action="{% url 'resend-email-verification' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-secondary">Reenviar verificación</button>
+                    </form>
+                {% endif %}
+            </div>
+        </aside>
+    {% endif %}
+
+    <main id="main-content" class="container" tabindex="-1">
         {% if messages %}
-            {% for message in messages %}
-                <div class="card">{{ message }}</div>
-            {% endfor %}
+            <div class="message-region" aria-live="polite" aria-atomic="true">
+                {% for message in messages %}
+                    <div
+                        class="message{% if message.tags %} message-{{ message.tags }}{% endif %}"
+                        {% if 'error' in message.tags %}role="alert"{% else %}role="status"{% endif %}
+                    >
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
         {% endif %}
         {% block content %}{% endblock %}
-    </div>
-    <footer>
-        <a href="{% url 'legal-terms' %}">Términos</a>
-        <a href="{% url 'legal-privacy-policy' %}">Política de datos</a>
-        <a href="{% url 'faq' %}">FAQ</a>
-        <span>Soporte: {{ support_email }}</span>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <nav class="footer-links" aria-label="Información institucional">
+                <a href="{% url 'legal-terms' %}">Términos</a>
+                <a href="{% url 'legal-privacy-policy' %}">Política de datos</a>
+                <a href="{% url 'faq' %}">Preguntas frecuentes</a>
+                <a href="https://opensai.org/" rel="external">OpenSAI</a>
+            </nav>
+            <span>Soporte: <a href="mailto:{{ support_email }}">{{ support_email }}</a></span>
+        </div>
     </footer>
 </body>
 </html>

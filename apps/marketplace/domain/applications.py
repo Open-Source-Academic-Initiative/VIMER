@@ -1,4 +1,8 @@
 from apps.corporate.models import Organization
+
+# Implementación única compartida con el modelo (vive en content para evitar
+# un import circular dominio <-> modelos); se re-exporta como API del dominio.
+from apps.marketplace.content import build_application_summary  # noqa: F401
 from apps.marketplace.domain.exceptions import (
     ChallengeApplicationNotAllowed,
     ChallengeNotOpenForApplications,
@@ -93,20 +97,3 @@ def ensure_existing_application_is_not_submitted(
             "Tu organización ya envió una propuesta para este desafío.",
             invariant_id=INV_14_SUBMITTED_APPLICATION_IS_IMMUTABLE,
         )
-
-
-def build_application_summary(
-    *,
-    problem_understanding: str,
-    proposed_solution: str,
-    capabilities_evidence: str,
-    execution_plan: str,
-) -> str:
-    return "\n\n".join(
-        [
-            f"Entendimiento del problema: {problem_understanding.strip()}",
-            f"Solución propuesta: {proposed_solution.strip()}",
-            f"Capacidades y evidencia: {capabilities_evidence.strip()}",
-            f"Plan de ejecución: {execution_plan.strip()}",
-        ]
-    )

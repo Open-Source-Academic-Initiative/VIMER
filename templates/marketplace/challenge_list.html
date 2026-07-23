@@ -1,42 +1,70 @@
 {% extends 'base.html' %}
 {% block title %}Desafíos de I+D+i - VIMER{% endblock %}
 {% block content %}
-<h2>Desafíos de Investigación y Desarrollo</h2>
-{% if user.organization and user.organization.role == 'DEMAND_SIDE' %}
-    <p><a href="{% url 'marketplace:challenge-create' %}" class="btn btn-primary">Publicar Nuevo Desafío</a></p>
+<h1>Desafíos de investigación, desarrollo e innovación</h1>
+{% if user.can_operate and user.organization.role == 'DEMAND_SIDE' %}
+    <p><a href="{% url 'marketplace:challenge-create' %}" class="btn btn-primary">Publicar un desafío</a></p>
 {% endif %}
 
-<form method="get" class="card">
-    <input type="search" name="q" value="{{ query }}" placeholder="Buscar desafíos">
-    <select name="category">
-        <option value="">Todas las categorías</option>
-        {% for category in categories %}
-            <option value="{{ category.slug }}" {% if selected_category == category.slug %}selected{% endif %}>{{ category.name }}</option>
-        {% endfor %}
-    </select>
-    <select name="status">
-        <option value="">Todos los estados</option>
-        {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit" class="btn btn-primary">Filtrar</button>
+<form method="get" class="card filter-card" role="search" aria-label="Filtrar desafíos">
+    <div class="filter-grid">
+        <div class="filter-field">
+            <label for="challenge-search">Buscar</label>
+            <input
+                id="challenge-search"
+                type="search"
+                name="q"
+                value="{{ query }}"
+                placeholder="Título, descripción u organización"
+            >
+        </div>
+        <div class="filter-field">
+            <label for="challenge-category">Categoría</label>
+            <select id="challenge-category" name="category">
+                <option value="">Todas las categorías</option>
+                {% for category in categories %}
+                    <option value="{{ category.slug }}" {% if selected_category == category.slug %}selected{% endif %}>{{ category.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-field">
+            <label for="challenge-status">Estado</label>
+            <select id="challenge-status" name="status">
+                <option value="">Todos los estados</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+    </div>
 </form>
 
 {% for challenge in challenges %}
-<div class="card">
-    <h3>{{ challenge.title }}</h3>
+<article class="card">
+    <h2>{{ challenge.title }}</h2>
     <p class="org-chip">
         {% if challenge.publisher.logo %}
             <img
                 src="{{ challenge.publisher.logo.url }}"
-                alt="Logo de {{ challenge.publisher.business_name }}"
+                alt=""
                 class="avatar avatar-marketplace"
+                width="36"
+                height="36"
+                loading="lazy"
             >
         {% endif %}
-        <span>Publicado por: <strong>{{ challenge.publisher.business_name }}</strong></span>
+        <span>Convoca: <strong>{{ challenge.publisher.business_name }}</strong></span>
     </p>
     <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
+    <p>
+        <strong>Presupuesto máximo:</strong>
+        {% if challenge.budget_amount is not None %}
+            {{ challenge.budget_amount|floatformat:2 }} {{ challenge.budget_currency }}
+        {% else %}
+            No informado en este registro histórico
+        {% endif %}
+    </p>
     <p>
         <strong>Categorías:</strong>
         {% for category in challenge.categories.all %}
@@ -48,15 +76,23 @@
     <p>
         <strong>Fecha límite:</strong>
         {% if challenge.application_deadline %}
-            {{ challenge.application_deadline }}
+            <time datetime="{{ challenge.application_deadline|date:'Y-m-d' }}">
+                {{ challenge.application_deadline|date:"d M Y" }}
+            </time>
         {% else %}
             Sin fecha límite
         {% endif %}
     </p>
     <p>{{ challenge.description|striptags|truncatewords:30 }}</p>
-    <a href="{% url 'marketplace:challenge-detail' challenge.pk %}" class="btn btn-primary">Ver Más</a>
-</div>
+    <a href="{% url 'marketplace:challenge-detail' challenge.pk %}" class="btn btn-primary">
+        Ver desafío <span class="visually-hidden">{{ challenge.title }}</span>
+    </a>
+</article>
 {% empty %}
-<p>No hay desafíos publicados en este momento.</p>
+<div class="card">
+    <h2>No encontramos desafíos</h2>
+    <p>Prueba otros filtros o vuelve más tarde para conocer nuevas oportunidades.</p>
+</div>
 {% endfor %}
+{% include 'includes/pagination.html' %}
 {% endblock %}

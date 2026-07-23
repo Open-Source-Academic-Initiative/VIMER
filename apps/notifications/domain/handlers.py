@@ -1,3 +1,5 @@
+import logging
+
 from django.urls import reverse
 from django.dispatch import receiver
 from django.conf import settings
@@ -20,18 +22,44 @@ from apps.marketplace.models import Application, Challenge
 from apps.notifications.models import Notification
 
 
+logger = logging.getLogger(__name__)
+
+
 def _build_challenge_link(challenge_id: int) -> str:
     return reverse("marketplace:challenge-detail", args=[challenge_id])
 
 
-def _send_notification_email(notification: Notification) -> None:
-    send_mail(
-        subject=notification.title,
-        message=f"{notification.body}\n\nEnlace: {notification.link}",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[notification.recipient.email],
-        fail_silently=True,
-    )
+def _format_average(average_score: float | None) -> str:
+    if average_score is None:
+        return "sin promedio registrado"
+    return f"promedio {average_score:.2f}/5"
+
+
+def send_notification_email(notification: Notification) -> None:
+    # The in-app inbox stores a relative link; emails need an absolute URL.
+    # Delivery is best effort, but failures must be observable in the logs.
+    absolute_link = f"{settings.PUBLIC_BASE_URL}{notification.link}"
+    try:
+        send_mail(
+            subject=notification.title,
+            message=f"{notification.body}\n\nEnlace: {absolute_link}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[notification.recipient.email],
+            fail_silently=False,
+        )
+    except OSError:
+        # smtplib.SMTPException subclasses OSError.
+        logger.warning(
+            "No fue posible enviar el email de notificación '%s' a %s.",
+            notification.title,
+            notification.recipient.email,
+            exc_info=True,
+        )
+
+
+# Backwards-compatible import for lifecycle consumers created before the
+# delivery helper became part of the public notifications API.
+_send_notification_email = send_notification_email
 
 
 @receiver(
@@ -48,12 +76,13 @@ def create_notifications_for_evaluation_started(sender, *, event, **kwargs):
             member.pk
             for application in challenge.applications.submitted()
             for member in application.applicant.members.all()
+            if member.can_operate
         }
     )
     if not recipient_ids:
         return
 
-    recipients = User.objects.filter(pk__in=recipient_ids)
+    recipients = User.objects.operational().filter(pk__in=recipient_ids)
     notifications = [
         Notification(
             recipient=recipient,
@@ -68,7 +97,7 @@ def create_notifications_for_evaluation_started(sender, *, event, **kwargs):
     ]
     Notification.objects.bulk_create(notifications)
     for notification in notifications:
-        _send_notification_email(notification)
+        send_notification_email(notification)
 
 
 @receiver(
@@ -88,7 +117,7 @@ def create_notifications_for_challenge_awarded(sender, *, event, **kwargs):
 
     notifications = []
 
-    for recipient in challenge.publisher.members.all():
+    for recipient in User.objects.operational_members_of(challenge.publisher_id):
         notifications.append(
             Notification(
                 recipient=recipient,
@@ -107,7 +136,7 @@ def create_notifications_for_challenge_awarded(sender, *, event, **kwargs):
         for application in challenge.applications.submitted()
     }
     for organization in applicant_orgs.values():
-        for recipient in organization.members.all():
+        for recipient in User.objects.operational_members_of(organization.pk):
             organization_won = organization.pk == winning_org.pk
             notifications.append(
                 Notification(
@@ -133,7 +162,7 @@ def create_notifications_for_challenge_awarded(sender, *, event, **kwargs):
     if notifications:
         Notification.objects.bulk_create(notifications)
         for notification in notifications:
-            _send_notification_email(notification)
+            send_notification_email(notification)
 
 
 @receiver(
@@ -163,11 +192,11 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
                 f"Tu propuesta para '{application.challenge.title}' quedó con "
                 f"{event.evaluated_count}/{event.criteria_total} criterios evaluados, "
                 f"{event.assessment_count} evaluaciones registradas, "
-                f"promedio {event.average_score:.2f}/5 y {applicant_ranking_fragment}"
+                f"{_format_average(event.average_score)} y {applicant_ranking_fragment}"
             ),
             link=_build_challenge_link(application.challenge_id),
         )
-        for recipient in application.applicant.members.all()
+        for recipient in User.objects.operational_members_of(application.applicant_id)
     ]
     team_recipient_ids = sorted(
         {
@@ -183,7 +212,7 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
         }
     )
     if team_recipient_ids:
-        for recipient in User.objects.filter(pk__in=team_recipient_ids):
+        for recipient in User.objects.operational().filter(pk__in=team_recipient_ids):
             notifications.append(
                 Notification(
                     recipient=recipient,
@@ -193,7 +222,7 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
                         f"{event.blind_reference} quedó con "
                         f"{event.evaluated_count}/{event.criteria_total} criterios cubiertos, "
                         f"{event.assessment_count} evaluaciones registradas y "
-                        f"promedio {event.average_score:.2f}/5."
+                        f"{_format_average(event.average_score)}."
                     ),
                     link=_build_challenge_link(application.challenge_id),
                 )
@@ -201,4 +230,4 @@ def create_notifications_for_application_evaluated(sender, *, event, **kwargs):
     if notifications:
         Notification.objects.bulk_create(notifications)
         for notification in notifications:
-            _send_notification_email(notification)
+            send_notification_email(notification)

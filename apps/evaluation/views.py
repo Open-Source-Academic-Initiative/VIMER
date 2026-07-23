@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import UserPassesTestMixin
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -24,10 +24,11 @@ from apps.evaluation.forms import (
     ChallengeEvaluationRoleAssignmentForm,
 )
 from apps.evaluation.models import ChallengeEvaluationRoleAssignment
+from apps.identity.mixins import OperationalUserRequiredMixin
 from apps.marketplace.models import Application, Challenge
 
 
-class ChallengePublisherRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+class ChallengePublisherRequiredMixin(OperationalUserRequiredMixin, UserPassesTestMixin):
     def get_challenge(self):
         if not hasattr(self, "_challenge"):
             self._challenge = get_object_or_404(Challenge, pk=self.kwargs["pk"])
@@ -38,8 +39,7 @@ class ChallengePublisherRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
         user = self.request.user
         return (
             user.is_authenticated
-            and user.organization is not None
-            and challenge.publisher_id == user.organization_id
+            and user.is_operational_member_of(challenge.publisher_id)
         )
 
 
@@ -59,6 +59,15 @@ class ChallengeEvaluationRoleRequiredMixin(ChallengePublisherRequiredMixin):
 class ChallengeEvaluationStartView(ChallengePublisherRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         challenge = self.get_challenge()
+
+        if request.POST.get("confirm") != "on":
+            messages.error(
+                request,
+                "Debes confirmar explícitamente el inicio de la evaluación.",
+            )
+            return HttpResponseRedirect(
+                reverse("marketplace:challenge-detail", args=[challenge.pk])
+            )
 
         try:
             start_challenge_evaluation(

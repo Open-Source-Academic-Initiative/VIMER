@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Propuesta para el Desafío - VIMER{% endblock %}
 {% block content %}
-<h2>Propuesta Tecnológica</h2>
-<h3>{{ challenge.title }}</h3>
+<h1>Propuesta tecnológica</h1>
+<h2>{{ challenge.title }}</h2>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
 <p>
     <strong>Fecha límite:</strong>
@@ -10,6 +10,14 @@
         {{ challenge.application_deadline }}
     {% else %}
         Sin fecha límite
+    {% endif %}
+</p>
+<p>
+    <strong>Presupuesto máximo:</strong>
+    {% if challenge.budget_amount is not None %}
+        {{ challenge.budget_amount|floatformat:2 }} {{ challenge.budget_currency }}
+    {% else %}
+        No informado en este registro histórico
     {% endif %}
 </p>
 {% if existing_application and existing_application.status == 'SUBMITTED' %}
@@ -20,6 +28,10 @@
         <p><strong>Solución propuesta:</strong> {{ existing_application.rendered_proposed_solution|safe }}</p>
         <p><strong>Capacidades y evidencia:</strong> {{ existing_application.rendered_capabilities_evidence|safe }}</p>
         <p><strong>Plan de ejecución:</strong> {{ existing_application.rendered_execution_plan|safe }}</p>
+        {% if existing_application.offered_amount is not None %}
+            <p><strong>Valor total ofertado:</strong> {{ existing_application.offered_amount|floatformat:2 }} {{ existing_application.offer_currency }}</p>
+            <p><strong>Duración estimada:</strong> {{ existing_application.estimated_duration_days }} días</p>
+        {% endif %}
         {% if existing_application.attachments.exists %}
             <p><strong>Adjuntos:</strong></p>
             <ul>
@@ -35,6 +47,24 @@
         <div class="card">
             <p><strong>Estado actual:</strong> Borrador privado</p>
             <p>Este borrador solo es visible para tu organización hasta que lo envíes.</p>
+            {% if existing_application.attachments.exists %}
+                <p><strong>Adjuntos del borrador:</strong></p>
+                <ul>
+                    {% for attachment in existing_application.attachments.all %}
+                        <li>
+                            <a href="{% url 'marketplace:application-attachment-download' attachment.opaque_id %}">{{ attachment.original_filename }}</a>
+                            <form method="post" action="{% url 'marketplace:application-attachment-delete' attachment.opaque_id %}" class="inline-form">
+                                {% csrf_token %}
+                                <label>
+                                    <input type="checkbox" name="confirm" required>
+                                    Confirmar eliminación
+                                </label>
+                                <button type="submit" class="btn btn-danger">Eliminar</button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
         </div>
     {% endif %}
     <form method="post" enctype="multipart/form-data">
@@ -43,6 +73,7 @@
         <button type="submit" name="intent" value="draft" class="btn btn-secondary">Guardar borrador</button>
         <button type="submit" name="intent" value="submit" class="btn btn-primary">Enviar propuesta</button>
     </form>
+    <p>Al enviar, la propuesta técnica, económica y sus adjuntos quedan en solo lectura.</p>
 {% else %}
     <p>Este desafío no está abierto para guardar o enviar propuestas.</p>
     {% if existing_application and existing_application.status == 'DRAFT' %}

@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views import View
 from django.views.generic import FormView, ListView, TemplateView
 
@@ -21,6 +22,7 @@ from apps.identity.application.services import (
     approve_organization_join_request,
     register_organization_user,
     reject_organization_join_request,
+    resend_email_verification,
     transfer_organization_titularity,
 )
 from apps.identity.models import EmailVerificationToken, OrganizationJoinRequest, User
@@ -43,10 +45,14 @@ class FAQPageView(TemplateView):
     template_name = "help/faq.html"
 
 
+class SignUpDoneView(TemplateView):
+    template_name = "identity/signup_done.html"
+
+
 class SignUpView(FormView):
     form_class = RegistrationForm
     template_name = "identity/signup.html"
-    success_url = reverse_lazy("login")
+    success_url = reverse_lazy("signup-done")
 
     def form_valid(self, form):
         try:
@@ -84,13 +90,39 @@ class SignUpView(FormView):
 
 
 class EmailVerificationView(TemplateView):
+    """Two-step verification: GET shows a confirmation button, POST consumes.
+
+    Consuming the token on GET would let email scanners/prefetchers trigger the
+    verification; the state change only happens on an explicit POST.
+    """
+
     template_name = "identity/email_verified.html"
+
+    def get_token(self):
+        return EmailVerificationToken.objects.filter(
+            token=self.kwargs["token"]
+        ).select_related("user").first()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        token = EmailVerificationToken.objects.filter(
-            token=self.kwargs["token"]
-        ).select_related("user").first()
+        token = self.get_token()
+        context["verified"] = False
+        context["confirmation_required"] = False
+        if token is None:
+            context["message"] = "El enlace de verificación no es válido."
+        elif not token.is_usable:
+            context["message"] = "El enlace de verificación expiró o ya fue usado."
+        else:
+            context["confirmation_required"] = True
+            context["message"] = (
+                "Confirma la verificación de tu correo para activar tu cuenta."
+            )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        context = super().get_context_data(**kwargs)
+        token = self.get_token()
+        context["confirmation_required"] = False
         if token is None:
             context["verified"] = False
             context["message"] = "El enlace de verificación no es válido."
@@ -101,7 +133,27 @@ class EmailVerificationView(TemplateView):
             token.mark_used()
             context["verified"] = True
             context["message"] = "Tu correo fue verificado correctamente."
-        return context
+        return self.render_to_response(context)
+
+
+class ResendEmailVerificationView(LoginRequiredMixin, View):
+    """Authenticated POST-only replacement of an outstanding verification link."""
+
+    def post(self, request, *args, **kwargs):
+        try:
+            resend_email_verification(user=request.user)
+        except RegistrationValidationError:
+            # Deliberately keep the response neutral: callers cannot infer
+            # delivery state and an existing token remains valid after rollback.
+            pass
+        messages.info(
+            request,
+            (
+                "Si tu cuenta requiere verificación, enviaremos un nuevo enlace "
+                "al correo registrado."
+            ),
+        )
+        return HttpResponseRedirect(reverse("home"))
 
 
 class TitularRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -109,9 +161,7 @@ class TitularRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
         user = self.request.user
         return (
             user.is_authenticated
-            and user.organization_id is not None
-            and user.status == User.AccountStatus.ACTIVE
-            and user.is_organization_titular
+            and user.can_govern_organization
         )
 
 
@@ -124,13 +174,13 @@ class OrganizationJoinRequestListView(TitularRequiredMixin, ListView):
         return OrganizationJoinRequest.objects.filter(
             organization_id=self.request.user.organization_id,
             status=OrganizationJoinRequest.Status.PENDING,
+            expires_at__gt=timezone.now(),
         ).select_related("requester", "organization")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["active_members"] = User.objects.filter(
-            organization_id=self.request.user.organization_id,
-            status=User.AccountStatus.ACTIVE,
+        context["active_members"] = User.objects.operational_members_of(
+            self.request.user.organization_id
         ).exclude(pk=self.request.user.pk)
         return context
 
@@ -169,6 +219,12 @@ class OrganizationJoinRequestRejectView(TitularRequiredMixin, View):
 
 class OrganizationTitularityTransferView(TitularRequiredMixin, View):
     def post(self, request, *args, **kwargs):
+        if request.POST.get("confirm_transfer") != "yes":
+            messages.error(
+                request,
+                "Debes confirmar explícitamente la transferencia de titularidad.",
+            )
+            return HttpResponseRedirect(reverse("organization-join-requests"))
         try:
             transfer_organization_titularity(
                 actor=request.user,

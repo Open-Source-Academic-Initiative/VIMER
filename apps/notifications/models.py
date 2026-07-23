@@ -8,13 +8,36 @@ class Notification(models.Model):
         EVALUATION_STARTED = "EVALUATION_STARTED", _("Evaluación iniciada")
         APPLICATION_EVALUATED = "APPLICATION_EVALUATED", _("Propuesta evaluada")
         CHALLENGE_AWARDED = "CHALLENGE_AWARDED", _("Desafío adjudicado")
+        CHALLENGE_CLOSED = "CHALLENGE_CLOSED", _("Recepción cerrada")
+        CHALLENGE_CANCELLED = "CHALLENGE_CANCELLED", _("Desafío cancelado")
+        CHALLENGE_DESERTED = "CHALLENGE_DESERTED", _("Desafío desierto")
+        REPRESENTATIVE_JOIN_REQUESTED = (
+            "REPRESENTATIVE_JOIN_REQUESTED",
+            _("Solicitud de unión creada"),
+        )
+        REPRESENTATIVE_JOIN_APPROVED = (
+            "REPRESENTATIVE_JOIN_APPROVED",
+            _("Solicitud de unión aprobada"),
+        )
+        REPRESENTATIVE_JOIN_REJECTED = (
+            "REPRESENTATIVE_JOIN_REJECTED",
+            _("Solicitud de unión rechazada"),
+        )
+        REPRESENTATIVE_JOIN_EXPIRED = (
+            "REPRESENTATIVE_JOIN_EXPIRED",
+            _("Solicitud de unión expirada"),
+        )
+        ORGANIZATION_OWNERSHIP_TRANSFERRED = (
+            "ORGANIZATION_OWNERSHIP_TRANSFERRED",
+            _("Titularidad transferida"),
+        )
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="notifications",
     )
-    kind = models.CharField(_("Tipo"), max_length=32, choices=Kind.choices)
+    kind = models.CharField(_("Tipo"), max_length=40, choices=Kind.choices)
     title = models.CharField(_("Título"), max_length=120)
     body = models.TextField(_("Mensaje"))
     link = models.CharField(_("Enlace"), max_length=255, blank=True, default="")

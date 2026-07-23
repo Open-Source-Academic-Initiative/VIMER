@@ -1,14 +1,85 @@
+version: "3.8"
+
 services:
   web:
-    build: .
+    build:
+      context: .
+    image: vimer:pilot
     ports:
-      - "8000:8000"
+      - "${VIMER_BIND_ADDRESS:-127.0.0.1}:${VIMER_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings
       DEPLOYMENT_PROFILE: pilot
+      DATABASE_URL: sqlite:////app/data/db.sqlite3
+      GUNICORN_WORKERS: "1"
+      ATTACHMENT_X_ACCEL_REDIRECT: "False"
+      TURNSTILE_REQUIRED: "${TURNSTILE_REQUIRED:-True}"
+      EMAIL_DELIVERY_REQUIRED: "${EMAIL_DELIVERY_REQUIRED:-True}"
     volumes:
-      - ./db.sqlite3:/app/db.sqlite3
-      - ./media:/app/media
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+      - "${VIMER_DATA_DIR:-./data}:/app/data"
+      - "${VIMER_MEDIA_DIR:-./media}:/app/media"
+      - pilot_static_data:/app/staticfiles
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "python", "/app/deploy/container_healthcheck.py"]
+      interval: 30s
+      timeout: 6s
+      start_period: 45s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  scheduler:
+    build:
+      context: .
+    image: vimer:pilot
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DEPLOYMENT_PROFILE: pilot
+      DATABASE_URL: sqlite:////app/data/db.sqlite3
+      RUN_STARTUP_TASKS: "False"
+      TURNSTILE_REQUIRED: "${TURNSTILE_REQUIRED:-True}"
+      EMAIL_DELIVERY_REQUIRED: "${EMAIL_DELIVERY_REQUIRED:-True}"
+      JOIN_REQUEST_EXPIRY_INTERVAL_SECONDS: "${JOIN_REQUEST_EXPIRY_INTERVAL_SECONDS:-300}"
+      CHALLENGE_CLOSURE_INTERVAL_SECONDS: "${CHALLENGE_CLOSURE_INTERVAL_SECONDS:-900}"
+      SCHEDULER_RETRY_DELAY_SECONDS: "${SCHEDULER_RETRY_DELAY_SECONDS:-60}"
+      SCHEDULER_HEALTH_GRACE_SECONDS: "${SCHEDULER_HEALTH_GRACE_SECONDS:-60}"
+    command: ["/app/deploy/scheduler.sh"]
+    depends_on:
+      - web
+    volumes:
+      - "${VIMER_DATA_DIR:-./data}:/app/data"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "python", "/app/deploy/scheduler_healthcheck.py"]
+      interval: 60s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  pilot_static_data:

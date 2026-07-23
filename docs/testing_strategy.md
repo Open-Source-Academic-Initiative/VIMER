@@ -14,6 +14,8 @@ The suite combines:
 - static validation through `compileall`
 - Django configuration checks through `manage.py check` and `manage.py check --deploy`
 
+The suite currently holds 144 tests and passes green both locally and inside the Debian-slim container image.
+
 ## Runtime optimization strategy
 
 The current optimization is intentionally conservative and Django-native:
@@ -56,6 +58,7 @@ The repository now provides a small `Makefile`:
 make test
 make test-fast
 make verify-fast
+make test-docker
 ```
 
 Notes:
@@ -63,6 +66,26 @@ Notes:
 - `make test-fast` defaults to `TEST_PARALLEL=4`
 - override the worker count with `make test-fast TEST_PARALLEL=2`
 - `make verify-fast` runs static compilation, Django checks, deploy checks, and the fast parallel suite
+- `make test-docker` builds the multi-stage `python:3.12-slim-trixie` image from the `Dockerfile` and runs the full suite inside the container; use it when the working tree lives on a `noexec` mount (e.g. an NFS-mounted home) where compiled extensions such as Pillow cannot be loaded directly. Pass `DOCKER="sudo docker"` when the Docker socket needs privileges.
+- in-container reference run on the pilot host: `Ran 144 tests in 87.043s` (single worker-friendly default; the build also resolved the latest in-range dependency patches and stayed green)
+
+## Manual QA validation
+
+Automated tests are complemented by a manual QA pass for the v1 pilot flows.
+A single idempotent management command seeds a complete set of accounts that
+cover every role and account state (platform superuser, Solicitante titular and
+designated evaluation-team members, a pending join request, two Proveedor
+titulares, and an email-unverified account for the operate-after-verification
+gate):
+
+```bash
+python manage.py seed_categories
+python manage.py seed_test_users
+```
+
+The seeder is for QA/staging only and must not be run on a real
+participant-facing instance. Credentials and manual test records are
+environment-local operational material and are intentionally not versioned.
 
 ## Maintenance guidance
 

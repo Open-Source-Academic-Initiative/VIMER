@@ -3,7 +3,12 @@
 {% block content %}
 <h1>Verificación de correo</h1>
 <p>{{ message }}</p>
-{% if verified %}
+{% if confirmation_required %}
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">Confirmar verificación</button>
+    </form>
+{% elif verified %}
     <p><a href="{% url 'login' %}" class="btn btn-primary">Iniciar sesión</a></p>
 {% endif %}
 {% endblock %}

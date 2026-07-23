@@ -1,3 +1,5 @@
+from django.contrib.auth import get_user_model
+
 from apps.evaluation.domain.exceptions import EvaluationDomainRuleViolation
 from apps.evaluation.domain.invariants import (
     INV_18_CHALLENGE_REQUIRES_EVALUATION_TEAM_BEFORE_EVALUATION,
@@ -14,10 +16,17 @@ from apps.marketplace.models import Application, Challenge
 
 def challenge_has_required_evaluation_team(challenge: Challenge) -> bool:
     assignments = challenge.evaluation_role_assignments
+    operational_user_ids = get_user_model().objects.operational_members_of(
+        challenge.publisher_id
+    )
     return (
-        assignments.filter(role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR).exists()
+        assignments.filter(
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+            user_id__in=operational_user_ids,
+        ).exists()
         and assignments.filter(
-            role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR
+            role=ChallengeEvaluationRoleAssignment.Role.ADJUDICATOR,
+            user_id__in=operational_user_ids,
         ).exists()
     )
 
@@ -32,7 +41,7 @@ def ensure_actor_belongs_to_publisher_organization(
     actor,
     message: str,
 ) -> None:
-    if actor.organization_id != challenge.publisher_id:
+    if not actor.is_operational_member_of(challenge.publisher_id):
         raise EvaluationDomainRuleViolation(
             message,
             invariant_id=INV_20_ONLY_PUBLISHER_ORGANIZATION_CAN_GOVERN_EVALUATION,
@@ -44,11 +53,16 @@ def ensure_requested_evaluation_role_members_belong_to_publisher_organization(
     challenge: Challenge,
     requested_user_ids: set[int],
 ) -> None:
-    publisher_member_ids = set(challenge.publisher.members.values_list("pk", flat=True))
+    publisher_member_ids = set(
+        get_user_model()
+        .objects.operational_members_of(challenge.publisher_id)
+        .values_list("pk", flat=True)
+    )
     invalid_user_ids = requested_user_ids - publisher_member_ids
     if invalid_user_ids:
         raise EvaluationDomainRuleViolation(
-            "Todos los roles de evaluación deben asignarse a miembros de la organización publicadora.",
+            "Todos los roles de evaluación deben asignarse a miembros operativos "
+            "de la organización publicadora.",
             invariant_id=INV_19_EVALUATION_ROLES_ARE_LIMITED_TO_PUBLISHER_ORGANIZATION_MEMBERS,
         )
 

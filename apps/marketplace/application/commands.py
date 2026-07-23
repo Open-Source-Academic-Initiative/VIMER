@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Any, Optional
 
 
@@ -9,6 +10,8 @@ class PublishChallengeCommand:
     description: str
     evaluation_criteria: str = ""
     application_deadline: Optional[date] = None
+    budget_amount: Optional[Decimal] = None
+    budget_currency: str = "COP"
     category_ids: tuple[int, ...] = ()
     attachments: tuple[Any, ...] = ()
 
@@ -19,6 +22,9 @@ class SubmitApplicationCommand:
     proposed_solution: str
     capabilities_evidence: str
     execution_plan: str
+    offered_amount: Optional[Decimal] = None
+    offer_currency: str = ""
+    estimated_duration_days: Optional[int] = None
     attachments: tuple[Any, ...] = ()
 
 
@@ -28,4 +34,7 @@ class SaveApplicationDraftCommand:
     proposed_solution: str = ""
     capabilities_evidence: str = ""
     execution_plan: str = ""
+    offered_amount: Optional[Decimal] = None
+    offer_currency: str = ""
+    estimated_duration_days: Optional[int] = None
     attachments: tuple[Any, ...] = ()

@@ -4,3 +4,6 @@ class MarketplaceConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.marketplace'
     verbose_name = 'Mercado I+D+i'
+
+    def ready(self):
+        import apps.marketplace.domain.handlers  # noqa: F401

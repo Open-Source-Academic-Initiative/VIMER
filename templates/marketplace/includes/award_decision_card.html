@@ -1,0 +1,63 @@
+<h3>Decisión de adjudicación</h3>
+<div class="card">
+    <p><strong>Propuesta ganadora:</strong> {{ award_decision.winning_application.applicant.business_name }}</p>
+    <p><strong>Comentario:</strong> {{ award_decision.comment }}</p>
+    <p><strong>Decidido por:</strong> {{ award_decision.decided_by.username }}</p>
+    {% if award_decision.winning_ranking_position %}
+        <p>
+            <strong>Posición comparativa registrada al adjudicar:</strong>
+            #{{ award_decision.winning_ranking_position }}
+        </p>
+    {% endif %}
+    {% if award_decision.winning_eligible_ranking_position %}
+        <p>
+            <strong>Posición elegible registrada al adjudicar:</strong>
+            #{{ award_decision.winning_eligible_ranking_position }}
+        </p>
+    {% endif %}
+    <p><strong>Modo de adjudicación:</strong> {{ award_decision.get_selection_mode_display }}</p>
+    {% if award_decision.exceptional_reason %}
+        <p>
+            <strong>Motivo estructurado:</strong>
+            {{ award_decision.get_exceptional_reason_display }}
+        </p>
+    {% endif %}
+    {% if award_decision.winning_average_score is not None %}
+        <p>
+            <strong>Promedio registrado al adjudicar:</strong>
+            {{ award_decision.winning_average_score|floatformat:2 }} / 5
+            | <strong>Puntaje total registrado:</strong>
+            {{ award_decision.winning_total_score }}
+        </p>
+    {% endif %}
+    {% if award_decision.winning_evaluated_criteria_count is not None and award_decision.winning_criteria_total is not None %}
+        <p>
+            <strong>Criterios evaluados al adjudicar:</strong>
+            {{ award_decision.winning_evaluated_criteria_count }}/{{ award_decision.winning_criteria_total }}
+        </p>
+    {% endif %}
+    {% if award_decision.best_available_applications_snapshot %}
+        <p><strong>Propuestas en la mejor posición disponible al adjudicar:</strong></p>
+        <ul>
+            {% for snapshot in award_decision.best_available_applications_snapshot %}
+                <li>
+                    {{ snapshot.blind_reference }}
+                    en posición #{{ snapshot.ranking_position }}
+                    con promedio {{ snapshot.average_score|floatformat:2 }}/5
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    {% if award_decision.higher_ranked_applications_snapshot %}
+        <p><strong>Propuestas con mejor posición que la adjudicada:</strong></p>
+        <ul>
+            {% for snapshot in award_decision.higher_ranked_applications_snapshot %}
+                <li>
+                    {{ snapshot.blind_reference }}
+                    en posición #{{ snapshot.ranking_position }}
+                    con promedio {{ snapshot.average_score|floatformat:2 }}/5
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</div>

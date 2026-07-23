@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 {% block title %}Adjudicar Desafío - VIMER{% endblock %}
 {% block content %}
-<h2>Adjudicar Desafío</h2>
-<h3>{{ challenge.title }}</h3>
+<h1>Adjudicar desafío</h1>
+<h2>{{ challenge.title }}</h2>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
 {% if challenge.evaluation_criteria_list %}
-    <h4>Criterios de evaluación</h4>
+	    <h3>Criterios de evaluación</h3>
     <ul>
         {% for criterion in challenge.evaluation_criteria_list %}
             <li>{{ criterion }}</li>
@@ -13,7 +13,7 @@
     </ul>
 {% endif %}
 {% if complete_application_evaluation_summaries %}
-    <h4>Ranking competitivo de Propuestas</h4>
+	    <h3>Ranking competitivo de propuestas</h3>
     <p>La identidad del postulante permanece oculta hasta que se registre la adjudicación.</p>
     <ul>
         {% for application in complete_application_evaluation_summaries %}
@@ -48,7 +48,7 @@
                     <ul>
                         {% for result in application.evaluation_summary.criterion_results %}
                             <li>
-                                <strong>{{ result.label }}:</strong>
+                                <strong>{{ result.label }} ({{ result.weight|floatformat:2 }} %):</strong>
                                 {% if result.evaluation_count %}
                                     promedio {{ result.average_score|floatformat:2 }}/5
                                     con {{ result.evaluation_count }} evaluacion{{ result.evaluation_count|pluralize:"es" }}
@@ -72,7 +72,7 @@
     </ul>
 {% endif %}
 {% if pending_application_evaluation_summaries %}
-    <h4>Propuestas no elegibles aún</h4>
+	    <h3>Propuestas no elegibles aún</h3>
     <p>Estas Propuestas siguen visibles, pero no compiten en el ranking hasta completar cobertura de criterios.</p>
     <ul>
         {% for application in pending_application_evaluation_summaries %}
@@ -93,7 +93,7 @@
     </ul>
 {% endif %}
 {% if best_available_application_summaries %}
-    <h4>Mejor lugar disponible</h4>
+	    <h3>Mejor lugar disponible</h3>
     <ul>
         {% for application in best_available_application_summaries %}
             <li>
@@ -106,7 +106,7 @@
 {% endif %}
 {% if award_blocking_messages %}
     <div class="card">
-        <h4>Adjudicación bloqueada</h4>
+	        <h3>Adjudicación bloqueada</h3>
         {% for message in award_blocking_messages %}
             <p>{{ message }}</p>
         {% endfor %}
@@ -146,6 +146,11 @@
         {{ form.comment.label_tag }}
         {{ form.comment }}
         {{ form.comment.errors }}
+    </p>
+    <p>
+        {{ form.confirm_award }}
+        {{ form.confirm_award.label_tag }}
+        {{ form.confirm_award.errors }}
     </p>
     <button type="submit" class="btn btn-primary" {% if is_award_blocked %}disabled{% endif %}>
         Registrar adjudicación

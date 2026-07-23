@@ -206,6 +206,7 @@ A short runbook section in this document covers:
 5. `docker compose exec web python manage.py seed_categories` (one-shot for pilot)
 6. `docker compose exec web python manage.py createsuperuser`
 7. smoke test: open landing, signup with a throwaway email, confirm verification email arrives, log in
+8. optional, for QA validation only: `docker compose exec web python manage.py seed_test_users` (do not run on a real participant-facing instance; keep credentials and test records outside version control)
 
 ### 6.4 Logging and uptime
 
@@ -330,7 +331,7 @@ Scope:
 - update `docs/domain/glossary.md` with new canonical terms
 - update `docs/domain/invariants.md` with `INV-50` through `INV-63`
 - update `docs/domain/context_map.md` with `Identity` extension and the `Notifications -> email` channel
-- update `docs/ddd_work_plan.md` with the v1 iteration as a closed phase and the next phase as the post-pilot move
+- record implemented domain decisions in the corresponding ADRs and canonical domain references
 - update `README.md` with a release v1 section and link to this rector
 
 Closure: all referenced files exist, the `make verify-fast` validation still passes, the rector document remains authoritative.
@@ -371,7 +372,6 @@ Closure: all referenced files exist, the `make verify-fast` validation still pas
 | Bounded contexts and integration | `docs/domain/context_map.md` |
 | Invariant inventory | `docs/domain/invariants.md` |
 | Approved scoring policy | `docs/domain/evaluation_scoring_and_award_policy.md` |
-| DDD work plan | `docs/ddd_work_plan.md` |
 | Functional and architecture diagrams | `docs/project_diagrams.md` |
 | Test strategy and benchmarks | `docs/testing_strategy.md` |
 | Deployment dual-mode | `docs/adr/0004-dual-mode-deployment.md` |

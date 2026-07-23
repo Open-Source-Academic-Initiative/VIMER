@@ -1,20 +1,60 @@
 {% extends 'base.html' %}
 {% block title %}Registro - VIMER{% endblock %}
+{% block extra_head %}
+    {% if turnstile_site_key %}
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    {% endif %}
+{% endblock %}
 {% block content %}
-<h1>Registro de Usuario y Organización</h1>
+<h1>Crear una cuenta</h1>
+<p>
+    Registra tu organización y a su primera persona representante. Si el NIT ya
+    existe, la persona titular deberá aprobar tu solicitud antes de que puedas
+    consultar información privada u operar en su nombre.
+</p>
 <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    {{ form.as_p }}
-    {% if turnstile_site_key %}
-        <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
-    {% endif %}
-    <p>
-        Al registrarte aceptas los
-        <a href="{% url 'legal-terms' %}" target="_blank" rel="noopener">Términos y Condiciones</a>
-        y la
-        <a href="{% url 'legal-privacy-policy' %}" target="_blank" rel="noopener">Política de Tratamiento de Datos</a>.
-    </p>
-    <button type="submit" class="btn btn-primary">Registrarse</button>
+    {{ form.non_field_errors }}
+    {{ form.turnstile_token }}
+    <fieldset>
+        <legend>Organización</legend>
+        {% include 'includes/form_field.html' with field=form.tax_id %}
+        {% include 'includes/form_field.html' with field=form.business_name %}
+        {% include 'includes/form_field.html' with field=form.chamber_of_commerce %}
+        {% include 'includes/form_field.html' with field=form.role %}
+        {% include 'includes/form_field.html' with field=form.contact_phone %}
+        {% include 'includes/form_field.html' with field=form.logo %}
+    </fieldset>
+    <fieldset>
+        <legend>Representante</legend>
+        {% include 'includes/form_field.html' with field=form.username %}
+        {% include 'includes/form_field.html' with field=form.first_name %}
+        {% include 'includes/form_field.html' with field=form.last_name %}
+        {% include 'includes/form_field.html' with field=form.email %}
+        {% include 'includes/form_field.html' with field=form.password %}
+        {% include 'includes/form_field.html' with field=form.confirm_password %}
+    </fieldset>
+    <fieldset>
+        <legend>Términos y datos personales</legend>
+        {% include 'includes/form_field.html' with field=form.accept_terms %}
+        {% include 'includes/form_field.html' with field=form.accept_privacy_policy %}
+        <p>
+            Consulta los
+            <a href="{% url 'legal-terms' %}" target="_blank" rel="noopener">
+                Términos y condiciones
+                <span class="visually-hidden">(abre en una pestaña nueva)</span>
+            </a>
+            y la
+            <a href="{% url 'legal-privacy-policy' %}" target="_blank" rel="noopener">
+                Política de tratamiento de datos
+                <span class="visually-hidden">(abre en una pestaña nueva)</span>
+            </a>.
+        </p>
+        {% if turnstile_site_key %}
+            <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+        {% endif %}
+    </fieldset>
+    <button type="submit" class="btn btn-primary">Crear cuenta</button>
 </form>
 <p>¿Ya tienes cuenta? <a href="{% url 'login' %}">Inicia sesión</a></p>
 {% endblock %}

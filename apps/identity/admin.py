@@ -1,7 +1,12 @@
 from django.contrib import admin, messages
 from django.contrib.admin.actions import delete_selected
 from django.contrib.auth.admin import UserAdmin
-from .models import EmailVerificationToken, OrganizationJoinRequest, User
+from .models import (
+    EmailVerificationToken,
+    IdentityAuditEntry,
+    OrganizationJoinRequest,
+    User,
+)
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
@@ -88,7 +93,21 @@ class OrganizationJoinRequestAdmin(admin.ModelAdmin):
         'requester__username',
         'requester__email',
     )
-    readonly_fields = ('created_at',)
+    readonly_fields = (
+        'organization',
+        'requester',
+        'status',
+        'decided_by',
+        'decided_at',
+        'expires_at',
+        'created_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(EmailVerificationToken)
@@ -96,3 +115,42 @@ class EmailVerificationTokenAdmin(admin.ModelAdmin):
     list_display = ('user', 'expires_at', 'used_at', 'created_at')
     search_fields = ('user__username', 'user__email', 'token')
     readonly_fields = ('token', 'created_at')
+
+
+@admin.register(IdentityAuditEntry)
+class IdentityAuditEntryAdmin(admin.ModelAdmin):
+    list_display = (
+        'event_type',
+        'organization',
+        'actor',
+        'subject',
+        'occurred_at',
+    )
+    list_filter = ('event_type', 'organization__role')
+    search_fields = (
+        'organization__business_name',
+        'actor__username',
+        'subject__username',
+        'description',
+    )
+    readonly_fields = (
+        'event_type',
+        'organization',
+        'actor',
+        'subject',
+        'secondary_user',
+        'join_request',
+        'description',
+        'snapshot',
+        'occurred_at',
+        'created_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

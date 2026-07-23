@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Revisa tu correo - VIMER{% endblock %}
+{% block content %}
+<section class="card" aria-labelledby="signup-done-title">
+    <h1 id="signup-done-title">Tu cuenta fue creada</h1>
+    <p>
+        Enviamos un enlace al correo que registraste. Debes abrirlo y confirmar
+        tu dirección antes de publicar, enviar propuestas o administrar una
+        organización.
+    </p>
+    <p>
+        Si solicitaste unirte a una organización existente, además necesitarás
+        la aprobación de su persona titular.
+    </p>
+    <p class="muted">
+        Revisa también la carpeta de correo no deseado. Si el mensaje no llega,
+        contacta a <a href="mailto:{{ support_email }}">{{ support_email }}</a>.
+    </p>
+    <a href="{% url 'login' %}" class="btn btn-primary">Ir a iniciar sesión</a>
+</section>
+{% endblock %}

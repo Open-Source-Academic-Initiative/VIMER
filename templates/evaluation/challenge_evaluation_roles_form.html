@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Equipo de Evaluación - VIMER{% endblock %}
 {% block content %}
-<h2>Equipo de Evaluación</h2>
-<h3>{{ challenge.title }}</h3>
+<h1>Equipo de evaluación</h1>
+<h2>{{ challenge.title }}</h2>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
 <form method="post">
     {% csrf_token %}

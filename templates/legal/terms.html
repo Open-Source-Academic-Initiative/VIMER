@@ -1,9 +1,64 @@
 {% extends 'base.html' %}
-{% block title %}Términos y Condiciones - VIMER{% endblock %}
+{% block title %}Términos y condiciones - VIMER{% endblock %}
 {% block content %}
-<h1>Términos y Condiciones VIMER v1</h1>
-<p>VIMER opera este release como piloto cerrado y gratuito para organizaciones participantes en Colombia.</p>
-<p>La plataforma facilita el encuentro entre solicitantes y proveedores tecnológicos. El ciclo funcional cierra cuando un desafío queda en estado adjudicado.</p>
-<p>VIMER no participa en contratos, pagos, negociaciones ni ejecución posterior entre las organizaciones.</p>
-<p>El piloto no incluye backup formal. Cada participante debe conservar copia propia de los materiales que cargue en la plataforma.</p>
+<article aria-labelledby="terms-title">
+    <h1 id="terms-title">Términos y condiciones de VIMER</h1>
+    <p><strong>Versión:</strong> {{ legal_terms_version }}</p>
+
+    <h2>Objeto</h2>
+    <p>
+        VIMER facilita el encuentro entre organizaciones convocantes que publican
+        desafíos de I+D+i y organizaciones proponentes que presentan soluciones
+        técnicas, económicas y documentales.
+    </p>
+
+    <h2>Responsabilidad de las organizaciones</h2>
+    <p>
+        Cada organización responde por la exactitud de su identidad, la autoridad
+        de sus representantes, la licitud del material cargado y la confidencialidad
+        de sus credenciales. Las decisiones publicadas en nombre de una
+        organización se atribuyen a sus cuentas autorizadas.
+    </p>
+
+    <h2>Proceso y plazos</h2>
+    <p>
+        Las propuestas deben presentarse dentro del plazo del desafío y respetar
+        su presupuesto y requisitos. Después del cierre, el equipo autorizado
+        evalúa con los criterios registrados. El resultado puede ser adjudicación,
+        declaración desierta o cancelación motivada.
+    </p>
+
+    <h2>Relación posterior</h2>
+    <p>
+        VIMER registra el proceso de selección, pero no es parte automática de
+        contratos, pagos, garantías, propiedad intelectual ni ejecución posterior
+        entre las organizaciones. Esas condiciones deben acordarse de forma expresa.
+    </p>
+
+    <h2>Uso aceptable</h2>
+    <p>
+        No se permite intentar acceder a otra organización, cargar código malicioso,
+        evadir controles, alterar evidencia, suplantar personas ni usar información
+        de propuestas para fines ajenos al desafío.
+    </p>
+
+    <h2>Disponibilidad y conservación</h2>
+    <p>
+        La operación aplica controles de respaldo y recuperación, pero cada
+        participante debe conservar copia de los materiales originales que aporte.
+        Las ventanas de mantenimiento o incidentes se comunicarán por los canales
+        disponibles.
+    </p>
+
+    <h2>Soporte</h2>
+    <p>
+        Para consultas operativas escribe a
+        <a href="mailto:{{ support_email }}">{{ support_email }}</a>.
+    </p>
+
+    <p class="muted">
+        Estos términos requieren evidencia de aprobación jurídica e institucional
+        antes de habilitar un entorno público.
+    </p>
+</article>
 {% endblock %}

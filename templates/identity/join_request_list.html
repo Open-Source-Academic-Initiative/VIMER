@@ -4,18 +4,26 @@
 <h1>Mi organización</h1>
 <h2>Solicitudes pendientes</h2>
 {% for join_request in join_requests %}
-    <div class="card">
-        <p><strong>{{ join_request.requester.get_full_name|default:join_request.requester.username }}</strong></p>
+    <article class="card" aria-labelledby="join-request-{{ join_request.pk }}">
+        <h3 id="join-request-{{ join_request.pk }}">
+            {{ join_request.requester.get_full_name|default:join_request.requester.username }}
+        </h3>
         <p>{{ join_request.requester.email }}</p>
-        <form method="post" action="{% url 'organization-join-request-approve' join_request.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-primary">Aprobar</button>
-        </form>
-        <form method="post" action="{% url 'organization-join-request-reject' join_request.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="btn">Rechazar</button>
-        </form>
-    </div>
+        <p class="muted">
+            Revisa la identidad y relación de esta persona con la organización
+            antes de concederle acceso.
+        </p>
+        <div class="actions">
+            <form method="post" action="{% url 'organization-join-request-approve' join_request.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Aprobar acceso</button>
+            </form>
+            <form method="post" action="{% url 'organization-join-request-reject' join_request.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Rechazar solicitud</button>
+            </form>
+        </div>
+    </article>
 {% empty %}
     <p>No hay solicitudes pendientes.</p>
 {% endfor %}
@@ -23,12 +31,28 @@
 <h2>Transferir titularidad</h2>
 <form method="post" action="{% url 'organization-titularity-transfer' %}">
     {% csrf_token %}
-    <select name="target_user_id" required>
-        <option value="">Selecciona un representante activo</option>
-        {% for member in active_members %}
-            <option value="{{ member.pk }}">{{ member.get_full_name|default:member.username }} - {{ member.email }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit" class="btn btn-primary">Transferir</button>
+    <fieldset>
+        <legend>Nueva persona titular</legend>
+        <p>
+            Esta acción retira tu titularidad y concede a otra persona el control
+            de membresías de la organización.
+        </p>
+        <p>
+            <label for="target-user-id">Representante activo y verificado</label>
+            <select id="target-user-id" name="target_user_id" required>
+                <option value="">Selecciona una persona</option>
+                {% for member in active_members %}
+                    <option value="{{ member.pk }}">{{ member.get_full_name|default:member.username }} — {{ member.email }}</option>
+                {% endfor %}
+            </select>
+        </p>
+        <p>
+            <label class="checkbox-label">
+                <input type="checkbox" name="confirm_transfer" value="yes" required>
+                Entiendo que perderé la titularidad de esta organización.
+            </label>
+        </p>
+        <button type="submit" class="btn btn-danger">Confirmar transferencia</button>
+    </fieldset>
 </form>
 {% endblock %}

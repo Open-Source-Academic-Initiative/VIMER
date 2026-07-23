@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Notificaciones - VIMER{% endblock %}
 {% block content %}
-<h2>Notificaciones</h2>
+<h1>Notificaciones</h1>
 
 {% if notifications %}
     <form method="post" action="{% url 'notifications:mark-all-read' %}">
@@ -10,8 +10,8 @@
     </form>
     <hr>
     {% for notification in notifications %}
-        <div class="card">
-            <p><strong>{{ notification.title }}</strong></p>
+        <article class="card" aria-labelledby="notification-{{ notification.pk }}">
+            <h2 id="notification-{{ notification.pk }}">{{ notification.title }}</h2>
             <p>{{ notification.body }}</p>
             <p>
                 <strong>Estado:</strong>
@@ -21,12 +21,19 @@
                     No leída
                 {% endif %}
             </p>
-            <p><small>{{ notification.created_at }}</small></p>
+            <p>
+                <small>
+                    <time datetime="{{ notification.created_at|date:'c' }}">
+                        {{ notification.created_at|date:"d M Y, H:i" }}
+                    </time>
+                </small>
+            </p>
             {% if notification.link %}
                 <p><a href="{{ notification.link }}">Ver desafío</a></p>
             {% endif %}
-        </div>
+        </article>
     {% endfor %}
+    {% include 'includes/pagination.html' %}
 {% else %}
     <p>No tienes notificaciones todavía.</p>
 {% endif %}
