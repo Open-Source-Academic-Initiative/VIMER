@@ -7,6 +7,9 @@
     --supply-ink: #123f28;
     --supply-pale: #eaf7ef;
     --paper: #f7f4ee;
+    --accent-industrial: #c76e0f;
+    --accent-industrial-ink: #7a4308;
+    --accent-industrial-pale: #fbf0e2;
     --ink: #17212b;
     --muted: #4f5e6b;
     --surface: #f5f8fb;
@@ -705,15 +708,83 @@ legend {
 }
 
 .feature-card--evaluation .feature-icon {
-    background: var(--surface-strong);
-    color: var(--ink);
+    background: var(--accent-industrial-pale);
+    color: var(--accent-industrial-ink);
+}
+
+.photo-band {
+    border-radius: 1.4rem;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: relative;
+}
+
+.photo-band-img {
+    display: block;
+    height: 24rem;
+    object-fit: cover;
+    width: 100%;
+}
+
+.photo-band::after {
+    background: linear-gradient(100deg, rgba(9, 45, 77, 0.96) 0%, rgba(9, 45, 77, 0.86) 40%, rgba(9, 45, 77, 0.4) 72%, rgba(9, 45, 77, 0.22) 100%);
+    content: "";
+    inset: 0;
+    position: absolute;
+    z-index: 1;
+}
+
+.photo-band-content {
+    border-left: 0.28rem solid var(--accent-industrial);
+    color: #fff;
+    left: clamp(1.5rem, 5vw, 3rem);
+    max-width: 30rem;
+    padding: 0.2rem 1.5rem 0.2rem 1.5rem;
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+}
+
+.photo-band-content h2 {
+    color: #fff;
+}
+
+.photo-band-content p {
+    color: #e4edf6;
+    margin: 0;
 }
 
 .journey {
     background: var(--brand-ink);
     border-radius: 1.2rem;
     color: #f5f9fc;
+    overflow: hidden;
     padding: clamp(1.5rem, 4vw, 2.5rem);
+    position: relative;
+}
+
+.journey-photo {
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    position: absolute;
+    width: 100%;
+    z-index: 0;
+}
+
+.journey::after {
+    background: linear-gradient(125deg, rgba(9, 45, 77, 0.95) 0%, rgba(7, 79, 132, 0.9) 55%, rgba(9, 45, 77, 0.86) 100%);
+    content: "";
+    inset: 0;
+    position: absolute;
+    z-index: 1;
+}
+
+.journey-content {
+    position: relative;
+    z-index: 2;
 }
 
 .journey h2 {
@@ -862,6 +933,16 @@ legend {
 
     .hero-actions .btn {
         width: 100%;
+    }
+
+    .photo-band-img {
+        height: 30rem;
+    }
+
+    .photo-band-content {
+        left: 1.25rem;
+        max-width: none;
+        right: 1.25rem;
     }
 }
 

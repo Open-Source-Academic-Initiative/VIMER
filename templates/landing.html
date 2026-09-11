@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}VIMER | Innovación aplicada con propósito{% endblock %}
 {% block content %}
 <div class="landing-shell">
@@ -45,6 +46,25 @@
                 <circle cx="160" cy="160" r="17" fill="#ffffff"/>
                 <circle cx="160" cy="160" r="17" fill="none" stroke="#ffffff" stroke-width="2"/>
             </svg>
+        </div>
+    </section>
+
+    <section class="photo-band" aria-labelledby="context-title">
+        <img
+            class="photo-band-img"
+            src="{% static 'vimer/images/photo-engineers-lab-800.jpg' %}"
+            srcset="{% static 'vimer/images/photo-engineers-lab-800.jpg' %} 800w, {% static 'vimer/images/photo-engineers-lab.jpg' %} 2000w"
+            sizes="100vw"
+            alt="Equipo técnico examinando un prototipo de hardware en un laboratorio"
+            loading="lazy"
+        >
+        <div class="photo-band-content">
+            <h2 id="context-title">Equipos técnicos, no solo formularios</h2>
+            <p>
+                Detrás de cada desafío hay ingenieros, investigadores y equipos de
+                producto evaluando alcance real: qué se puede construir, con qué
+                capacidades y en qué plazo.
+            </p>
         </div>
     </section>
 
@@ -134,17 +154,28 @@
     </section>
 
     <section class="journey" aria-labelledby="journey-title">
-        <div class="eyebrow">Cómo funciona</div>
-        <h2 id="journey-title">Del desafío a la solución seleccionada</h2>
-        <ol>
-            <li>La organización convocante publica el desafío, su presupuesto, criterios y fecha límite.</li>
-            <li>Las organizaciones proponentes preparan y envían sus ofertas dentro del plazo.</li>
-            <li>Después del cierre, el equipo autorizado evalúa las propuestas recibidas.</li>
-            <li>La decisión se registra y se comunica a las organizaciones participantes.</li>
-        </ol>
-        {% if not user.is_authenticated %}
-            <p><a href="{% url 'login' %}">Ya tengo una cuenta: iniciar sesión</a></p>
-        {% endif %}
+        <img
+            class="journey-photo"
+            src="{% static 'vimer/images/photo-industrial-robots-800.jpg' %}"
+            srcset="{% static 'vimer/images/photo-industrial-robots-800.jpg' %} 800w, {% static 'vimer/images/photo-industrial-robots.jpg' %} 1800w"
+            sizes="100vw"
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+        >
+        <div class="journey-content">
+            <div class="eyebrow">Cómo funciona</div>
+            <h2 id="journey-title">Del desafío a la solución seleccionada</h2>
+            <ol>
+                <li>La organización convocante publica el desafío, su presupuesto, criterios y fecha límite.</li>
+                <li>Las organizaciones proponentes preparan y envían sus ofertas dentro del plazo.</li>
+                <li>Después del cierre, el equipo autorizado evalúa las propuestas recibidas.</li>
+                <li>La decisión se registra y se comunica a las organizaciones participantes.</li>
+            </ol>
+            {% if not user.is_authenticated %}
+                <p><a href="{% url 'login' %}">Ya tengo una cuenta: iniciar sesión</a></p>
+            {% endif %}
+        </div>
     </section>
 </div>
 {% endblock %}
