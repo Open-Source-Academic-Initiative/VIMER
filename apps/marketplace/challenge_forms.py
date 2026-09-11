@@ -1,5 +1,6 @@
 from django import forms
 from django.utils import timezone
+from crispy_forms.helper import FormHelper
 
 from apps.marketplace.models import Challenge, ChallengeCategory
 from apps.marketplace.application.commands import PublishChallengeCommand
@@ -62,6 +63,11 @@ class ChallengePublicationForm(forms.Form):
         label="Adjuntos del desafío (PDF, JPG o PNG)",
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+
     def clean_application_deadline(self):
         deadline = self.cleaned_data["application_deadline"]
         if deadline < timezone.localdate():
@@ -106,3 +112,5 @@ class ChallengeTransitionForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["reason"].required = reason_required
         self.fields["reason"].help_text = reason_help_text
+        self.helper = FormHelper()
+        self.helper.form_tag = False

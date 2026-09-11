@@ -1,18 +1,10 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
 {% block title %}Equipo de Evaluación - VIMER{% endblock %}
 {% block content %}
 <h1>Equipo de evaluación</h1>
 <h2>{{ challenge.title }}</h2>
 <p><strong>Estado:</strong> {{ challenge.get_status_display }}</p>
-<form method="post">
-    {% csrf_token %}
-    {% if form.non_field_errors %}
-        <div class="card">
-            {{ form.non_field_errors }}
-        </div>
-    {% endif %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Guardar equipo</button>
-</form>
+{% crispy form %}
 <p><a href="{% url 'marketplace:challenge-detail' challenge.pk %}">Volver al Desafío</a></p>
 {% endblock %}

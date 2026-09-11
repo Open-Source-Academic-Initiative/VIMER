@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
 {% block title %}Propuesta para el Desafío - VIMER{% endblock %}
 {% block content %}
 <h1>Propuesta tecnológica</h1>
@@ -69,7 +70,7 @@
     {% endif %}
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        {{ form.as_p }}
+        {% crispy form %}
         <button type="submit" name="intent" value="draft" class="btn btn-secondary">Guardar borrador</button>
         <button type="submit" name="intent" value="submit" class="btn btn-primary">Enviar propuesta</button>
     </form>

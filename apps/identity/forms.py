@@ -1,11 +1,36 @@
 from django import forms
 from django.conf import settings
+from django.contrib.auth.forms import AuthenticationForm, PasswordResetForm, SetPasswordForm
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import HTML, Fieldset, Layout, Submit
 from apps.corporate.avatar_utils import validate_logo_image
 from .models import User
 from apps.corporate.models import Organization
 from apps.identity.application.commands import RegisterOrganizationUserCommand
+
+_TERMS_HTML = """
+<p>
+    Consulta los
+    <a href="{% url 'legal-terms' %}" target="_blank" rel="noopener">
+        Términos y condiciones
+        <span class="visually-hidden">(abre en una pestaña nueva)</span>
+    </a>
+    y la
+    <a href="{% url 'legal-privacy-policy' %}" target="_blank" rel="noopener">
+        Política de tratamiento de datos
+        <span class="visually-hidden">(abre en una pestaña nueva)</span>
+    </a>.
+</p>
+"""
+
+_TURNSTILE_HTML = """
+{% if turnstile_site_key %}
+    <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+{% endif %}
+"""
+
 
 class RegistrationForm(forms.Form):
     # Organization fields
@@ -39,6 +64,40 @@ class RegistrationForm(forms.Form):
     email = forms.EmailField(label="Correo electrónico")
     first_name = forms.CharField(max_length=150, label="Nombre")
     last_name = forms.CharField(max_length=150, label="Apellido")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.attrs = {"enctype": "multipart/form-data"}
+        self.helper.layout = Layout(
+            "turnstile_token",
+            Fieldset(
+                "Organización",
+                "tax_id",
+                "business_name",
+                "chamber_of_commerce",
+                "role",
+                "contact_phone",
+                "logo",
+            ),
+            Fieldset(
+                "Representante",
+                "username",
+                "first_name",
+                "last_name",
+                "email",
+                "password",
+                "confirm_password",
+            ),
+            Fieldset(
+                "Términos y datos personales",
+                "accept_terms",
+                "accept_privacy_policy",
+                HTML(_TERMS_HTML),
+                HTML(_TURNSTILE_HTML),
+            ),
+            Submit("submit", "Crear cuenta"),
+        )
 
     def clean_tax_id(self):
         tax_id = self.cleaned_data["tax_id"].strip()
@@ -113,3 +172,30 @@ class RegistrationForm(forms.Form):
             accepted_privacy_policy=self.cleaned_data["accept_privacy_policy"],
             turnstile_token=self.cleaned_data.get("turnstile_token", ""),
         )
+
+
+class StyledAuthenticationForm(AuthenticationForm):
+    """AuthenticationForm with a crispy-bootstrap5 helper for login.html."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.add_input(Submit("submit", "Entrar"))
+
+
+class StyledPasswordResetForm(PasswordResetForm):
+    """PasswordResetForm with a crispy-bootstrap5 helper for password_reset_form.html."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.add_input(Submit("submit", "Enviar instrucciones"))
+
+
+class StyledSetPasswordForm(SetPasswordForm):
+    """SetPasswordForm with a crispy-bootstrap5 helper for password_reset_confirm.html."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.add_input(Submit("submit", "Guardar contraseña"))

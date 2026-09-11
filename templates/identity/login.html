@@ -1,12 +1,9 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
 {% block title %}Iniciar Sesión - VIMER{% endblock %}
 {% block content %}
 <h1>Iniciar sesión</h1>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Entrar</button>
-</form>
+{% crispy form %}
 <p><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></p>
 <p>¿No tienes cuenta? <a href="{% url 'signup' %}">Regístrate aquí</a></p>
 {% endblock %}

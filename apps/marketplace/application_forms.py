@@ -1,4 +1,5 @@
 from django import forms
+from crispy_forms.helper import FormHelper
 
 from apps.marketplace.application.commands import (
     SaveApplicationDraftCommand,
@@ -74,6 +75,8 @@ class ApplicationSubmissionForm(forms.Form):
                 f"{challenge.budget_currency}."
             )
             self.fields["offer_currency"].initial = challenge.budget_currency
+        self.helper = FormHelper()
+        self.helper.form_tag = False
 
     def clean(self):
         cleaned_data = super().clean()

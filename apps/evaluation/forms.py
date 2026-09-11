@@ -1,6 +1,8 @@
 from django import forms
 from django.db.models import Case, IntegerField, Value, When
 from django.contrib.auth import get_user_model
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Submit
 
 from apps.evaluation.domain.blind_references import (
     build_challenge_application_blind_reference_map,
@@ -79,6 +81,8 @@ class ChallengeEvaluationRoleAssignmentForm(forms.Form):
         self.fields["observer_users"].help_text = (
             "Los observadores pueden seguir el proceso, pero no evaluar ni adjudicar."
         )
+        self.helper = FormHelper()
+        self.helper.add_input(Submit("submit", "Guardar equipo"))
 
     def to_command(self) -> AssignChallengeEvaluationRolesCommand:
         return AssignChallengeEvaluationRolesCommand(
