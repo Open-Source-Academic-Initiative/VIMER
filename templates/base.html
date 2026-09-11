@@ -40,7 +40,7 @@
                         <a href="{% url 'notifications:list' %}">
                             Notificaciones
                             {% if notifications_unread_count %}
-                                <span aria-label="{{ notifications_unread_count }} sin leer">({{ notifications_unread_count }})</span>
+                                <span class="notif-count" aria-label="{{ notifications_unread_count }} sin leer">{{ notifications_unread_count }}</span>
                             {% endif %}
                         </a>
                         {% if user.is_organization_titular %}
@@ -122,7 +122,12 @@
                 <a href="{% url 'legal-terms' %}">Términos</a>
                 <a href="{% url 'legal-privacy-policy' %}">Política de datos</a>
                 <a href="{% url 'faq' %}">Preguntas frecuentes</a>
-                <a href="https://opensai.org/" rel="external">OpenSAI</a>
+                <a href="https://opensai.org/" rel="external" class="external-link">
+                    OpenSAI
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M9 6 H18 V15 M18 6 L7 17"/>
+                    </svg>
+                </a>
             </nav>
             <span>Soporte: <a href="mailto:{{ support_email }}">{{ support_email }}</a></span>
         </div>

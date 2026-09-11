@@ -125,7 +125,10 @@ h3 {
 .site-header {
     background: var(--brand-ink);
     border-bottom: 0.25rem solid var(--brand-accent);
+    box-shadow: 0 0.35rem 1rem rgba(9, 45, 77, 0.18);
     color: #fff;
+    position: relative;
+    z-index: 10;
 }
 
 .site-nav {
@@ -185,20 +188,41 @@ h3 {
 
 .nav-links a,
 .nav-links .btn-link {
+    align-items: center;
+    border-bottom: 0.14rem solid transparent;
     color: #fff;
+    display: inline-flex;
     font-weight: 650;
+    gap: 0.4rem;
     margin: 0;
+    padding-bottom: 0.15rem;
+    text-decoration: none;
+    transition: border-color 0.15s ease;
 }
 
 .nav-links a:hover,
 .nav-links .btn-link:hover {
+    border-bottom-color: var(--brand-accent);
     color: #fff;
-    text-decoration: underline;
 }
 
 .nav-links form {
     display: inline;
     margin: 0;
+}
+
+.notif-count {
+    align-items: center;
+    background: var(--brand-accent);
+    border-radius: 999px;
+    color: var(--brand-ink);
+    display: inline-flex;
+    font-size: 0.72rem;
+    font-weight: 800;
+    justify-content: center;
+    line-height: 1;
+    min-width: 1.3rem;
+    padding: 0.22rem 0.4rem;
 }
 
 .identity-chip,
@@ -493,7 +517,7 @@ legend {
 
 .site-footer {
     background: var(--surface);
-    border-top: 0.08rem solid var(--border);
+    border-top: 0.18rem solid var(--brand-accent);
 }
 
 .footer-inner {
@@ -510,7 +534,27 @@ legend {
 .footer-links {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 1rem;
+    gap: 0.5rem 1.35rem;
+}
+
+.footer-links a {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.footer-links a:hover {
+    color: var(--brand-ink);
+}
+
+.external-link {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.3rem;
+}
+
+.external-link svg {
+    height: 0.85rem;
+    width: 0.85rem;
 }
 
 .landing-shell {
