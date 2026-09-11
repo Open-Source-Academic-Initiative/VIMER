@@ -6,83 +6,121 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="VIMER conecta desafíos empresariales de I+D+i con organizaciones capaces de convertirlos en soluciones.">
     <title>{% block title %}VIMER{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'vimer/vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vimer/vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
     <link rel="stylesheet" href="{% static 'vimer/css/app.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
 
-    <header class="site-header">
-        <nav class="site-nav" aria-label="Navegación principal">
-            <a class="brand-lockup" href="{% url 'home' %}" aria-label="VIMER, un proyecto de OpenSAI. Ir al inicio">
-                <img
-                    class="brand-logo"
-                    src="{% static 'vimer/images/opensai-glider.png' %}"
-                    alt=""
-                    width="45"
-                    height="45"
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-4 border-info" aria-label="Navegación principal">
+            <div class="container">
+                <a class="navbar-brand d-inline-flex align-items-center gap-2" href="{% url 'home' %}" aria-label="VIMER, un proyecto de OpenSAI. Ir al inicio">
+                    <img
+                        class="rounded border border-light border-opacity-50"
+                        src="{% static 'vimer/images/opensai-glider.png' %}"
+                        alt=""
+                        width="45"
+                        height="45"
+                    >
+                    <span class="d-flex flex-column lh-sm">
+                        <span class="fw-bold fs-5">VIMER</span>
+                        <span class="small text-white-50">Un proyecto de OpenSAI</span>
+                    </span>
+                </a>
+                <button
+                    class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#mainNav"
+                    aria-controls="mainNav"
+                    aria-expanded="false"
+                    aria-label="Abrir menú de navegación"
                 >
-                <span>
-                    <span class="brand-product">VIMER</span>
-                    <span class="brand-parent">Un proyecto de OpenSAI</span>
-                </span>
-            </a>
+                    <span class="navbar-toggler-icon"></span>
+                </button>
 
-            <div class="nav-links">
-                <a href="{% url 'marketplace:challenge-list' %}">Desafíos</a>
-                {% if user.is_authenticated %}
-                    {% if user.can_operate %}
-                        {% if user.organization.role == 'DEMAND_SIDE' %}
-                            <a href="{% url 'marketplace:my-challenges' %}">Mis desafíos</a>
-                        {% elif user.organization.role == 'SUPPLY_SIDE' %}
-                            <a href="{% url 'marketplace:my-applications' %}">Mis propuestas</a>
-                        {% endif %}
-                        <a href="{% url 'notifications:list' %}">
-                            Notificaciones
-                            {% if notifications_unread_count %}
-                                <span class="notif-count" aria-label="{{ notifications_unread_count }} sin leer">{{ notifications_unread_count }}</span>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'marketplace:challenge-list' %}">Desafíos</a>
+                        </li>
+                        {% if user.is_authenticated %}
+                            {% if user.can_operate %}
+                                {% if user.organization.role == 'DEMAND_SIDE' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="{% url 'marketplace:my-challenges' %}">Mis desafíos</a>
+                                    </li>
+                                {% elif user.organization.role == 'SUPPLY_SIDE' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="{% url 'marketplace:my-applications' %}">Mis propuestas</a>
+                                    </li>
+                                {% endif %}
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'notifications:list' %}">
+                                        Notificaciones
+                                        {% if notifications_unread_count %}
+                                            <span class="badge rounded-pill text-bg-info" aria-label="{{ notifications_unread_count }} sin leer">{{ notifications_unread_count }}</span>
+                                        {% endif %}
+                                    </a>
+                                </li>
+                                {% if user.is_organization_titular %}
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="{% url 'organization-join-requests' %}">Mi organización</a>
+                                    </li>
+                                {% endif %}
+                                {% if user.organization and user.organization.role == 'DEMAND_SIDE' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="{% url 'marketplace:challenge-create' %}">Publicar desafío</a>
+                                    </li>
+                                {% endif %}
                             {% endif %}
-                        </a>
-                        {% if user.is_organization_titular %}
-                            <a href="{% url 'organization-join-requests' %}">Mi organización</a>
-                        {% endif %}
-                        {% if user.organization and user.organization.role == 'DEMAND_SIDE' %}
-                            <a href="{% url 'marketplace:challenge-create' %}">Publicar desafío</a>
-                        {% endif %}
-                    {% endif %}
-                    {% if user.can_operate and user.organization %}
-                        <span class="identity-chip" aria-label="Organización y rol">
-                            {% if user.organization.logo %}
-                                <img
-                                    src="{{ user.organization.logo.url }}"
-                                    alt=""
-                                    class="avatar"
-                                    width="36"
-                                    height="36"
-                                >
+                            {% if user.can_operate and user.organization %}
+                                <li class="nav-item">
+                                    <span class="d-inline-flex align-items-center gap-2 py-2" aria-label="Organización y rol">
+                                        {% if user.organization.logo %}
+                                            <img
+                                                src="{{ user.organization.logo.url }}"
+                                                alt=""
+                                                class="rounded-circle border border-light border-opacity-50"
+                                                width="36"
+                                                height="36"
+                                                style="object-fit: cover;"
+                                            >
+                                        {% endif %}
+                                        <span class="badge rounded-pill {% if user.organization.role == 'DEMAND_SIDE' %}text-bg-primary{% else %}text-bg-supply{% endif %}">
+                                            {{ user.organization.get_role_display }}
+                                        </span>
+                                    </span>
+                                </li>
                             {% endif %}
-                            <span class="badge badge-{{ user.organization.role|lower }}">
-                                {{ user.organization.get_role_display }}
-                            </span>
-                        </span>
-                    {% endif %}
-                    <form method="post" action="{% url 'logout' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-link">
-                            Cerrar sesión <span class="visually-hidden">de {{ user.username }}</span>
-                        </button>
-                    </form>
-                {% else %}
-                    <a href="{% url 'login' %}">Iniciar sesión</a>
-                    <a href="{% url 'signup' %}">Crear cuenta</a>
-                {% endif %}
+                            <li class="nav-item">
+                                <form method="post" action="{% url 'logout' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-link nav-link">
+                                        Cerrar sesión <span class="visually-hidden">de {{ user.username }}</span>
+                                    </button>
+                                </form>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'login' %}">Iniciar sesión</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'signup' %}">Crear cuenta</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
             </div>
         </nav>
     </header>
 
     {% if user.is_authenticated and not user.can_operate %}
-        <aside class="status-banner" aria-labelledby="account-status-title">
-            <div class="status-banner-inner">
+        <aside class="alert alert-warning rounded-0 mb-0 border-0 border-bottom" aria-labelledby="account-status-title">
+            <div class="container">
                 <strong id="account-status-title">Tu cuenta todavía no puede operar.</strong>
                 {% if user.status == 'PENDING_APPROVAL' %}
                     La persona titular de la organización debe aprobar tu solicitud.
@@ -91,9 +129,9 @@
                 {% endif %}
                 {% if not user.is_email_verified and user.is_active %}
                     Revisa tu correo y completa la verificación antes de publicar, aplicar o administrar la organización.
-                    <form class="inline-form" method="post" action="{% url 'resend-email-verification' %}">
+                    <form class="d-inline" method="post" action="{% url 'resend-email-verification' %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-secondary">Reenviar verificación</button>
+                        <button type="submit" class="btn btn-secondary btn-sm">Reenviar verificación</button>
                     </form>
                 {% endif %}
             </div>
@@ -102,10 +140,10 @@
 
     <main id="main-content" class="container" tabindex="-1">
         {% if messages %}
-            <div class="message-region" aria-live="polite" aria-atomic="true">
+            <div class="my-3" aria-live="polite" aria-atomic="true">
                 {% for message in messages %}
                     <div
-                        class="message{% if message.tags %} message-{{ message.tags }}{% endif %}"
+                        class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% elif 'success' in message.tags %}alert-success{% else %}alert-info{% endif %}"
                         {% if 'error' in message.tags %}role="alert"{% else %}role="status"{% endif %}
                     >
                         {{ message }}
@@ -116,21 +154,20 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="site-footer">
-        <div class="footer-inner">
-            <nav class="footer-links" aria-label="Información institucional">
-                <a href="{% url 'legal-terms' %}">Términos</a>
-                <a href="{% url 'legal-privacy-policy' %}">Política de datos</a>
-                <a href="{% url 'faq' %}">Preguntas frecuentes</a>
-                <a href="https://opensai.org/" rel="external" class="external-link">
+    <footer class="border-top border-4 border-info bg-light">
+        <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3 py-4">
+            <nav class="d-flex flex-wrap gap-3" aria-label="Información institucional">
+                <a class="text-body-secondary link-underline-opacity-25 link-underline-opacity-100-hover" href="{% url 'legal-terms' %}">Términos</a>
+                <a class="text-body-secondary link-underline-opacity-25 link-underline-opacity-100-hover" href="{% url 'legal-privacy-policy' %}">Política de datos</a>
+                <a class="text-body-secondary link-underline-opacity-25 link-underline-opacity-100-hover" href="{% url 'faq' %}">Preguntas frecuentes</a>
+                <a class="text-body-secondary link-underline-opacity-25 link-underline-opacity-100-hover d-inline-flex align-items-center gap-1" href="https://opensai.org/" rel="external">
                     OpenSAI
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M9 6 H18 V15 M18 6 L7 17"/>
-                    </svg>
+                    <i class="bi bi-box-arrow-up-right small" aria-hidden="true"></i>
                 </a>
             </nav>
             <span>Soporte: <a href="mailto:{{ support_email }}">{{ support_email }}</a></span>
         </div>
     </footer>
+    <script src="{% static 'vimer/vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 </body>
 </html>

@@ -125,110 +125,7 @@ h3 {
     top: 1rem;
 }
 
-.site-header {
-    background: var(--brand-ink);
-    border-bottom: 0.25rem solid var(--brand-accent);
-    box-shadow: 0 0.35rem 1rem rgba(9, 45, 77, 0.18);
-    color: #fff;
-    position: relative;
-    z-index: 10;
-}
 
-.site-nav {
-    align-items: center;
-    display: flex;
-    gap: 1rem;
-    justify-content: space-between;
-    margin: 0 auto;
-    max-width: var(--content-width);
-    padding: 0.8rem 1.25rem;
-}
-
-.brand-lockup {
-    align-items: center;
-    color: #fff;
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: 0.7rem;
-    text-decoration: none;
-}
-
-.brand-lockup:hover {
-    color: #fff;
-}
-
-.brand-logo {
-    border: 0.12rem solid rgba(255, 255, 255, 0.7);
-    border-radius: 0.7rem;
-    height: 2.8rem;
-    width: 2.8rem;
-}
-
-.brand-product {
-    display: block;
-    font-size: 1.25rem;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-    line-height: 1;
-}
-
-.brand-parent {
-    color: #d6e9f8;
-    display: block;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    margin-top: 0.25rem;
-}
-
-.nav-links {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem 1rem;
-    justify-content: flex-end;
-}
-
-.nav-links a,
-.nav-links .btn-link {
-    align-items: center;
-    border-bottom: 0.14rem solid transparent;
-    color: #fff;
-    display: inline-flex;
-    font-weight: 650;
-    gap: 0.4rem;
-    margin: 0;
-    padding-bottom: 0.15rem;
-    text-decoration: none;
-    transition: border-color 0.15s ease;
-}
-
-.nav-links a:hover,
-.nav-links .btn-link:hover {
-    border-bottom-color: var(--brand-accent);
-    color: #fff;
-}
-
-.nav-links form {
-    display: inline;
-    margin: 0;
-}
-
-.notif-count {
-    align-items: center;
-    background: var(--brand-accent);
-    border-radius: 999px;
-    color: var(--brand-ink);
-    display: inline-flex;
-    font-size: 0.72rem;
-    font-weight: 800;
-    justify-content: center;
-    line-height: 1;
-    min-width: 1.3rem;
-    padding: 0.22rem 0.4rem;
-}
-
-.identity-chip,
 .org-chip {
     align-items: center;
     display: inline-flex;
@@ -266,30 +163,12 @@ h3 {
     color: #154d2b;
 }
 
-.status-banner {
-    background: #fff4cc;
-    border-bottom: 0.12rem solid #ba8b00;
-    color: #3c2c00;
-}
-
-.status-banner-inner {
-    margin: 0 auto;
-    max-width: var(--content-width);
-    padding: 0.7rem 1.25rem;
-}
-
-.container {
-    margin: 0 auto;
-    max-width: var(--content-width);
+#main-content {
     min-height: 58vh;
-    padding: 2rem 1.25rem 3.5rem;
+    padding-block: 2rem 3.5rem;
 }
 
 .card {
-    background: #fff;
-    border: 0.08rem solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 0.2rem 0.7rem rgba(9, 45, 77, 0.04);
     margin-bottom: 1rem;
     padding: 1.15rem;
 }
@@ -302,60 +181,6 @@ h3 {
     margin-bottom: 0;
 }
 
-.btn {
-    align-items: center;
-    border: 0.12rem solid transparent;
-    border-radius: 0.45rem;
-    cursor: pointer;
-    display: inline-flex;
-    font: inherit;
-    font-weight: 700;
-    justify-content: center;
-    line-height: 1.25;
-    min-height: 2.75rem;
-    padding: 0.58rem 1rem;
-    text-align: center;
-    text-decoration: none;
-}
-
-.btn-primary {
-    background: var(--brand);
-    color: #fff;
-}
-
-.btn-primary:hover {
-    background: var(--brand-ink);
-    color: #fff;
-}
-
-.btn-secondary {
-    background: #fff;
-    border-color: var(--brand);
-    color: var(--brand);
-}
-
-.btn-secondary:hover {
-    background: var(--brand-pale);
-    color: var(--brand-ink);
-}
-
-.btn-danger {
-    background: var(--danger);
-    color: #fff;
-}
-
-.btn-danger:hover {
-    background: var(--danger-dark);
-    color: #fff;
-}
-
-.btn-link {
-    background: transparent;
-    border: 0;
-    min-height: auto;
-    padding: 0;
-}
-
 .actions {
     align-items: center;
     display: flex;
@@ -366,37 +191,6 @@ h3 {
 .inline-form {
     display: inline;
     margin: 0;
-}
-
-.message-region {
-    margin-bottom: 1rem;
-}
-
-.message {
-    background: var(--surface);
-    border: 0.08rem solid var(--border);
-    border-left-width: 0.35rem;
-    border-radius: 0.45rem;
-    margin-bottom: 0.75rem;
-    padding: 0.75rem 1rem;
-}
-
-.message-success {
-    background: #eaf7ef;
-    border-color: #70a881;
-    border-left-color: var(--success);
-}
-
-.message-error {
-    background: #fff0f0;
-    border-color: #c78686;
-    border-left-color: var(--danger);
-}
-
-.message-warning {
-    background: #fff7d8;
-    border-color: #b89a3e;
-    border-left-color: var(--warning);
 }
 
 form p {
@@ -516,48 +310,6 @@ legend {
 
 .pagination .current {
     color: var(--muted);
-}
-
-.site-footer {
-    background: var(--surface);
-    border-top: 0.18rem solid var(--brand-accent);
-}
-
-.footer-inner {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem 1.2rem;
-    justify-content: space-between;
-    margin: 0 auto;
-    max-width: var(--content-width);
-    padding: 1.4rem 1.25rem;
-}
-
-.footer-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.35rem;
-}
-
-.footer-links a {
-    color: var(--muted);
-    font-weight: 600;
-}
-
-.footer-links a:hover {
-    color: var(--brand-ink);
-}
-
-.external-link {
-    align-items: center;
-    display: inline-flex;
-    gap: 0.3rem;
-}
-
-.external-link svg {
-    height: 0.85rem;
-    width: 0.85rem;
 }
 
 .landing-shell {
@@ -865,15 +617,6 @@ legend {
 }
 
 @media (max-width: 58rem) {
-    .site-nav {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .nav-links {
-        justify-content: flex-start;
-    }
-
     .filter-grid,
     .feature-grid,
     .value-grid {
@@ -906,24 +649,8 @@ legend {
 }
 
 @media (max-width: 38rem) {
-    .container {
+    #main-content {
         padding-top: 1.25rem;
-    }
-
-    .site-nav {
-        padding-inline: 1rem;
-    }
-
-    .nav-links {
-        align-items: stretch;
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .nav-links a,
-    .nav-links form,
-    .nav-links button {
-        text-align: left;
     }
 
     .hero {
