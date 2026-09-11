@@ -98,8 +98,10 @@ h4 {
 }
 
 h1 {
+    font-family: var(--font-display);
     font-size: clamp(2rem, 5vw, 3.4rem);
-    letter-spacing: -0.035em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
 }
 
 h2 {
@@ -169,6 +171,7 @@ h3 {
 }
 
 .card {
+    box-shadow: 0 0.35rem 1.1rem rgba(9, 45, 77, 0.07);
     margin-bottom: 1rem;
     padding: 1.15rem;
 }
@@ -179,6 +182,23 @@ h3 {
 
 .card > :last-child {
     margin-bottom: 0;
+}
+
+.btn-primary,
+.btn-supply,
+.btn-industrial {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-primary:hover,
+.btn-supply:hover,
+.btn-industrial:hover {
+    box-shadow: 0 0.3rem 0.7rem rgba(9, 45, 77, 0.18);
+    transform: translateY(-0.1rem);
+}
+
+.site-navbar {
+    background: linear-gradient(125deg, var(--brand-ink) 0%, #074f84 100%);
 }
 
 .actions {
@@ -246,10 +266,11 @@ textarea {
 }
 
 fieldset {
-    border: 0.12rem solid var(--border);
+    background: var(--paper);
+    border: 0.08rem solid var(--border);
     border-radius: var(--radius);
     margin: 0 0 1.35rem;
-    padding: 1rem 1.25rem;
+    padding: 1.1rem 1.25rem;
 }
 
 legend {
@@ -676,5 +697,17 @@ legend {
 @media (prefers-reduced-motion: reduce) {
     html {
         scroll-behavior: auto;
+    }
+
+    .btn-primary,
+    .btn-supply,
+    .btn-industrial {
+        transition: none;
+    }
+
+    .btn-primary:hover,
+    .btn-supply:hover,
+    .btn-industrial:hover {
+        transform: none;
     }
 }

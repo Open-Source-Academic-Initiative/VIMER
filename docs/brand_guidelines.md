@@ -62,12 +62,13 @@ La interfaz utiliza la pila de fuentes del sistema para evitar dependencias
 externas y mejorar rendimiento. Los títulos usan peso alto, interlineado corto
 y `Brand ink`; el cuerpo usa `Ink` y un interlineado mínimo de 1.6.
 
-Excepción documentada: los títulos de la página de inicio (`landing.html`) usan
-adicionalmente **Space Grotesk**, alojado localmente en
-`assets/vimer/fonts/` (sin petición a terceros, sin costo de rendimiento
-adicional frente a una fuente del sistema). Es la única excepción a la pila
-de fuentes del sistema, limitada a los títulos de la portada; el resto de la
-interfaz sigue usando la pila de fuentes del sistema sin cambios.
+Excepción documentada: el `h1` único de cada página usa adicionalmente
+**Space Grotesk**, alojado localmente en `assets/vimer/fonts/` (sin
+petición a terceros, sin costo de rendimiento adicional frente a una fuente
+del sistema). Es la única excepción a la pila de fuentes del sistema,
+limitada al `h1`; el resto de la interfaz (cuerpo, controles, `h2`-`h4`
+salvo los de `landing.html`) sigue usando la pila de fuentes del sistema
+sin cambios.
 
 Debe existir un único `h1` descriptivo por página. Los niveles posteriores no
 se eligen por tamaño visual sino por estructura del contenido.
@@ -117,3 +118,7 @@ Cualquier reemplazo del logo, paleta o lockup requiere:
   títulos de portada (alojada localmente). Cambio aprobado por el
   responsable del proyecto como parte del rediseño visual de VIMER; ningún
   token, logo o lockup existente se modifica o retira.
+- **2026-09-11** — la excepción tipográfica de `Space Grotesk` se extiende
+  del `h1` de portada al `h1` único de cada página de la interfaz (sigue
+  alojada localmente, sin petición a terceros). Aprobado por el responsable
+  del proyecto como parte del mismo rediseño visual.
