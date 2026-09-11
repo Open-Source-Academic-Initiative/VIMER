@@ -45,6 +45,13 @@ El glider:
 | Focus | `#ffbf47` | Indicador de foco visible |
 | Danger | `#9f2323` | Acciones destructivas y errores |
 | Success | `#206a3b` | Confirmaciones |
+| Supply | `#1f7a4d` | Identidad del rol "organización proponente" (armoniza con el badge `supply_side` ya existente) |
+| Supply ink | `#123f28` | Texto sobre `Supply pale` |
+| Supply pale | `#eaf7ef` | Superficies del rol proponente |
+| Accent industrial | `#c76e0f` | Acento cálido, complementario de `Brand` en la rueda de color; identidad del rol "equipo de evaluación" y detalle de las bandas fotográficas |
+| Accent industrial ink | `#7a4308` | Texto sobre `Accent industrial pale` |
+| Accent industrial pale | `#fbf0e2` | Superficies del rol de evaluación |
+| Paper | `#f7f4ee` | Fondo cálido neutro para paneles de sección alternos |
 
 No se comunica estado solo mediante color. Todo estado debe incluir texto o un
 nombre accesible.
@@ -54,6 +61,13 @@ nombre accesible.
 La interfaz utiliza la pila de fuentes del sistema para evitar dependencias
 externas y mejorar rendimiento. Los títulos usan peso alto, interlineado corto
 y `Brand ink`; el cuerpo usa `Ink` y un interlineado mínimo de 1.6.
+
+Excepción documentada: los títulos de la página de inicio (`landing.html`) usan
+adicionalmente **Space Grotesk**, alojado localmente en
+`assets/vimer/fonts/` (sin petición a terceros, sin costo de rendimiento
+adicional frente a una fuente del sistema). Es la única excepción a la pila
+de fuentes del sistema, limitada a los títulos de la portada; el resto de la
+interfaz sigue usando la pila de fuentes del sistema sin cambios.
 
 Debe existir un único `h1` descriptivo por página. Los niveles posteriores no
 se eligen por tamaño visual sino por estructura del contenido.
@@ -94,3 +108,12 @@ Cualquier reemplazo del logo, paleta o lockup requiere:
 3. comprobación de contraste;
 4. regresión visual y de accesibilidad;
 5. aprobación de la persona responsable de la identidad OpenSAI.
+
+### Historial
+
+- **2026-09-11** — se añaden los tokens `Supply`/`Supply ink`/`Supply pale`,
+  `Accent industrial`/`Accent industrial ink`/`Accent industrial pale` y
+  `Paper`, y se documenta la excepción tipográfica de `Space Grotesk` en los
+  títulos de portada (alojada localmente). Cambio aprobado por el
+  responsable del proyecto como parte del rediseño visual de VIMER; ningún
+  token, logo o lockup existente se modifica o retira.
