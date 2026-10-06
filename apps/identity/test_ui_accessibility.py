@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.contrib import admin
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from unittest.mock import patch
 
 from apps.corporate.models import Organization
 
@@ -25,6 +27,22 @@ class PublicInterfaceRegressionTests(TestCase):
             if directive.strip().startswith("script-src")
         )
         self.assertNotIn("'unsafe-inline'", script_policy)
+        self.assertNotIn("'unsafe-inline'", policy)
+
+    def test_admin_inline_styles_use_the_native_csp_nonce(self):
+        user = get_user_model().objects.create_superuser(
+            username="csp_admin", email="csp-admin@example.test", password="ClaveSegura123",
+        )
+        self.client.force_login(user)
+        model_admin = admin.site._registry[get_user_model()]
+        with patch.object(model_admin, "actions_on_top", False), patch.object(model_admin, "actions_on_bottom", False):
+            response = self.client.get(reverse("admin:identity_user_changelist"))
+        self.assertEqual(response.status_code, 200)
+        policy = response.headers["Content-Security-Policy"]
+        self.assertNotIn("'unsafe-inline'", policy)
+        style_policy = next(part for part in policy.split(";") if part.strip().startswith("style-src"))
+        nonce = style_policy.split("'nonce-", 1)[1].split("'", 1)[0]
+        self.assertContains(response, f'<style nonce="{nonce}">')
 
     def test_login_links_native_password_reset(self):
         response = self.client.get(reverse("login"))

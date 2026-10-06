@@ -1,14 +1,86 @@
 # Operación segura de VIMER
 
-Esta guía cubre los perfiles `pilot` (SQLite) y `production` (PostgreSQL +
-Nginx/TLS) con Docker Compose v1. Los comandos deben ejecutarse desde la raíz
+## Despliegue local vigente
+
+La candidata `v0.0.2b1-local` está disponible para pruebas manuales en
+`http://192.168.0.10:8088`. El [cierre actual](cierre_beta.md) contiene el alcance,
+las pruebas y la identificación completa. Su aceptación pública está pendiente.
+El proyecto canónico es `vimer-review`; conserva SQLite y los volúmenes
+`vimer-review_review_data`, `vimer-review_review_media` y
+`vimer-review_pilot_static_data`. Web y scheduler usan el mismo ID de imagen
+fijado en el override. `RUN_STARTUP_TASKS=False` evita repetir migraciones.
+
+Ejecutar en ASUS, desde `/home/andres/Desarrollo/vimer`:
+
+```sh
+componer_vimer() {
+  docker compose --env-file artifacts/runtime/vimer-review.env \
+    -p vimer-review -f docker-compose.pilot.yml \
+    -f artifacts/runtime/vimer-review.override.yml "$@"
+}
+componer_vimer up -d --no-build --pull never --wait web scheduler
+componer_vimer ps
+```
+
+Para parar, detener primero `componer_vimer stop scheduler` y luego
+`componer_vimer stop web`. Para reanudar, levantar web con `--wait`, comprobar
+salud y migraciones, y después levantar scheduler. Mantener una sola réplica.
+Las variables de Compose y la configuración de recuperación están protegidas;
+no imprimir `compose config` sin redacción ni guardar secretos en Git.
+
+### Respaldo y recuperación del despliegue local
+
+Los datos efectivos están en volúmenes Docker; el `db.sqlite3` del repositorio
+es otra base. Para respaldar, detener los dos escritores como se indicó y
+reutilizar el script con sus rutas de volumen explícitas:
+
+```sh
+umask 077
+destino_respaldo="/home/andres/Backups/VIMER/manual-$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -m 700 "$destino_respaldo"
+docker run --rm --pull never --network none --read-only \
+  --user "$(id -u):$(id -g)" \
+  -v vimer-review_review_data:/origen/data:ro \
+  -v vimer-review_review_media:/origen/media:ro \
+  -v "$destino_respaldo":/recuperacion \
+  -e VIMER_BACKUP_WRITES_QUIESCED=True \
+  -e DATABASE_URL=sqlite:////app/data/db.sqlite3 \
+  -e VIMER_SQLITE_PATH=/origen/data/db.sqlite3 \
+  -e VIMER_MEDIA_DIR=/origen/media \
+  --entrypoint sh \
+  sha256:4131a24380f9987a8b62e4af94cbba1401d42c5067f3504aa32d41cadf2360e4 \
+  deploy/ops/backup.sh pilot /recuperacion
+```
+
+Verificar `MANIFEST.sha256` desde la carpeta del respaldo y validar
+`media.tar.gz` con `deploy/ops/validate_media_archive.py`. Restaurar primero en
+un directorio aislado, con `deploy/ops/sqlite_restore.py` y extracción del archivo
+de medios. El archivo de destino debe conservar UID 100, GID 101 y modo `0644`;
+la extracción debe conservar los propietarios y permisos archivados. Comprobar
+integridad, claves foráneas, referencias y hashes antes de conectar esos datos.
+El operador privilegiado del contenedor de recuperación se limita a ese
+destino; no cambiar permisos de volúmenes operativos por conveniencia.
+
+La recuperación comprobada está en
+`/home/andres/Backups/VIMER/cierre-beta-20261006T171610Z`, junto con la imagen
+candidata, los archivos efectivos de Compose y configuración privada. Los
+archivos de imagen fueron verificados mediante
+[Docker image save/load](https://docs.docker.com/reference/cli/docker/image/save/).
+Antes de reemplazar datos actuales, conservar un respaldo consistente nuevo y
+conciliar las escrituras posteriores. Aplicar únicamente las migraciones
+pendientes con la candidata y arrancar scheduler después de web sano.
+
+## Perfiles disponibles y preparación general
+
+Esta guía cubre los perfiles `pilot` y `production` (Nginx/TLS), ambos con
+SQLite o PostgreSQL, usando Docker Compose. Los comandos deben ejecutarse desde la raíz
 del repositorio.
 
 ## Preparación
 
 1. Copiar `.env.example` a `.env` y reemplazar todos los marcadores
    `CHANGE_ME`. `.env` nunca se versiona.
-2. Para el piloto, crear `data/` y `media/`. SQLite vive únicamente en
+2. Si se usa SQLite, crear `data/` y, para el piloto, `media/`. SQLite vive en
    `data/db.sqlite3`; se monta el directorio completo y no un archivo
    preexistente, lo que evita que Docker convierta accidentalmente una ruta de
    archivo inexistente en un directorio.
@@ -23,7 +95,7 @@ del repositorio.
    ```
 
 `config/settings.py` aborta el arranque de producción ante `DEBUG=True`, una
-clave secreta débil o de ejemplo, SQLite, hosts no explícitos, orígenes CSRF o
+clave secreta débil o de ejemplo, un motor no soportado, hosts no explícitos, orígenes CSRF o
 URL pública sin HTTPS, Turnstile incompleto, correo por consola, credenciales
 SMTP de ejemplo, controles HTTPS desactivados o datos legales ausentes.
 También exige Turnstile y entrega de correo en cualquier piloto con
@@ -31,6 +103,29 @@ También exige Turnstile y entrega de correo en cualquier piloto con
 `EMAIL_DELIVERY_REQUIRED=False` con backend de consola) se reserva para un
 entorno cerrado de mantenimiento que no admite participantes; producción lo
 rechaza siempre.
+
+El perfil de seguridad no selecciona el motor. Para SQLite en producción,
+definir `DATABASE_URL=sqlite:////app/data/db.sqlite3` y dejar `COMPOSE_PROFILES`
+vacío. `web` y `scheduler` comparten `VIMER_DATA_DIR` en `/app/data`; el
+directorio debe permitir escritura al usuario del contenedor. Para PostgreSQL
+del compose, definir `COMPOSE_PROFILES=postgresql`, configurar `POSTGRES_*` y
+usar `DATABASE_URL=postgresql://USUARIO:CLAVE_CODIFICADA@db:5432/NOMBRE`.
+Una base PostgreSQL externa no requiere ese perfil de Compose. En ambos casos
+se conservan TLS, cookies seguras, HSTS, CSP y adjuntos privados.
+
+Construir las tres imágenes con `docker-compose -f docker-compose.production.yml build`
+antes del arranque. Nginx 1.30.5 y PostgreSQL 16.15 parten de imágenes oficiales
+fijadas por digest; los Dockerfiles aplican únicamente correcciones demostradas
+por el escáner. PostgreSQL se ejecuta como `postgres` (UID 70), sin root ni
+`gosu`; los volúmenes nuevos conservan ese propietario. Para un volumen
+existente, verificar previamente el propietario de `PGDATA` y respaldarlo;
+la candidata no cambia permisos de datos operativos.
+
+
+SQLite usa `transaction_mode=IMMEDIATE`, nativo de Django, para serializar
+escritores al entrar en `atomic()`. No ofrece la capacidad de escritura
+simultánea de PostgreSQL: mantener transacciones cortas y medir la carga antes
+de aumentar concurrencia; no se ha certificado un SLA de capacidad.
 
 Los datos del responsable legal son configuración operacional y no deben
 inventarse en código:
@@ -154,6 +249,17 @@ artefactos. SQLite usa su API de backup y valida integridad; PostgreSQL usa
 `pg_dump` en formato custom. En producción, un contenedor efímero de la imagen
 web lee el volumen de medios sin iniciar Django.
 
+Para respaldar SQLite con el perfil `production`, exportar el mismo
+`DATABASE_URL` del despliegue y definir `VIMER_SQLITE_PATH` con la ruta del
+host (`VIMER_DATA_DIR/db.sqlite3`). El script no carga `.env`. Sin una URL
+exportada conserva el valor predeterminado histórico: SQLite en piloto y
+PostgreSQL en producción. La restauración identifica SQLite por
+`database.sqlite3` en el respaldo, independientemente del perfil. La restauración
+conserva los permisos y el UID/GID de una base existente. El operador debe
+poder escribir en el directorio y preservar ese propietario; usar el usuario
+del archivo o privilegios operativos autorizados. No ampliar permisos para
+resolver diferencias de propietario.
+
 La base y los medios solo forman un punto consistente si no hay escrituras
 durante ambas capturas. Detener `web` y `scheduler`; el script exige la
 confirmación explícita `VIMER_BACKUP_WRITES_QUIESCED=True`:
@@ -199,6 +305,10 @@ restablecimiento de contraseña y verificación de correo se aplican en Nginx y
 como red de seguridad cacheada en Django. Turnstile es obligatorio y
 fail-closed en producción.
 
+El login del administrador (`/admin/login/`) comparte los límites de acceso.
+La CSP elimina `unsafe-inline`: los estilos del administrador emplean el
+nonce nativo de Django y las plantillas propias cargan CSS externo.
+
 Los servicios usan `restart: unless-stopped`, healthchecks y rotación del
 driver `json-file` (cinco archivos de 10 MiB). Revisar:
 
@@ -212,16 +322,18 @@ un backend compartido antes de escalar.
 
 ## Dependencias, SCA y SBOM
 
-La aplicación exige Django `6.0.7` y mantiene un `requirements.lock` exacto
-con hashes. La imagen exige esos hashes al instalar; una dependencia o
+La aplicación exige Django `6.1.2` y mantiene un `requirements.lock` exacto
+con hashes. La rama 6.1 tiene soporte extendido hasta diciembre de 2027;
+planear la migración a Django 6.2 LTS cuando se publique en abril de 2027,
+sin anticipar su adopción. Referencia: [calendario oficial de Django](https://www.djangoproject.com/download/). La imagen exige esos hashes al instalar; una dependencia o
 artefacto no declarado hace fallar el build.
 
-Los locks se generan con Python 3.12 y `pip-tools==7.6.0`, preservando las
+Los locks se generan con Python 3.12 y `pip-tools==7.6.1`, preservando las
 versiones revisadas mediante el lock anterior como constraint:
 
 ```sh
 python3 -m venv .venv-lock
-.venv-lock/bin/python -m pip install pip-tools==7.6.0
+.venv-lock/bin/python -m pip install pip-tools==7.6.1
 .venv-lock/bin/pip-compile --generate-hashes \
   --strip-extras \
   --no-annotate \
@@ -304,7 +416,7 @@ Antes del release:
 PATH="$PWD/.venv-security/bin:$PATH" sh deploy/ops/security_scan.sh
 ```
 
-La versión impresa de Django debe ser `6.0.7`; validar el lock con hashes en
+La versión impresa de Django debe ser `6.1.2`; validar el lock con hashes en
 un venv limpio antes de construir la imagen.
 
 Axe se ejecuta de forma opt-in con versiones fijadas de Firefox, Selenium y

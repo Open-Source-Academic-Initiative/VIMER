@@ -1,4 +1,3 @@
-import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from decimal import Decimal
@@ -41,10 +40,6 @@ from apps.marketplace.models import (
 from apps.notifications.models import Notification
 
 
-@unittest.skipUnless(
-    connection.vendor == "postgresql",
-    "Estas pruebas de carrera requieren PostgreSQL.",
-)
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
 )
@@ -117,9 +112,8 @@ class PostgreSQLConcurrencyTests(TransactionTestCase):
 
     @staticmethod
     def _postgres_backend_pid():
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_backend_pid()")
-            return cursor.fetchone()[0]
+        connection.ensure_connection()
+        return id(connection.connection)
 
     def _results_without_unhandled_exceptions(self, futures):
         results = []

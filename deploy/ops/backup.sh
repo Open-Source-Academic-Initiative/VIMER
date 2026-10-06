@@ -22,7 +22,21 @@ mkdir -p "$destination"
 umask 077
 mkdir "$backup_directory"
 
-if [ "$profile" = "pilot" ]; then
+database_url="${DATABASE_URL:-}"
+if [ -z "$database_url" ]; then
+    if [ "$profile" = "pilot" ]; then
+        database_url="sqlite:////app/data/db.sqlite3"
+    else
+        database_url="postgresql://db/vimer"
+    fi
+fi
+case "$database_url" in
+    sqlite:*) database_engine="sqlite" ;;
+    postgres:*|postgresql:*) database_engine="postgresql" ;;
+    *) echo "DATABASE_URL debe usar SQLite o PostgreSQL." >&2; exit 2 ;;
+esac
+
+if [ "$database_engine" = "sqlite" ]; then
     sqlite_path="${VIMER_SQLITE_PATH:-./data/db.sqlite3}"
     python3 deploy/ops/sqlite_backup.py \
         "$sqlite_path" \

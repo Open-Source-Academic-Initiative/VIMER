@@ -3,6 +3,7 @@ TEST_PARALLEL ?= 4
 DEPLOY_CHECK_SECRET_KEY ?= J7a!Nq8gP2zV4xR6tY0uL3mS5wC9dF1hK7bQ2nM4pX8rT6vW1yZ
 DOCKER ?= docker
 TEST_IMAGE ?= vimer:test
+DATABASE_URL ?= postgresql://vimer:test-password@localhost:5432/vimer
 
 .PHONY: check check-deploy compile lint migrations-check compose-config \
 	test test-fast test-coverage verify-fast test-docker security-scan
@@ -17,7 +18,7 @@ lint:
 # pilot sin TLS reporta warnings W004/W006/W008/W012/W016 por diseño.
 check-deploy:
 	READ_DOT_ENV_FILE=False DEBUG=False DEPLOYMENT_PROFILE=production \
-		DATABASE_URL='postgresql://vimer:test-password@localhost:5432/vimer' \
+		DATABASE_URL='$(DATABASE_URL)' \
 		SECRET_KEY='$(DEPLOY_CHECK_SECRET_KEY)' \
 		ALLOWED_HOSTS='vimer.example.test' \
 		CSRF_TRUSTED_ORIGINS='https://vimer.example.test' \

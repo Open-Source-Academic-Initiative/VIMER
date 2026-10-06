@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import subprocess
 import sys
 import time
@@ -15,6 +16,29 @@ from django.urls import reverse
 from config.context_processors import public_settings
 from config.security import RateLimitMiddleware
 from deploy.scheduler_healthcheck import main as scheduler_healthcheck
+from deploy.ops.sqlite_restore import main as sqlite_restore
+
+
+class SQLiteRestoreTests(SimpleTestCase):
+    def test_restore_recovers_data_and_preserves_operational_permissions(self):
+        with TemporaryDirectory(prefix="vimer-restore-test-") as directory:
+            backup = Path(directory) / "backup.sqlite3"
+            target = Path(directory) / "db.sqlite3"
+            with sqlite3.connect(backup) as database:
+                database.execute("CREATE TABLE example (value TEXT)")
+                database.execute("INSERT INTO example VALUES ('original')")
+            with sqlite3.connect(target) as database:
+                database.execute("CREATE TABLE example (value TEXT)")
+                database.execute("INSERT INTO example VALUES ('changed')")
+            backup.chmod(0o600)
+            target.chmod(0o640)
+            owner = (target.stat().st_uid, target.stat().st_gid)
+            with patch.object(sys, "argv", ["sqlite_restore.py", str(backup), str(target)]):
+                self.assertEqual(sqlite_restore(), 0)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o640)
+            self.assertEqual((target.stat().st_uid, target.stat().st_gid), owner)
+            with sqlite3.connect(target) as database:
+                self.assertEqual(database.execute("SELECT value FROM example").fetchone(), ("original",))
 
 
 class HealthEndpointTests(TestCase):
@@ -43,6 +67,19 @@ class HealthEndpointTests(TestCase):
 
 
 class RateLimitMiddlewareTests(SimpleTestCase):
+    @override_settings(
+        RATE_LIMIT_ENABLED=True,
+        CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    )
+    def test_admin_login_has_the_same_brute_force_limit_as_public_login(self):
+        cache.clear()
+        middleware = RateLimitMiddleware(lambda request: HttpResponse("ok"))
+        factory = RequestFactory()
+        limit, _ = settings.RATE_LIMIT_RULES["/login/"]
+        responses = [middleware(factory.post("/admin/login/", REMOTE_ADDR="192.0.2.11"))
+                     for _ in range(limit + 1)]
+        self.assertEqual(responses[-1].status_code, 429)
+
     @override_settings(
         RATE_LIMIT_ENABLED=True,
         RATE_LIMIT_RULES={"/login/": (2, 60)},
@@ -106,6 +143,46 @@ class MediaIsolationTests(SimpleTestCase):
 
 
 class DeploymentSettingsFailFastTests(SimpleTestCase):
+    def production_environment(self, database_url):
+        return {
+            "DEBUG": "False", "DEPLOYMENT_PROFILE": "production",
+            "DATABASE_URL": database_url,
+            "SECRET_KEY": "J7a!Nq8gP2zV4xR6tY0uL3mS5wC9dF1hK7bQ2nM4pX8rT6vW1yZ",
+            "ALLOWED_HOSTS": "vimer.example.test",
+            "CSRF_TRUSTED_ORIGINS": "https://vimer.example.test",
+            "PUBLIC_BASE_URL": "https://vimer.example.test",
+            "TURNSTILE_REQUIRED": "True", "TURNSTILE_SITE_KEY": "test-site-key",
+            "TURNSTILE_SECRET_KEY": "test-secret-key",
+            "EMAIL_DELIVERY_REQUIRED": "True", "EMAIL_HOST": "smtp.example.test",
+            "EMAIL_HOST_USER": "test-user@example.test", "EMAIL_HOST_PASSWORD": "test-password",
+            "DEFAULT_FROM_EMAIL": "noreply@example.test",
+            "LEGAL_CONTROLLER_NAME": "Responsable de prueba", "LEGAL_CONTROLLER_ID": "ID de prueba",
+            "LEGAL_CONTROLLER_ADDRESS": "Dirección de prueba",
+            "LEGAL_CONTROLLER_CONTACT_CHANNEL": "Canal de prueba", "PRIVACY_EMAIL": "privacy@example.test",
+        }
+
+    def test_production_accepts_both_supported_database_backends(self):
+        for url in ("sqlite:////tmp/vimer-config-test.sqlite3", "postgresql://vimer:test@localhost/vimer"):
+            with self.subTest(url=url):
+                result = self.run_settings_import(**self.production_environment(url))
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_database_choice_does_not_disable_production_security_gates(self):
+        for url in ("sqlite:////tmp/vimer-config-test.sqlite3", "postgresql://vimer:test@localhost/vimer"):
+            for variable, value, message in (
+                ("DEBUG", "True", "DEBUG must be False"),
+                ("SECRET_KEY", "short", "Production SECRET_KEY"),
+                ("SECURE_SSL_REDIRECT", "False", "Production security settings"),
+                ("TURNSTILE_REQUIRED", "False", "TURNSTILE_REQUIRED cannot be disabled"),
+                ("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend", "console email backend"),
+            ):
+                with self.subTest(url=url, variable=variable):
+                    environment = self.production_environment(url)
+                    environment[variable] = value
+                    result = self.run_settings_import(**environment)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(message, result.stderr)
+
     environment_names = {
         "DEBUG",
         "DEPLOYMENT_PROFILE",

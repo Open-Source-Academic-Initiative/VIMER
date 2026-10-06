@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -419,6 +420,15 @@ class DesafioFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase)
 
 
 class PropuestaFlowTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+    def test_application_form_does_not_expose_private_challenge_by_id(self):
+        self.client.force_login(self.supply_user)
+        url = reverse("marketplace:challenge-apply", args=[self.challenge.pk])
+        for status in (Challenge.Status.DRAFT, Challenge.Status.ARCHIVED):
+            with self.subTest(status=status):
+                Challenge.objects.filter(pk=self.challenge.pk).update(status=status)
+                self.assertEqual(self.client.get(url).status_code, 404)
+                self.assertEqual(self.client.post(url, {"intent": "draft"}).status_code, 404)
+
     def test_challenge_apply_page_includes_challenge_context(self):
         self.client.force_login(self.supply_user)
 
@@ -729,6 +739,13 @@ class DesafioServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCa
 
 
 class PropuestaServiceTests(MarketplaceSharedFixtureMixin, MediaRootIsolatedTestCase):
+    def test_database_rejects_invalid_application_lifecycle_without_model_validation(self):
+        application = self.create_submitted_application()
+        for changes in ({"status": "INVALID"}, {"applied_at": None}, {"status": Application.Status.DRAFT}):
+            with self.subTest(changes=changes):
+                with self.assertRaises(IntegrityError), transaction.atomic():
+                    Application.objects.filter(pk=application.pk).update(**changes)
+
     def test_save_application_draft_allows_incomplete_components(self):
         draft = save_application_draft(
             challenge=self.challenge,
@@ -1136,6 +1153,25 @@ class DraftAttachmentManagementTests(
             ),
             actor=self.supply_user,
         )
+
+    def test_draft_attachment_stays_private_after_challenge_closes_or_is_awarded(self):
+        draft = self._save_draft_with_attachments([self._make_pdf()])
+        attachment = draft.attachments.first()
+        ChallengeEvaluationRoleAssignment.objects.create(
+            challenge=self.challenge,
+            user=self.demand_user,
+            role=ChallengeEvaluationRoleAssignment.Role.EVALUATOR,
+        )
+        url = reverse("marketplace:application-attachment-download", args=[attachment.opaque_id])
+        for status in (Challenge.Status.CLOSED, Challenge.Status.AWARDED):
+            with self.subTest(status=status):
+                Challenge.objects.filter(pk=self.challenge.pk).update(status=status)
+                self.client.force_login(self.demand_user)
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.force_login(self.supply_user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF-"))
 
     def test_attachment_count_limit_is_cumulative_across_draft_saves(self):
         max_count = settings.MARKETPLACE_ATTACHMENT_MAX_COUNT

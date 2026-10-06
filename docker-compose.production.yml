@@ -2,11 +2,14 @@ version: "3.8"
 
 services:
   db:
-    image: postgres:16.14-alpine3.23@sha256:42b8b8b29c8a4e933d88943e5b03001a78794905cf786e6e7634e9f2abd5a0d3
+    profiles: [postgresql]
+    build:
+      context: ./deploy/postgresql
+    image: vimer-postgresql:production
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-vimer}"
       POSTGRES_USER: "${POSTGRES_USER:-vimer}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -36,9 +39,8 @@ services:
       HEALTHCHECK_HOST: "${VIMER_DOMAIN:?VIMER_DOMAIN is required}"
       TURNSTILE_REQUIRED: "True"
       EMAIL_DELIVERY_REQUIRED: "True"
-    depends_on:
-      - db
     volumes:
+      - ${VIMER_DATA_DIR:-./data}:/app/data
       - media_data:/app/media
       - static_data:/app/staticfiles
     read_only: true
@@ -76,8 +78,10 @@ services:
       SCHEDULER_HEALTH_GRACE_SECONDS: "${SCHEDULER_HEALTH_GRACE_SECONDS:-60}"
     command: ["/app/deploy/scheduler.sh"]
     depends_on:
-      - db
-      - web
+      web:
+        condition: service_healthy
+    volumes:
+      - ${VIMER_DATA_DIR:-./data}:/app/data
     read_only: true
     tmpfs:
       - /tmp
@@ -98,7 +102,9 @@ services:
         max-file: "5"
 
   nginx:
-    image: nginx:1.28.3-alpine3.23@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    build:
+      context: ./deploy/nginx
+    image: vimer-nginx:production
     environment:
       VIMER_DOMAIN: "${VIMER_DOMAIN:?VIMER_DOMAIN is required}"
     depends_on:

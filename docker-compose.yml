@@ -12,7 +12,7 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings
       DEPLOYMENT_PROFILE: pilot
-      DATABASE_URL: sqlite:////app/data/db.sqlite3
+      DATABASE_URL: "${DATABASE_URL:-sqlite:////app/data/db.sqlite3}"
       GUNICORN_WORKERS: "1"
       TURNSTILE_REQUIRED: "${TURNSTILE_REQUIRED:-True}"
       EMAIL_DELIVERY_REQUIRED: "${EMAIL_DELIVERY_REQUIRED:-True}"
@@ -48,7 +48,7 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings
       DEPLOYMENT_PROFILE: pilot
-      DATABASE_URL: sqlite:////app/data/db.sqlite3
+      DATABASE_URL: "${DATABASE_URL:-sqlite:////app/data/db.sqlite3}"
       RUN_STARTUP_TASKS: "False"
       TURNSTILE_REQUIRED: "${TURNSTILE_REQUIRED:-True}"
       EMAIL_DELIVERY_REQUIRED: "${EMAIL_DELIVERY_REQUIRED:-True}"
@@ -58,7 +58,8 @@ services:
       SCHEDULER_HEALTH_GRACE_SECONDS: "${SCHEDULER_HEALTH_GRACE_SECONDS:-60}"
     command: ["/app/deploy/scheduler.sh"]
     depends_on:
-      - web
+      web:
+        condition: service_healthy
     volumes:
       - "${VIMER_DATA_DIR:-./data}:/app/data"
     read_only: true

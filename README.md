@@ -1,5 +1,22 @@
 # VIMER
 
+## Estado del proyecto
+
+VIMER cuenta con una candidata para pruebas manuales. El flujo principal
+permite ingresar, guardar borradores, enviar propuestas y descargar archivos
+con autorización. La aprobación como beta estable y la publicación pública
+siguen pendientes.
+
+La publicación pública requiere configurar y comprobar dominio, TLS y
+renovación, entrega de correo SMTP, Turnstile y datos del responsable.
+Los resultados técnicos de un entorno de prueba no acreditan por sí solos
+estabilidad general ni disponibilidad pública.
+
+SQLite y PostgreSQL se eligen mediante `DATABASE_URL`, independientemente
+del perfil de seguridad. Las direcciones de acceso, cuentas, configuración
+efectiva y evidencias operativas de cada instalación se gestionan por canales
+privados del operador.
+
 This is the authoritative project document. This `README.md` consolidates VIMER's functional, technical, and operational documentation.
 
 ## Summary
@@ -7,7 +24,7 @@ This is the authoritative project document. This `README.md` consolidates VIMER'
 VIMER is a Django MVP designed to connect organizations acting as `Solicitantes` with organizations acting as `Proveedores tecnológicos` around R&D&I challenges.
 
 Current status:
-- Stable development baseline.
+- El estado de la candidata y sus límites de aceptación se describen al inicio de este documento.
 - A public landing page is available at `/`.
 - The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, draft proposal save, and final application submission.
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
@@ -16,7 +33,7 @@ Current status:
 - The current Phase 6 semantic-alignment slice is now closed for marketplace and evaluation UI, business-oriented tests, and core project documentation.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- The automated test suite currently passes with 151 tests.
+- La validación automatizada incluye suites para SQLite y PostgreSQL; sus resultados deben interpretarse según el alcance de cada ejecución.
 - Operating the platform (publishing challenges, applying, and running evaluation) now requires a verified email and an active account, enforced through a native `OperationalUserRequiredMixin`; unverified users keep read-only navigation.
 - Outbound email links (email verification and in-app notifications) are now built as absolute URLs from `PUBLIC_BASE_URL`, and the signup verification email no longer fails silently: if it cannot be sent, registration rolls back so no account is left stranded.
 - Django Admin now prevents a platform superuser from deleting its own account.
@@ -47,7 +64,7 @@ Current status:
 - A repository-level `Makefile` now exposes `make test-fast` and `make verify-fast` for the optimized validation path.
 - The approved equal-weight scoring, tie-aware ranking, and exceptional-adjudication policy is now implemented end to end.
 - The project already adopts key Django 6.0 platform capabilities, including `STORAGES`, first-party CSP middleware through `ContentSecurityPolicyMiddleware`, and `SECURE_CSP` security policy settings.
-- The current CSP still allows inline script/style sources for compatibility with existing templates, so tightening that policy toward nonce/static-only delivery remains an explicit hardening task.
+- La CSP usa archivos estáticos y nonces nativos de Django para estilos del administrador; no permite `unsafe-inline`.
 - Django 6.0 template partials and the Tasks framework are available in the platform reference set, but they are not currently used in VIMER because no concrete product flow requires them yet.
 - Containerized serving now uses `gunicorn` instead of Django's development server.
 - Challenges now support a formal evaluation team with designated evaluators, one designated adjudicator, and optional observers.
@@ -61,7 +78,7 @@ Current status:
 - Challenge publication rejects a missing category selection explicitly instead of silently assigning a default category.
 - Challenge and notification lists are paginated; the marketplace UI shares one palette defined in `base.html`, the signup form is grouped into fieldsets, and `challenge_detail` is split into focused template includes.
 - `ruff` (lint) and `coverage` are now part of the development toolchain (`make lint`, `make test-coverage`); `make verify-fast` runs compile + lint + checks + tests.
-- The project is not production-ready yet: broader test coverage and several operational gaps (CSP tightening, email queueing) still need to be addressed.
+- La promoción requiere aceptación técnica y aprobación del responsable del despliegue. El correo asíncrono es una mejora opcional según volumen.
 
 ## Domain
 
@@ -210,8 +227,8 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- `python manage.py test` currently passes with 151 tests.
-- The repository is well structured, and the current active local iteration branch is `feature/v1-pilot-readiness`.
+- La matriz de pruebas cubre SQLite y PostgreSQL; conservar la evidencia de cada ejecución en el entorno autorizado del operador.
+- El repositorio organiza el código por aplicaciones y casos de uso.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
 - The root route now exposes a dedicated landing page instead of sending users directly to signup.
@@ -308,7 +325,7 @@ This slice closed the gap between "code-complete" and "functionally verified" fo
 ## Requirements
 
 - Python 3.12+
-- Django 6.0.x
+- Django 6.1.2, fijado con hashes en `requirements.lock`
 - Pillow
 - django-environ
 
@@ -396,12 +413,12 @@ The previous full-suite baseline before the optimization pass was `396.022s`. Th
 
 - Keep this README synchronized with the current implementation and local branch reality.
 - Harden production configuration (`DEBUG=False`, secure cookies, HSTS, SSL redirect).
-- Tighten the current CSP away from inline allowances as template assets move to static files or nonce-based delivery.
+- Conservar la CSP sin `unsafe-inline` al incorporar nuevas plantillas.
 - Complete the production deployment stack around `gunicorn` and external infrastructure.
 - Add more tests for permissions, validations, and business-rule failures.
 - Evaluate additional database constraints to reinforce remaining domain invariants.
 - Improve form and template UX.
-- Define a persistence and deployment strategy beyond SQLite.
+- Mantener las validaciones de SQLite y PostgreSQL al modificar persistencia.
 - Evaluate Django 6.0 template partials or the Tasks framework only if a concrete product flow justifies adopting them.
 - Deepen evaluation audit and governance now that the approved scoring and adjudication policy is implemented.
 
@@ -413,7 +430,7 @@ Posture in one paragraph:
 
 - closed pilot with public-grade self-service signup, URL distributed externally to participants only
 - jurisdiction Colombia, Habeas Data minimum legal at signup, free of charge
-- VPS+Docker dual-mode deployment: pilot (`gunicorn`+SQLite) and production (Nginx+gunicorn+Postgres/MariaDB) selectable through `DEPLOYMENT_PROFILE`
+- Despliegue con `pilot` (Gunicorn) o `production` (Nginx, Gunicorn y TLS); ambos admiten SQLite o PostgreSQL mediante `DATABASE_URL`.
 - multi-representative onboarding with delegable titularity, email verification, password reset and Cloudflare Turnstile in signup
 - attachments and sanitized markdown in `Desafío` and `Propuesta`, closed taxonomy of categorías, search and filters in the marketplace
 - minimal `Administración de plataforma` dashboard, single support email, FAQ

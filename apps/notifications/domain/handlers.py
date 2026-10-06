@@ -56,12 +56,6 @@ def send_notification_email(notification: Notification) -> None:
             exc_info=True,
         )
 
-
-# Backwards-compatible import for lifecycle consumers created before the
-# delivery helper became part of the public notifications API.
-_send_notification_email = send_notification_email
-
-
 @receiver(
     challenge_evaluation_started,
     sender=ChallengeEvaluationStarted,

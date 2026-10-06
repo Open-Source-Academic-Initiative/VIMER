@@ -1,8 +1,5 @@
 from apps.corporate.models import Organization
 
-# Implementación única compartida con el modelo (vive en content para evitar
-# un import circular dominio <-> modelos); se re-exporta como API del dominio.
-from apps.marketplace.content import build_application_summary  # noqa: F401
 from apps.marketplace.domain.exceptions import (
     ChallengeApplicationNotAllowed,
     ChallengeNotOpenForApplications,

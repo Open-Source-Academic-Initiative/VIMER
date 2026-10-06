@@ -1,6 +1,7 @@
 import os
 import shutil
 import sqlite3
+import stat
 import sys
 from pathlib import Path
 
@@ -26,9 +27,20 @@ def main() -> int:
         return 1
 
     target.parent.mkdir(parents=True, exist_ok=True)
+    target_metadata = target.stat() if target.exists() else None
     temporary_target = target.with_name(f".{target.name}.restore-{os.getpid()}")
-    shutil.copy2(backup, temporary_target)
-    os.replace(temporary_target, target)
+    try:
+        shutil.copy2(backup, temporary_target)
+        if target_metadata is not None:
+            temporary_metadata = temporary_target.stat()
+            if (temporary_metadata.st_uid, temporary_metadata.st_gid) != (
+                target_metadata.st_uid, target_metadata.st_gid
+            ):
+                os.chown(temporary_target, target_metadata.st_uid, target_metadata.st_gid)
+            os.chmod(temporary_target, stat.S_IMODE(target_metadata.st_mode))
+        os.replace(temporary_target, target)
+    finally:
+        temporary_target.unlink(missing_ok=True)
     return 0
 
 
