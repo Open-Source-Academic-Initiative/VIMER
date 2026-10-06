@@ -35,7 +35,7 @@ if [ -n "$running_web" ] || [ -n "$running_scheduler" ]; then
     exit 1
 fi
 
-if [ "$profile" = "pilot" ]; then
+if [ -f "$backup_directory/database.sqlite3" ]; then
     sqlite_path="${VIMER_SQLITE_PATH:-./data/db.sqlite3}"
     python3 deploy/ops/sqlite_restore.py \
         "$backup_directory/database.sqlite3" \

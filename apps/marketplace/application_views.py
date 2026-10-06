@@ -58,7 +58,10 @@ class ApplicationCreateView(OperationalUserRequiredMixin, RoleRequiredMixin, For
 
     def get_challenge(self):
         if not hasattr(self, "_challenge"):
-            self._challenge = get_object_or_404(Challenge, pk=self.kwargs["pk"])
+            self._challenge = get_object_or_404(
+                Challenge.objects.visible_to_organization(self.request.user.organization),
+                pk=self.kwargs["pk"],
+            )
         return self._challenge
 
     def get_existing_application(self):
@@ -199,8 +202,10 @@ class ApplicationAttachmentDownloadView(OperationalUserRequiredMixin, View):
         is_operational_publisher = request.user.is_operational_member_of(
             challenge.publisher_id
         )
+        is_submitted = application.status == Application.Status.SUBMITTED
         is_evaluation_team = (
-            is_operational_publisher
+            is_submitted
+            and is_operational_publisher
             and challenge.status
             in {
                 Challenge.Status.CLOSED,
@@ -212,7 +217,8 @@ class ApplicationAttachmentDownloadView(OperationalUserRequiredMixin, View):
             ).exists()
         )
         publisher_can_open_awarded_file = (
-            is_operational_publisher
+            is_submitted
+            and is_operational_publisher
             and challenge.status == Challenge.Status.AWARDED
         )
         if not (

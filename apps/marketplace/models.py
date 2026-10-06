@@ -655,6 +655,13 @@ class Application(models.Model):
             ),
             models.CheckConstraint(
                 condition=(
+                    models.Q(status="DRAFT", applied_at__isnull=True)
+                    | models.Q(status="SUBMITTED", applied_at__isnull=False)
+                ),
+                name="application_status_matches_submission_date",
+            ),
+            models.CheckConstraint(
+                condition=(
                     models.Q(offered_amount__isnull=True)
                     | models.Q(offered_amount__gt=0)
                 ),
@@ -850,9 +857,6 @@ class AttachmentBase(models.Model):
     class Meta:
         abstract = True
         ordering = ["created_at", "id"]
-
-    def clean(self):
-        validate_attachment_file(self.file)
 
     def save(self, *args, **kwargs):
         if self.file:

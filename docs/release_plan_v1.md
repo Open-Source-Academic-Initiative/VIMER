@@ -70,8 +70,8 @@ A release that satisfies 2.1 without 2.2 is not a release; it is a code-complete
 | 1 | Release type | Closed pilot, public-grade signup, URL distributed externally to participants only |
 | 2 | Jurisdiction | Colombia only, Habeas Data minimum legal at signup (ADR 0008) |
 | 3 | Monetization | Free of charge in this release |
-| 4 | Deployment | VPS+Docker dual-mode: `pilot` (gunicorn+SQLite), `production` (Nginx+gunicorn+Postgres/MariaDB) (ADR 0004) |
-| 5 | Persistence | Database engine agnostic via `DATABASE_URL`, no official engine matrix |
+| 4 | Despliegue | `pilot` con Gunicorn; `production` con Nginx, Gunicorn y TLS (ADR 0004). |
+| 5 | Persistencia | SQLite o PostgreSQL mediante `DATABASE_URL`, independientes del perfil; matriz ejecutada en `validacion_v1.md`. |
 | 6 | Email | Gmail SMTP of the operator, ~500 sends/day ceiling assumed |
 | 7 | Multi-representative | Self-association by tax identifier with titular approval; delegable titularity (ADR 0005) |
 | 8 | Organization verification | Email of representative only |
@@ -184,14 +184,15 @@ The full text of each new invariant is authored in `docs/domain/invariants.md` a
 - `pilot`: SQLite default, gunicorn binding `0.0.0.0:8000`, no HTTPS redirect by default, HSTS off by default, secure cookies off by default
 - `production`: requires `DATABASE_URL`, `SECURE_SSL_REDIRECT=True`, HSTS on with subdomains and preload, secure cookies on, expects to live behind Nginx
 
-Every default remains overridable through its own env var. The profile is a shortcut, not a policy.
+El motor es independiente del perfil. Producción exige los controles de
+seguridad y rechaza su desactivación; ambos motores conservan esa exigencia.
 
 ### 6.2 Docker topology
 
 Two compose files ship with the release:
 
-- `docker-compose.pilot.yml`: single `web` service, gunicorn+SQLite, volume for `db.sqlite3` and `media/`
-- `docker-compose.production.yml`: services for `web` (gunicorn), `db` (Postgres), `nginx` (reverse proxy with TLS via Certbot or external)
+- `docker-compose.pilot.yml`: `web` y `scheduler`, con base configurable y directorios persistentes.
+- `docker-compose.production.yml`: `web`, `scheduler` y Nginx/TLS; PostgreSQL del compose es opcional mediante `COMPOSE_PROFILES=postgresql`. SQLite comparte `/app/data` entre `web` y `scheduler`.
 
 The `Dockerfile` remains single. The selection happens through the compose file used.
 

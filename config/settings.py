@@ -109,6 +109,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
+                'django.template.context_processors.csp',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.notifications.context_processors.notifications_summary',
@@ -127,11 +128,16 @@ if DEPLOYMENT_PROFILE == "production" and not configured_database_url:
 DATABASES = {
     'default': env.db('DATABASE_URL', default=default_database_url)
 }
+if DATABASES["default"]["ENGINE"] not in {
+    "django.db.backends.sqlite3", "django.db.backends.postgresql",
+}:
+    raise ImproperlyConfigured("DATABASE_URL debe usar SQLite o PostgreSQL.")
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    # Tomar el bloqueo de escritura antes de leer el estado dentro de atomic().
+    # SQLite ignora select_for_update(); IMMEDIATE evita la carrera al convertir
+    # una transacción de lectura en escritura y conserva los mismos servicios.
+    DATABASES["default"].setdefault("OPTIONS", {})["transaction_mode"] = "IMMEDIATE"
 if DEPLOYMENT_PROFILE == "production":
-    if DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql":
-        raise ImproperlyConfigured(
-            "Production DATABASE_URL must use PostgreSQL."
-        )
     DATABASES["default"]["CONN_MAX_AGE"] = env.int(
         "DATABASE_CONN_MAX_AGE",
         default=60,
@@ -208,7 +214,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = env.bool(
 SECURE_CSP = {
     "default-src": [CSP.SELF],
     "script-src": [CSP.SELF, "https://challenges.cloudflare.com"],
-    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE],
+    "style-src": [CSP.SELF, CSP.NONCE],
     "img-src": [CSP.SELF, "data:"],
     "font-src": [CSP.SELF, "data:"],
     "connect-src": [CSP.SELF, "https://challenges.cloudflare.com"],
@@ -305,6 +311,10 @@ RATE_LIMIT_ENABLED = env.bool(
 )
 TRUST_PROXY_CLIENT_IP = DEPLOYMENT_PROFILE == "production"
 RATE_LIMIT_RULES = {
+    "/admin/login/": (
+        env.int("RATE_LIMIT_LOGIN_ATTEMPTS", default=10),
+        env.int("RATE_LIMIT_LOGIN_WINDOW_SECONDS", default=300),
+    ),
     "/login/": (
         env.int("RATE_LIMIT_LOGIN_ATTEMPTS", default=10),
         env.int("RATE_LIMIT_LOGIN_WINDOW_SECONDS", default=300),

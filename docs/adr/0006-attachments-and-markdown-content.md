@@ -61,7 +61,7 @@ Positive:
 Negative:
 
 - the codebase gains two new models, file validators, and permission-aware download views
-- markdown rendering must be reviewed against the existing CSP (`unsafe-inline` for style is currently allowed; markdown does not use inline styles, so CSP can stay as-is for this release)
+- El Markdown sanitizado no usa estilos inline. La CSP mantiene CSS externo y nonces nativos del administrador, sin `unsafe-inline`.
 - file storage in `media/` complicates pilot backups, which ADR 0009 explicitly does not implement
 - migration to object storage in production is a follow-up, not a release task
 

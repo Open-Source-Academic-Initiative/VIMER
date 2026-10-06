@@ -1,4 +1,13 @@
-FROM python:3.12.13-alpine3.23@sha256:601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d AS dependencies
+FROM python:3.12.13-alpine3.23@sha256:601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d AS base
+
+# Parches del mismo Alpine; la imagen base fijada aún contiene CVE altas.
+RUN apk add --no-cache --upgrade \
+    libcrypto3=3.5.9-r0 \
+    libssl3=3.5.9-r0 \
+    libuuid=2.41.6-r1 \
+    sqlite-libs=3.53.4-r0
+
+FROM base AS dependencies
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -16,7 +25,7 @@ RUN python -m venv "${VIRTUAL_ENV}" \
         --only-binary=:all: \
         --requirement requirements.lock
 
-FROM python:3.12.13-alpine3.23@sha256:601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d AS runtime
+FROM base AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

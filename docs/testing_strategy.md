@@ -89,6 +89,12 @@ environment-local operational material and are intentionally not versioned.
 
 ## Maintenance guidance
 
+Las pruebas SQLite usan una base en archivo dentro del directorio temporal
+del runner para comprobar la espera real entre conexiones concurrentes.
+Las dos pruebas de carreras del módulo histórico
+`apps.marketplace.test_postgresql_concurrency` se ejecutan en ambos motores.
+La validación y la versión vigentes se registran en `validacion_v1.md`.
+
 When adding or refactoring tests:
 
 - prefer `setUpTestData()` for immutable fixtures reused across methods
