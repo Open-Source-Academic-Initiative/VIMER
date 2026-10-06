@@ -1,8 +1,21 @@
 # VIMER
 
-La candidata para pruebas manuales está en [VIMER local](http://192.168.0.10:8088).
-La entrega vigente y su alcance se consultan en [Cierre de la candidata local](docs/cierre_beta.md).
-SQLite y PostgreSQL se eligen mediante `DATABASE_URL`, independientemente del perfil de seguridad.
+## Estado del proyecto
+
+VIMER cuenta con una candidata para pruebas manuales. El flujo principal
+permite ingresar, guardar borradores, enviar propuestas y descargar archivos
+con autorización. La aprobación como beta estable y la publicación pública
+siguen pendientes.
+
+La publicación pública requiere configurar y comprobar dominio, TLS y
+renovación, entrega de correo SMTP, Turnstile y datos del responsable.
+Los resultados técnicos de un entorno de prueba no acreditan por sí solos
+estabilidad general ni disponibilidad pública.
+
+SQLite y PostgreSQL se eligen mediante `DATABASE_URL`, independientemente
+del perfil de seguridad. Las direcciones de acceso, cuentas, configuración
+efectiva y evidencias operativas de cada instalación se gestionan por canales
+privados del operador.
 
 This is the authoritative project document. This `README.md` consolidates VIMER's functional, technical, and operational documentation.
 
@@ -11,7 +24,7 @@ This is the authoritative project document. This `README.md` consolidates VIMER'
 VIMER is a Django MVP designed to connect organizations acting as `Solicitantes` with organizations acting as `Proveedores tecnológicos` around R&D&I challenges.
 
 Current status:
-- Stable development baseline.
+- El estado de la candidata y sus límites de aceptación se describen al inicio de este documento.
 - A public landing page is available at `/`.
 - The main flow is implemented: signup, login, challenge listing, challenge detail, challenge publishing, draft proposal save, and final application submission.
 - Write-side use cases are routed through explicit application services in `identity`, `marketplace`, `evaluation`, and `notifications`.
@@ -20,7 +33,7 @@ Current status:
 - The current Phase 6 semantic-alignment slice is now closed for marketplace and evaluation UI, business-oriented tests, and core project documentation.
 - Duplicate applications are prevented through an explicit database constraint.
 - The application submission flow now distinguishes duplicate applications from other business-rule validation errors.
-- Los resultados de la suite completa por motor se registran en `docs/validacion_v1.md`.
+- La validación automatizada incluye suites para SQLite y PostgreSQL; sus resultados deben interpretarse según el alcance de cada ejecución.
 - Operating the platform (publishing challenges, applying, and running evaluation) now requires a verified email and an active account, enforced through a native `OperationalUserRequiredMixin`; unverified users keep read-only navigation.
 - Outbound email links (email verification and in-app notifications) are now built as absolute URLs from `PUBLIC_BASE_URL`, and the signup verification email no longer fails silently: if it cannot be sent, registration rolls back so no account is left stranded.
 - Django Admin now prevents a platform superuser from deleting its own account.
@@ -65,7 +78,7 @@ Current status:
 - Challenge publication rejects a missing category selection explicitly instead of silently assigning a default category.
 - Challenge and notification lists are paginated; the marketplace UI shares one palette defined in `base.html`, the signup form is grouped into fieldsets, and `challenge_detail` is split into focused template includes.
 - `ruff` (lint) and `coverage` are now part of the development toolchain (`make lint`, `make test-coverage`); `make verify-fast` runs compile + lint + checks + tests.
-- La promoción depende de los gates ejecutados en `docs/validacion_v1.md`; el correo asíncrono es una mejora opcional según volumen.
+- La promoción requiere aceptación técnica y aprobación del responsable del despliegue. El correo asíncrono es una mejora opcional según volumen.
 
 ## Domain
 
@@ -214,8 +227,8 @@ Duplicate applications are enforced both through domain validation and through a
 
 Strengths:
 - The project starts correctly and `python manage.py check` reports no errors.
-- La matriz SQLite/PostgreSQL vigente y sus pruebas están en [Validación de VIMER v1](docs/validacion_v1.md).
-- The repository is well structured, and the current active local iteration branch is `feature/v1-pilot-readiness`.
+- La matriz de pruebas cubre SQLite y PostgreSQL; conservar la evidencia de cada ejecución en el entorno autorizado del operador.
+- El repositorio organiza el código por aplicaciones y casos de uso.
 - The core domain is already modeled and navigable.
 - The write side is now routed through explicit application services instead of form-bound persistence logic.
 - The root route now exposes a dedicated landing page instead of sending users directly to signup.
