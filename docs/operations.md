@@ -1,5 +1,77 @@
 # Operación segura de VIMER
 
+## Despliegue local vigente
+
+La candidata `v0.0.2b1-local` está disponible para pruebas manuales en
+`http://192.168.0.10:8088`. El [cierre actual](cierre_beta.md) contiene el alcance,
+las pruebas y la identificación completa. Su aceptación pública está pendiente.
+El proyecto canónico es `vimer-review`; conserva SQLite y los volúmenes
+`vimer-review_review_data`, `vimer-review_review_media` y
+`vimer-review_pilot_static_data`. Web y scheduler usan el mismo ID de imagen
+fijado en el override. `RUN_STARTUP_TASKS=False` evita repetir migraciones.
+
+Ejecutar en ASUS, desde `/home/andres/Desarrollo/vimer`:
+
+```sh
+componer_vimer() {
+  docker compose --env-file artifacts/runtime/vimer-review.env \
+    -p vimer-review -f docker-compose.pilot.yml \
+    -f artifacts/runtime/vimer-review.override.yml "$@"
+}
+componer_vimer up -d --no-build --pull never --wait web scheduler
+componer_vimer ps
+```
+
+Para parar, detener primero `componer_vimer stop scheduler` y luego
+`componer_vimer stop web`. Para reanudar, levantar web con `--wait`, comprobar
+salud y migraciones, y después levantar scheduler. Mantener una sola réplica.
+Las variables de Compose y la configuración de recuperación están protegidas;
+no imprimir `compose config` sin redacción ni guardar secretos en Git.
+
+### Respaldo y recuperación del despliegue local
+
+Los datos efectivos están en volúmenes Docker; el `db.sqlite3` del repositorio
+es otra base. Para respaldar, detener los dos escritores como se indicó y
+reutilizar el script con sus rutas de volumen explícitas:
+
+```sh
+umask 077
+destino_respaldo="/home/andres/Backups/VIMER/manual-$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -m 700 "$destino_respaldo"
+docker run --rm --pull never --network none --read-only \
+  --user "$(id -u):$(id -g)" \
+  -v vimer-review_review_data:/origen/data:ro \
+  -v vimer-review_review_media:/origen/media:ro \
+  -v "$destino_respaldo":/recuperacion \
+  -e VIMER_BACKUP_WRITES_QUIESCED=True \
+  -e DATABASE_URL=sqlite:////app/data/db.sqlite3 \
+  -e VIMER_SQLITE_PATH=/origen/data/db.sqlite3 \
+  -e VIMER_MEDIA_DIR=/origen/media \
+  --entrypoint sh \
+  sha256:4131a24380f9987a8b62e4af94cbba1401d42c5067f3504aa32d41cadf2360e4 \
+  deploy/ops/backup.sh pilot /recuperacion
+```
+
+Verificar `MANIFEST.sha256` desde la carpeta del respaldo y validar
+`media.tar.gz` con `deploy/ops/validate_media_archive.py`. Restaurar primero en
+un directorio aislado, con `deploy/ops/sqlite_restore.py` y extracción del archivo
+de medios. El archivo de destino debe conservar UID 100, GID 101 y modo `0644`;
+la extracción debe conservar los propietarios y permisos archivados. Comprobar
+integridad, claves foráneas, referencias y hashes antes de conectar esos datos.
+El operador privilegiado del contenedor de recuperación se limita a ese
+destino; no cambiar permisos de volúmenes operativos por conveniencia.
+
+La recuperación comprobada está en
+`/home/andres/Backups/VIMER/cierre-beta-20261006T171610Z`, junto con la imagen
+candidata, los archivos efectivos de Compose y configuración privada. Los
+archivos de imagen fueron verificados mediante
+[Docker image save/load](https://docs.docker.com/reference/cli/docker/image/save/).
+Antes de reemplazar datos actuales, conservar un respaldo consistente nuevo y
+conciliar las escrituras posteriores. Aplicar únicamente las migraciones
+pendientes con la candidata y arrancar scheduler después de web sano.
+
+## Perfiles disponibles y preparación general
+
 Esta guía cubre los perfiles `pilot` y `production` (Nginx/TLS), ambos con
 SQLite o PostgreSQL, usando Docker Compose. Los comandos deben ejecutarse desde la raíz
 del repositorio.

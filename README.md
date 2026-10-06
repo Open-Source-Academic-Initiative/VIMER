@@ -1,8 +1,8 @@
 # VIMER
 
-La entrega vigente y su decisión de promoción se consultan en
-[Validación de VIMER v1](docs/validacion_v1.md). SQLite y PostgreSQL se eligen
-mediante `DATABASE_URL`, independientemente del perfil de seguridad.
+La candidata para pruebas manuales está en [VIMER local](http://192.168.0.10:8088).
+La entrega vigente y su alcance se consultan en [Cierre de la candidata local](docs/cierre_beta.md).
+SQLite y PostgreSQL se eligen mediante `DATABASE_URL`, independientemente del perfil de seguridad.
 
 This is the authoritative project document. This `README.md` consolidates VIMER's functional, technical, and operational documentation.
 
